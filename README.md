@@ -4,9 +4,9 @@
 
 对照路线来自：
 - 原帖学习路径：Transformer + 字符级语言模型 + nanoGPT 验收标准
-- 官方实现：[karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)（核对过的 commit：`3adf61e`）
+- 官方实现：[karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)（核对过的 commit：`3adf61e154c3fe3fca428ad6bc3818b27a3b8291`）
 
-> 原则：进度与笔记只记录可核对事实（官方 README / 源码），不写臆测。
+> 原则：进度与笔记只记录可核对事实（官方 README / 源码 / 本机实际运行输出），不写臆测。
 
 ---
 
@@ -14,18 +14,27 @@
 
 | 步骤 | 内容 | 状态 | 依据 |
 |------|------|------|------|
-| 1 | 数据管道：`data/shakespeare_char/prepare.py`（字符级 tokenizer → `train.bin` / `val.bin` / `meta.pkl`） | 进行中 | nanoGPT README quick start + `prepare.py` |
+| 1 | 数据管道：`data/shakespeare_char/prepare.py`（字符级 tokenizer → `train.bin` / `val.bin` / `meta.pkl`） | **已完成**（2026-09-20） | 本机实跑 stdout + 产物 |
 | 2 | 开训：`python train.py config/train_shakespeare_char.py` | 未开始 | README + `config/train_shakespeare_char.py` |
 | 3 | 采样：`python sample.py --out_dir=out-shakespeare-char` | 未开始 | README |
 | 4 | 精读 `model.py`（Attention / QKV / Multi-Head / FFN / LayerNorm / 残差） | 未开始 | `model.py` |
 | 5 | 精读 `train.py`（warmup / LR schedule / 训练 loop） | 未开始 | `train.py` + config |
 
-### 第 1 步验收标准（来自 `prepare.py` 注释）
+### 第 1 步实跑记录（本机）
 
-- 数据集约 `1,115,394` 字符
-- vocab size = `65`
-- train ≈ `1,003,854` / val ≈ `111,540` tokens（90/10）
-- 产物：`train.bin`、`val.bin`、`meta.pkl`
+- 路径：`/workspace/nanoGPT`（commit `3adf61e154c3fe3fca428ad6bc3818b27a3b8291`）
+- 命令：`.venv/bin/python data/shakespeare_char/prepare.py`
+- stdout：
+  - `length of dataset in characters: 1,115,394`
+  - `vocab size: 65`
+  - `train has 1,003,854 tokens`
+  - `val has 111,540 tokens`
+- 产物（`data/shakespeare_char/`）：
+  - `train.bin` — 2,007,708 bytes
+  - `val.bin` — 223,080 bytes
+  - `meta.pkl` — 703 bytes；加载确认 `vocab_size == 65`
+
+与 `prepare.py` 注释中的验收数字一致。
 
 ### 第 2 步配置要点（来自 `config/train_shakespeare_char.py`）
 
