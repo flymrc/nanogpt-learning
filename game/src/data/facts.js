@@ -1,0 +1,70 @@
+/**
+ * Grounded in karpathy/nanoGPT data/shakespeare_char/prepare.py comments
+ * and the repo notes (commit 3adf61e). Do not invent extra ML facts here.
+ */
+
+export const CHARSET =
+  "\n" +
+  " " +
+  "!$&',-.3:;?" +
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+  "abcdefghijklmnopqrstuvwxyz";
+
+export const VOCAB_SIZE = CHARSET.length; // 65
+
+if (VOCAB_SIZE !== 65) {
+  throw new Error("CHARSET 必须与 prepare.py 注释中的 65 字符词表一致");
+}
+
+export const stoi = Object.fromEntries([...CHARSET].map((ch, i) => [ch, i]));
+export const itos = Object.fromEntries([...CHARSET].map((ch, i) => [i, ch]));
+
+export function encode(s) {
+  return [...s].map((ch) => {
+    if (!(ch in stoi)) {
+      throw new Error(`不在 shakespeare_char 词表中: ${JSON.stringify(ch)}`);
+    }
+    return stoi[ch];
+  });
+}
+
+export function displayGlyph(ch) {
+  if (ch === "\n") return "↵";
+  if (ch === " ") return "␣";
+  return ch;
+}
+
+export function displayLabel(ch) {
+  if (ch === "\n") return "\\n";
+  if (ch === " ") return "空格";
+  return ch;
+}
+
+/** Same 16-char window as notes/02 (train.bin i=1000, block=16). */
+export const DEMO_SNIPPET = "Second Citizen:\n";
+export const DEMO_NEXT_CHAR = "W";
+export const DEMO_IDS = encode(DEMO_SNIPPET);
+export const DEMO_STREAM = encode(DEMO_SNIPPET + DEMO_NEXT_CHAR);
+export const DEMO_Y_IDS = encode(DEMO_SNIPPET.slice(1) + DEMO_NEXT_CHAR);
+
+const EXPECTED_DEMO_IDS = [31, 43, 41, 53, 52, 42, 1, 15, 47, 58, 47, 64, 43, 52, 10, 0];
+if (DEMO_IDS.join(",") !== EXPECTED_DEMO_IDS.join(",")) {
+  throw new Error("演示句 encode 结果应与 notes/02 中 train.bin i=1000 切片一致");
+}
+
+export const DEMO_BLOCK = 16;
+export const REAL_BLOCK = 256;
+export const REAL_BATCH = 64;
+export const TOKENS_PER_ITER = REAL_BATCH * REAL_BLOCK; // 16384, single-process
+
+export const DATASET = {
+  chars: 1115394,
+  vocab: 65,
+  trainTokens: 1003854,
+  valTokens: 111540,
+  split: "90 / 10",
+  files: ["train.bin", "val.bin", "meta.pkl"],
+};
+
+export const CHARSET_PRINTABLE =
+  "↵ !$&',-.3:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
