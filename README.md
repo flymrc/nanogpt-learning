@@ -41,9 +41,12 @@
 
 ```
 notes/          # 按步骤展开的学习笔记
+game/           # Phaser 3 闯关：第 1–2 步点击动画（见 game/README.md）
 experiments/    # 训练日志、loss、采样样例（待用）
 code/           # 自己的改动 / 对照实现（待用）
 ```
+
+想把笔记变成可点的动画，进入 [`game/`](game/)：`cd game && npm install && npm run dev`。
 
 ## 参考
 
