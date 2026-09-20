@@ -22,8 +22,10 @@ export const C = {
   dangerSoft: 0xe8a0a0,
 };
 
-export const FONT_UI = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
-export const FONT_MONO = '"IBM Plex Mono", "SF Mono", Consolas, monospace';
+export const FONT_UI =
+  '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", "Droid Sans Fallback", sans-serif';
+export const FONT_MONO =
+  '"IBM Plex Mono", "SF Mono", Consolas, "WenQuanYi Micro Hei Mono", monospace';
 
 export function uiText(size, extra = {}) {
   return {

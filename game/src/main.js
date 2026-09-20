@@ -24,8 +24,20 @@ async function boot() {
   if (document.fonts?.ready) {
     await document.fonts.ready;
   }
-  // eslint-disable-next-line no-new
-  new Phaser.Game(config);
+  const game = new Phaser.Game(config);
+  window.__nanoGPTGame = game;
+  window.__nanoGPTAdvance = () => {
+    const active = game.scene.getScenes(true)[0];
+    if (!active) return null;
+    if (typeof active.advance === "function") {
+      active.advance();
+    } else if (active.sys.settings.key === "Title") {
+      active.scene.start("Level1");
+    } else if (active.sys.settings.key === "End") {
+      active.scene.start("Title");
+    }
+    return active.sys.settings.key;
+  };
 }
 
 boot();

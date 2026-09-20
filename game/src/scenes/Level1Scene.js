@@ -68,7 +68,9 @@ export default class Level1Scene extends Phaser.Scene {
     this.nextBtn = createButton(this, W - 180, H - 68, "下一步", () => this.advance(), {
       width: 200,
     });
+    this.nextBtn.setDepth(20);
     this.hint = addAdvanceHint(this);
+    this.hint.setDepth(20);
 
     this.step = 0;
     this.busy = false;
@@ -146,9 +148,7 @@ export default class Level1Scene extends Phaser.Scene {
           if (this.mappedChips[first]) pulseChip(this, this.mappedChips[first]);
         }
 
-        this.uniqueLabel.setText(
-          `本段已见唯一字符：${this.uniqueSeen.size}　·　这一格 stoi['${displayLabel(ch)}'] = ${id}`,
-        );
+        this.uniqueLabel.setText(`本段已见唯一字符：${this.uniqueSeen.size}`);
 
         if (index === CHARS.length - 1) {
           this.vocabHint.setText(`词表大小 = 唯一字符数。本段演示 ${this.uniqueSeen.size} 个；完整 shakespeare_char 是 ${VOCAB_SIZE}。`);
@@ -175,12 +175,13 @@ export default class Level1Scene extends Phaser.Scene {
       duration: 200,
     });
 
-    const panel = makePanel(this, W / 2, 536, 1040, 156);
+    const panel = makePanel(this, 500, 524, 880, 136);
     panel.setAlpha(0);
     panel.y += 24;
+    panel.setDepth(5);
 
     const title = this.add
-      .text(-500, -64, "完整 shakespeare_char（prepare.py）", uiText(18, { color: C.tealCss, fontStyle: "700" }))
+      .text(-420, -48, "完整 shakespeare_char（prepare.py）", uiText(18, { color: C.tealCss, fontStyle: "700" }))
       .setOrigin(0, 0.5);
 
     const body = [
@@ -189,19 +190,21 @@ export default class Level1Scene extends Phaser.Scene {
       "写出 train.bin、val.bin（uint16 id）和 meta.pkl（vocab_size + stoi / itos）",
     ];
     const lines = body.map((line, i) =>
-      this.add.text(-500, -24 + i * 30, line, uiText(18)).setOrigin(0, 0.5),
+      this.add.text(-420, -14 + i * 28, line, uiText(17)).setOrigin(0, 0.5),
     );
 
     panel.add([title, ...lines]);
     this.tweens.add({
       targets: panel,
       alpha: 1,
-      y: 536,
+      y: 524,
       duration: 360,
       ease: "Cubic.Out",
       onComplete: () => {
         this.nextBtn.setLabel("明白了");
         this.hint.setText("点「明白了」进入第 2 关");
+        this.children.bringToTop(this.nextBtn);
+        this.children.bringToTop(this.hint);
         this.busy = false;
       },
     });

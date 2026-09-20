@@ -53,8 +53,8 @@ export default class EndScene extends Phaser.Scene {
         targets: panel,
         alpha: 1,
         x: W / 2,
-        delay: 120 + i * 140,
-        duration: 380,
+        delay: 40 + i * 70,
+        duration: 280,
         ease: "Cubic.Out",
       });
     });

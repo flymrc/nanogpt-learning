@@ -104,12 +104,12 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   });
   container.on("pointerdown", (pointer, _lx, _ly, event) => {
     event?.stopPropagation?.();
+    onClick();
     scene.tweens.add({
       targets: container,
       scale: 0.97,
       duration: 80,
       yoyo: true,
-      onComplete: () => onClick(),
     });
   });
 

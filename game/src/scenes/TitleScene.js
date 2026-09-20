@@ -58,9 +58,8 @@ export default class TitleScene extends Phaser.Scene {
     });
     card.addAt(g, 0);
 
-    createButton(this, W / 2, 580, "开始", () => {
-      this.scene.start("Level1");
-    }, { width: 240, height: 58 });
+    this.advance = () => this.scene.start("Level1");
+    createButton(this, W / 2, 580, "开始", () => this.advance(), { width: 240, height: 58 });
 
     addAdvanceHint(this, "空格也可开始 · 全程点击推进");
 

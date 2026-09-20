@@ -90,7 +90,9 @@ export default class Level2Scene extends Phaser.Scene {
     this.nextBtn = createButton(this, W - 180, H - 68, "下一步", () => this.advance(), {
       width: 200,
     });
+    this.nextBtn.setDepth(20);
     this.hint = addAdvanceHint(this);
+    this.hint.setDepth(20);
 
     this.phase = 0;
     this.busy = false;
@@ -120,7 +122,7 @@ export default class Level2Scene extends Phaser.Scene {
     this.busy = true;
     setCaption(
       this.caption,
-      `x = data[i : i+block]。演示长度 ${DEMO_BLOCK}；正式 block_size=${REAL_BLOCK}，batch_size=${REAL_BATCH}。`,
+      `x = data[i : i + block]。演示长度 ${DEMO_BLOCK}；正式 block_size = ${REAL_BLOCK}，batch_size = ${REAL_BATCH}。`,
     );
 
     const first = this.streamPos[0];
@@ -131,6 +133,8 @@ export default class Level2Scene extends Phaser.Scene {
     const height = 88;
 
     this.windowRect.clear();
+    this.windowRect.fillStyle(C.blue, 0.1);
+    this.windowRect.fillRoundedRect(left, top, right - left, height, 12);
     this.windowRect.lineStyle(3, C.blue, 1);
     this.windowRect.strokeRoundedRect(left, top, right - left, height, 12);
     this.windowRect.setAlpha(0);
@@ -174,16 +178,19 @@ export default class Level2Scene extends Phaser.Scene {
     this.busy = true;
     setCaption(
       this.caption,
-      "y = data[i+1 : i+1+block]。相对 x 整体右移 1，最后多出来的是窗口外下一个字符。",
+      "y = data[i+1 : i+1+block]。相对 x 整体右移 1；最后一格来自窗口外的下一个字符。",
     );
 
     const first = this.streamPos[1];
     const last = this.streamPos[DEMO_BLOCK];
     const left = first.x - 34;
     const right = last.x + 34;
+    this.tweens.add({ targets: this.windowRect, alpha: 0.35, duration: 200 });
     this.yWindow = this.add.graphics();
+    this.yWindow.fillStyle(C.gold, 0.1);
+    this.yWindow.fillRoundedRect(left, first.y - 36, right - left, 88, 12);
     this.yWindow.lineStyle(3, C.gold, 1);
-    this.yWindow.strokeRoundedRect(left, first.y - 44, right - left, 88, 12);
+    this.yWindow.strokeRoundedRect(left, first.y - 36, right - left, 88, 12);
     this.yWindow.setAlpha(0);
     this.tweens.add({ targets: this.yWindow, alpha: 1, duration: 240 });
 
@@ -223,7 +230,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     const run = (k) => {
       if (k >= PAIR_STEPS.length) {
-        this.pairCaption.setText("整段 y 就是 x 向后错一位：Second Citizen:\\n  →  econd Citizen:\\nW");
+        this.pairCaption.setText("整段 y 就是 x 向后错一位：Second Citizen:↵  →  econd Citizen:↵W");
         this.busy = false;
         return;
       }
@@ -253,20 +260,21 @@ export default class Level2Scene extends Phaser.Scene {
     );
 
     this.pairCaption.setText("");
-    const panel = makePanel(this, W / 2, 548, 1040, 150);
+    const panel = makePanel(this, 500, 538, 880, 132);
     panel.setAlpha(0);
     panel.y += 20;
+    panel.setDepth(5);
 
     const lines = [
       { t: "训练接口", c: C.tealCss },
       { t: `logits, loss = model(x, y)　·　最后一维 = vocab_size = ${VOCAB_SIZE}`, c: C.text },
       { t: `正式形状 (batch, block) = (${REAL_BATCH}, ${REAL_BLOCK})　·　单卡每 iter ${TOKENS_PER_ITER} tokens`, c: C.text },
-      { t: "本关不训练、不编造 loss 数字。Attention 是下一步如何从 x 算出表示。", c: C.muted },
+      { t: "本关不训练、不编造 loss。Attention 是下一步如何从 x 算出表示。", c: C.muted },
     ];
     lines.forEach((line, i) => {
       panel.add(
         this.add
-          .text(-500, -52 + i * 30, line.t, uiText(i === 0 ? 18 : 17, { color: line.c, fontStyle: i === 0 ? "700" : "400" }))
+          .text(-420, -46 + i * 28, line.t, uiText(i === 0 ? 18 : 16, { color: line.c, fontStyle: i === 0 ? "700" : "400" }))
           .setOrigin(0, 0.5),
       );
     });
@@ -274,12 +282,14 @@ export default class Level2Scene extends Phaser.Scene {
     this.tweens.add({
       targets: panel,
       alpha: 1,
-      y: 548,
+      y: 538,
       duration: 360,
       ease: "Cubic.Out",
       onComplete: () => {
         this.nextBtn.setLabel("明白了");
         this.hint.setText("点「明白了」查看本局契约");
+        this.children.bringToTop(this.nextBtn);
+        this.children.bringToTop(this.hint);
         this.done = true;
         this.busy = false;
       },
