@@ -17,7 +17,10 @@ let started = false;
 let lastBufferKey = "";
 let bootPromise = null;
 let bootGen = 0;
+let lookHook = null;
 const lookTarget = { x: 0, y: 0 };
+const lookCurrent = { x: 0, y: 0 };
+let lookLastMs = 0;
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
@@ -220,6 +223,7 @@ async function bootLive2d() {
   model.interactive = true;
   model.anchor.set(0.5, 0.12);
   placeModel();
+  attachLookHook(model);
   model.on("hit", () => playMood("react"));
   model.on("pointertap", (event) => {
     const global = event?.data?.global;
@@ -296,8 +300,12 @@ function placeModel() {
 function teardownLive2d() {
   bootGen += 1;
   talking = false;
+  detachLookHook();
   lookTarget.x = 0;
   lookTarget.y = 0;
+  lookCurrent.x = 0;
+  lookCurrent.y = 0;
+  lookLastMs = 0;
   if (mouthRaf) {
     cancelAnimationFrame(mouthRaf);
     mouthRaf = 0;
@@ -403,7 +411,8 @@ function showStaticFallback() {
 
 /**
  * Eyes / head follow the pointer over the whole wide page.
- * Uses FocusController ([-1, 1], +Y up) so Idle motions stay additive.
+ * Idle motions would otherwise own ParamAngle*; we overwrite those
+ * after each motion update so the face clearly tracks the cursor.
  */
 function onPointerMove(event) {
   if (!model || !pixiApp || !isWidePcTutor()) return;
@@ -413,18 +422,11 @@ function onPointerMove(event) {
   if (rect.width < 8 || rect.height < 8) return;
 
   const faceX = rect.left + rect.width * 0.5;
-  const faceY = rect.top + rect.height * 0.3;
-  const reachX = Math.max(rect.width * 0.55, window.innerWidth * 0.38);
-  const reachY = Math.max(rect.height * 0.5, window.innerHeight * 0.42);
+  const faceY = rect.top + rect.height * 0.28;
+  const reachX = Math.max(rect.width * 0.42, window.innerWidth * 0.32);
+  const reachY = Math.max(rect.height * 0.4, window.innerHeight * 0.34);
   lookTarget.x = clamp((event.clientX - faceX) / reachX, -1, 1);
   lookTarget.y = clamp((faceY - event.clientY) / reachY, -1, 1);
-
-  const focus = model.internalModel?.focusController;
-  if (focus && typeof focus.focus === "function") {
-    focus.focus(lookTarget.x, lookTarget.y);
-    return;
-  }
-  applyLookFallback();
 }
 
 function onPointerDown(event) {
@@ -434,17 +436,47 @@ function onPointerDown(event) {
   playMood("react");
 }
 
-function applyLookFallback() {
-  const core = model?.internalModel?.coreModel;
-  if (!core?.addParameterValueById) return;
+function attachLookHook(host) {
+  detachLookHook();
+  const im = host?.internalModel;
+  if (!im || typeof im.on !== "function") return;
+  im.focusController?.focus?.(0, 0, true);
+  lookHook = () => applyLookOverwrite();
+  im.on("afterMotionUpdate", lookHook);
+}
+
+function detachLookHook() {
+  const im = model?.internalModel;
+  if (lookHook && im && typeof im.off === "function") {
+    im.off("afterMotionUpdate", lookHook);
+  }
+  lookHook = null;
+}
+
+function applyLookOverwrite() {
+  const im = model?.internalModel;
+  const core = im?.coreModel;
+  if (!core) return;
+  const now = performance.now();
+  const dt = lookLastMs ? Math.min(48, now - lookLastMs) : 16;
+  lookLastMs = now;
+  const k = 1 - Math.exp(-dt / 80);
+  lookCurrent.x += (lookTarget.x - lookCurrent.x) * k;
+  lookCurrent.y += (lookTarget.y - lookCurrent.y) * k;
+  const x = lookCurrent.x;
+  const y = lookCurrent.y;
+  // Official path: updateFocus() adds focus * 30 to head / eyes after this hook.
+  im.focusController?.focus?.(x, y, true);
   try {
-    core.addParameterValueById("ParamAngleX", lookTarget.x * 16);
-    core.addParameterValueById("ParamAngleY", lookTarget.y * 10);
-    core.addParameterValueById("ParamEyeBallX", lookTarget.x);
-    core.addParameterValueById("ParamEyeBallY", lookTarget.y);
-    core.addParameterValueById("ParamBodyAngleX", lookTarget.x * 6);
+    core.setParameterValueById?.("ParamAngleX", x * 24);
+    core.setParameterValueById?.("ParamAngleY", y * 16);
+    core.setParameterValueById?.("ParamAngleZ", x * y * -12);
+    core.setParameterValueById?.("ParamEyeBallX", x);
+    core.setParameterValueById?.("ParamEyeBallY", y);
+    core.setParameterValueById?.("ParamBodyAngleX", x * 12);
+    core.setParameterValueById?.("ParamBodyAngleY", y * 5);
   } catch {
-    /* optional */
+    /* optional Cubism ids */
   }
 }
 
@@ -461,7 +493,23 @@ function installDebugProbe() {
       canvasCount: canvases.length,
       stageChildren: kids.length,
       modelCount: kids.filter((child) => child?.internalModel).length,
-      look: { ...lookTarget },
+      look: { target: { ...lookTarget }, current: { ...lookCurrent } },
+      params: (() => {
+        const core = model?.internalModel?.coreModel;
+        const read = (id) => {
+          try {
+            return core?.getParameterValueById?.(id) ?? null;
+          } catch {
+            return null;
+          }
+        };
+        return {
+          angleX: read("ParamAngleX"),
+          angleY: read("ParamAngleY"),
+          eyeX: read("ParamEyeBallX"),
+          eyeY: read("ParamEyeBallY"),
+        };
+      })(),
       canvas: canvas
         ? {
             width: canvas.width,
