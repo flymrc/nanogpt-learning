@@ -26,7 +26,7 @@ export function mountGameCursor(getGame) {
   window.addEventListener("pointerleave", leave, { passive: true });
   document.documentElement.addEventListener("mouseenter", enter);
 
-  const hot = "a, button, [data-note], .notes-term, .mute-toggle, .notes-toggle, .notes-close";
+  const hot = "a, button, [data-note], .notes-term, .mute-toggle, .notes-toggle, .book-toggle, .notes-close";
   document.addEventListener(
     "pointerover",
     (event) => {

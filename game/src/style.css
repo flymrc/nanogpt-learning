@@ -72,11 +72,11 @@ body {
 .tutor-bubble {
   position: relative;
   z-index: 2;
-  flex: 0 1 auto;
-  max-height: min(48vh, 420px);
-  overflow: auto;
-  margin: 16px 14px 0;
-  padding: 12px 14px 14px;
+  flex: 0 0 auto;
+  max-height: 132px;
+  overflow: hidden;
+  margin: 12px 12px 0;
+  padding: 10px 12px 12px;
   background: #fffdf8;
   border: 4px solid #3b2a2e;
   border-radius: 18px;
@@ -93,10 +93,15 @@ body {
 
 .tutor-purpose {
   margin: 0;
+  padding-right: 52px;
   font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.25;
   color: #3b2a2e;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .tutor-caption {
@@ -158,7 +163,7 @@ body {
 #tutor-stage {
   position: relative;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 64%;
   width: 100%;
   overflow: hidden;
   cursor: pointer;
@@ -238,10 +243,10 @@ body {
   display: block;
 }
 
-.notes-toggle {
+.notes-toggle,
+.book-toggle {
   position: absolute;
   top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 60px);
   z-index: 30;
   height: 52px;
   padding: 0 14px;
@@ -257,10 +262,76 @@ body {
   touch-action: manipulation;
 }
 
+.notes-toggle {
+  right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 60px);
+}
+
+.book-toggle {
+  right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 168px);
+}
+
+@media (max-width: 560px) {
+  .notes-toggle,
+  .book-toggle {
+    height: 44px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .notes-toggle {
+    right: calc(max(8px, env(safe-area-inset-right, 0px) + 6px) + 52px);
+  }
+  .book-toggle {
+    right: calc(max(8px, env(safe-area-inset-right, 0px) + 6px) + 132px);
+  }
+}
+
 .notes-toggle:hover,
-.notes-toggle[aria-expanded="true"] {
+.notes-toggle[aria-expanded="true"],
+.book-toggle:hover,
+.book-toggle[aria-expanded="true"] {
   background: #ffe7a8;
   transform: scale(1.04);
+}
+
+#lesson-book-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 76px 16px 20px;
+  background: rgba(59, 42, 46, 0.22);
+}
+
+#lesson-book-overlay[hidden] {
+  display: none !important;
+}
+
+.lesson-book-card {
+  width: min(520px, 100%);
+  max-height: min(72dvh, 560px);
+  overflow: auto;
+  padding: 16px;
+  background: #fffdf8;
+  border: 5px solid #3b2a2e;
+  border-radius: 22px;
+  box-shadow: 6px 8px 0 rgba(59, 42, 46, 0.2);
+  color: #3b2a2e;
+}
+
+.lesson-book-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.lesson-book-head h2 {
+  margin: 0;
+  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-size: 24px;
 }
 
 #notes-overlay {
