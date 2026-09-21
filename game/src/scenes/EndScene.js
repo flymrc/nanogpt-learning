@@ -1,6 +1,5 @@
 import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
-import { VOCAB_SIZE } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
@@ -52,26 +51,26 @@ export default class EndScene extends Phaser.Scene {
     const cards = [
       {
         icon: "deco-badge",
-        fallback: "?",
-        title: "猜下一个字",
-        caption: "像输入法补全",
-        tip: "语言模型就是「下一个字的概率排行榜」。本游戏没有训练模型。",
+        fallback: "带",
+        title: "台词拉成纸带",
+        caption: "一字一号，共 65 牌",
+        tip: "号码只是座位号。本局只有这套莎翁字符，不是宇宙词表。",
         accent: C.teal,
       },
       {
         icon: "deco-window",
-        fallback: "号",
-        title: "字换成号码",
-        caption: `一共 ${VOCAB_SIZE} 种字`,
-        tip: "练习卷和检查卷是两串整数。源码里叫 train.bin / val.bin。",
+        fallback: "卷",
+        title: "练习卷和验收卷",
+        caption: "验收不是答题纸",
+        tip: "九成练习、一成抽查。源码里叫 train.bin / val.bin。",
         accent: C.blue,
       },
       {
         icon: "deco-star",
-        fallback: "★",
-        title: "往后挪一格",
-        caption: "猜错要罚分",
-        tip: "正确答案是后一位。源码里这个罚分叫交叉熵。本游戏没有训练。",
+        fallback: "空",
+        title: "剪一段来填空",
+        caption: "错题分取平均",
+        tip: "y 只放在评分桌。评分看真答案被押了多少。本游戏没有训练，也不编造分数。",
         accent: C.gold,
       },
     ];

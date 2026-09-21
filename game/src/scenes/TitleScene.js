@@ -33,7 +33,7 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 520, ease: "Back.Out" });
 
     this.add
-      .text(v.cx, titles.bottom - titleSize * 0.35, "像手机输入法那样", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
+      .text(v.cx, titles.bottom - titleSize * 0.35, "先把台词拉成纸带", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
       .setOrigin(0.5);
 
     this.playPreview(v, plan);
@@ -42,7 +42,7 @@ export default class TitleScene extends Phaser.Scene {
     const robotX = v.portrait ? v.left + 48 : v.left + 80;
     const robotY = mascot.cy;
     addRobot(this, robotX, robotY, { scale: plan.robotScale });
-    addSpeechBubble(this, robotX + (v.portrait ? 140 : 156), robotY - 8, "一起猜下一个字！", {
+    addSpeechBubble(this, robotX + (v.portrait ? 140 : 156), robotY - 8, "从一条长纸带讲起！", {
       maxWidth: Math.min(v.compact ? 180 : 240, v.right - robotX - 80),
       fontSize: v.compact ? 18 : 24,
     });
@@ -68,29 +68,22 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   playPreview(v, plan) {
-    const sample = ["S", "e", "c"];
+    const sample = ["S", "e", "c", "o", "n", "d"];
     const tile = plan.tile;
     const preview = plan.slots.preview;
     const stack = plan.stackPreview;
     const yChars = stack ? preview.top + tile / 2 + 4 : preview.cy;
-    const fromX = v.cx - tile * 2.2;
+    const gap = tile + 8;
+    const fromX = v.cx - ((sample.length - 1) * gap) / 2;
     sample.forEach((ch, i) => {
-      makeCharTile(this, fromX + i * (tile + 10), yChars, ch, {
+      makeCharTile(this, fromX + i * gap, yChars, ch, {
         width: tile,
         height: tile,
         seed: ch,
       });
     });
-    const qX = fromX + 3 * (tile + 10) + tile * 0.15;
-    this.add.text(qX - tile * 0.55, yChars, "→", displayText(28, { color: C.coralCss })).setOrigin(0.5);
-    const guess = makeCharTile(this, qX + tile * 0.35, yChars, "?", {
-      width: tile,
-      height: tile,
-      seed: "?",
-    });
-    guess.setAlpha(0.92);
     this.add
-      .text(v.cx, stack ? preview.bottom - 8 : preview.bottom - 2, "下一字？", displayText(16, { color: C.muted }))
+      .text(v.cx, stack ? preview.bottom - 8 : preview.bottom - 2, "一条长纸带", displayText(16, { color: C.muted }))
       .setOrigin(0.5);
   }
 }

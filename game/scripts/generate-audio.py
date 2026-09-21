@@ -27,14 +27,14 @@ TMP = OUT / "_tmp"
 
 VOICE = "zh-CN-XiaoxiaoNeural"
 VO_LINES = {
-    "vo-title": "一起猜下一个字吧！",
-    "vo-level1": "先想想手机输入法。",
-    "vo-map": "每个字都排进榜。",
-    "vo-reuse": "同样的字，同一个号。",
-    "vo-level2": "看见这个，猜下一个。",
-    "vo-shift": "正确答案往后挪一格。",
-    "vo-next": "看见S，下一字是e。",
-    "vo-loss": "猜得越离谱，罚分越大。",
+    "vo-title": "从一条长纸带讲起。",
+    "vo-level1": "每个字符领一张号码牌。",
+    "vo-map": "号码只是座位号。",
+    "vo-reuse": "本局只有六十五张字符牌。",
+    "vo-level2": "每次随手剪一段来看。",
+    "vo-shift": "答案往右挪一格。",
+    "vo-next": "每个位置都在问下一字。",
+    "vo-loss": "押得越少，错题分越大。",
     "vo-clear": "通关啦！",
 }
 
