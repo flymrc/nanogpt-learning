@@ -1,116 +1,164 @@
 import Phaser from "phaser";
-import { C, FONT_MONO, FONT_UI, H, W, monoText, uiText } from "./theme.js";
+import { C, H, W, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
   const g = scene.add.graphics();
-  g.fillGradientStyle(0x0c1220, 0x0c1220, 0x152033, 0x101828, 1);
+  g.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, 0xffd6e8, 1);
   g.fillRect(0, 0, W, H);
 
-  g.lineStyle(1, 0x1c2a40, 0.45);
-  for (let x = 40; x < W; x += 40) {
-    g.lineBetween(x, 0, x, H);
-  }
-  for (let y = 40; y < H; y += 40) {
-    g.lineBetween(0, y, W, y);
-  }
-
-  g.fillStyle(0x3ecfc4, 0.05);
-  g.fillCircle(180, 80, 220);
-  g.fillStyle(0xf0c14b, 0.04);
-  g.fillCircle(1100, 640, 260);
-}
-
-export function addHeader(scene, { level, total, title }) {
-  scene.add
-    .text(48, 28, `第 ${level}/${total} 关`, uiText(18, { color: C.tealCss }))
-    .setOrigin(0, 0.5);
-
-  scene.add.text(48, 54, title, uiText(28, { fontStyle: "700" })).setOrigin(0, 0.5);
-
-  const dots = scene.add.container(W - 56, 40);
-  for (let i = 0; i < total; i += 1) {
-    const dot = scene.add.circle(i * -22, 0, 6, i + 1 === level ? C.teal : 0x3a4a66);
-    dots.add(dot);
+  g.fillStyle(C.sun, 1);
+  g.lineStyle(6, C.stroke, 1);
+  g.fillCircle(1140, 86, 52);
+  g.strokeCircle(1140, 86, 52);
+  for (let i = 0; i < 8; i += 1) {
+    const a = (Math.PI * 2 * i) / 8;
+    g.lineStyle(6, C.stroke, 1);
+    g.lineBetween(
+      1140 + Math.cos(a) * 64,
+      86 + Math.sin(a) * 64,
+      1140 + Math.cos(a) * 82,
+      86 + Math.sin(a) * 82,
+    );
   }
 
-  scene.add
-    .text(W - 48, 62, "nanoGPT · shakespeare_char", uiText(14, { color: C.muted }))
-    .setOrigin(1, 0.5);
+  g.fillStyle(C.hillDark, 1);
+  g.fillEllipse(220, 760, 780, 280);
+  g.fillStyle(C.hill, 1);
+  g.fillEllipse(980, 780, 900, 300);
+  g.lineStyle(6, C.stroke, 0.35);
+  g.strokeEllipse(220, 760, 780, 280);
+  g.strokeEllipse(980, 780, 900, 300);
+
+  spawnClouds(scene);
+  spawnTwinkles(scene);
 }
 
-export function addCaption(scene, text) {
-  const panel = scene.add.container(W / 2, 108);
-  const g = scene.add.graphics();
-  g.fillStyle(C.surface, 0.94);
-  g.lineStyle(2, C.stroke, 0.9);
-  g.fillRoundedRect(-560, -36, 1120, 72, 14);
-  g.strokeRoundedRect(-560, -36, 1120, 72, 14);
-  const label = scene.add
-    .text(0, 0, text, uiText(20, { align: "center", wordWrap: { width: 1040 } }))
-    .setOrigin(0.5);
-  panel.add([g, label]);
-  panel.setData("label", label);
-  return panel;
-}
-
-export function setCaption(panel, text) {
-  const label = panel.getData("label");
-  label.setText(text);
-  label.setAlpha(0);
-  panel.scene.tweens.add({
-    targets: label,
-    alpha: 1,
-    duration: 220,
-    ease: "Quad.Out",
+function spawnClouds(scene) {
+  const spots = [
+    { x: 160, y: 72, s: 0.7 },
+    { x: 430, y: 48, s: 0.5 },
+    { x: 860, y: 70, s: 0.62 },
+  ];
+  spots.forEach((spot, i) => {
+    const cloud = scene.textures.exists("deco-cloud")
+      ? scene.add.image(spot.x, spot.y, "deco-cloud").setScale(spot.s).setAlpha(0.95)
+      : drawCloud(scene, spot.x, spot.y, spot.s);
+    scene.tweens.add({
+      targets: cloud,
+      x: spot.x + (i % 2 === 0 ? 24 : -20),
+      duration: 4200 + i * 500,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
   });
 }
 
+function drawCloud(scene, x, y, s) {
+  const g = scene.add.graphics();
+  g.fillStyle(C.white, 1);
+  g.lineStyle(5, C.stroke, 1);
+  g.fillCircle(x - 28 * s, y + 6 * s, 22 * s);
+  g.fillCircle(x + 8 * s, y - 4 * s, 28 * s);
+  g.fillCircle(x + 36 * s, y + 8 * s, 20 * s);
+  g.fillRoundedRect(x - 48 * s, y, 90 * s, 28 * s, 12 * s);
+  return g;
+}
+
+function spawnTwinkles(scene) {
+  for (let i = 0; i < 8; i += 1) {
+    const x = 80 + ((i * 157) % (W - 160));
+    const y = 30 + ((i * 83) % 140);
+    const star = scene.textures.exists("deco-star")
+      ? scene.add.image(x, y, "deco-star").setScale(0.28 + (i % 3) * 0.06).setAlpha(0.55)
+      : scene.add.star(x, y, 5, 4, 9, C.gold).setAlpha(0.5);
+    scene.tweens.add({
+      targets: star,
+      alpha: { from: 0.25, to: 0.8 },
+      scale: star.scale * 1.15,
+      duration: 1400 + i * 180,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
+  }
+}
+
+export function addHeader(scene, { level, total, title }) {
+  const badge = scene.add.container(78, 46);
+  const g = scene.add.graphics();
+  drawSticker(g, -38, -28, 76, 56, 18, C.coral);
+  badge.add(g);
+  badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(24)).setOrigin(0.5));
+
+  scene.add.text(132, 46, title, displayText(34)).setOrigin(0, 0.5);
+
+  const dots = scene.add.container(W - 64, 46);
+  for (let i = 0; i < total; i += 1) {
+    const on = i + 1 === level;
+    const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
+    if (key) {
+      dots.add(scene.add.image(i * -36, 0, key).setScale(on ? 0.55 : 0.38).setAlpha(on ? 1 : 0.35));
+    } else {
+      dots.add(scene.add.star(i * -36, 0, 5, on ? 8 : 6, on ? 16 : 12, on ? C.gold : 0xf3d9a2));
+    }
+  }
+}
+
+export function addBeat(scene, { title, caption }) {
+  const wrap = scene.add.container(W / 2, 108);
+  const titleText = scene.add.text(0, -16, title, displayText(28)).setOrigin(0.5);
+  const cap = scene.add.text(0, 18, caption, uiText(18, { color: C.muted })).setOrigin(0.5);
+  wrap.add([titleText, cap]);
+  wrap.setData("title", titleText);
+  wrap.setData("caption", cap);
+  return wrap;
+}
+
+export function setBeat(beat, { title, caption }) {
+  const titleText = beat.getData("title");
+  const cap = beat.getData("caption");
+  if (title) titleText.setText(title);
+  if (caption !== undefined) cap.setText(caption);
+  titleText.setAlpha(0);
+  cap.setAlpha(0);
+  beat.scene.tweens.add({ targets: [titleText, cap], alpha: 1, duration: 180 });
+}
+
 export function createButton(scene, x, y, label, onClick, opts = {}) {
-  const w = opts.width ?? 220;
-  const h = opts.height ?? 54;
-  const fill = opts.fill ?? C.teal;
-  const textColor = opts.textColor ?? C.textDark;
+  const w = opts.width ?? 240;
+  const h = opts.height ?? 68;
+  const fill = opts.fill ?? C.coral;
   const container = scene.add.container(x, y);
 
   const bg = scene.add.graphics();
   const draw = (hover) => {
     bg.clear();
-    bg.fillStyle(hover ? 0x62ddd4 : fill, opts.alpha ?? 1);
-    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
-    bg.lineStyle(2, 0xffffff, hover ? 0.28 : 0.12);
-    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 12);
+    drawSticker(bg, -w / 2, -h / 2, w, h, 22, hover ? 0xff9aa2 : fill, { shadow: true });
   };
   draw(false);
 
   const text = scene.add
-    .text(0, 0, label, uiText(opts.fontSize ?? 22, { color: textColor, fontStyle: "700" }))
+    .text(0, -2, label, displayText(opts.fontSize ?? 28, { color: opts.textColor ?? C.text }))
     .setOrigin(0.5);
 
   container.add([bg, text]);
   container.setSize(w, h);
-  container.setInteractive(
-    new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h),
-    Phaser.Geom.Rectangle.Contains,
-  );
+  container.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
   container.input.cursor = "pointer";
 
   container.on("pointerover", () => {
     draw(true);
-    scene.tweens.add({ targets: container, scale: 1.04, duration: 140, ease: "Quad.Out" });
+    scene.tweens.add({ targets: container, scale: 1.06, duration: 120, ease: "Back.Out" });
   });
   container.on("pointerout", () => {
     draw(false);
-    scene.tweens.add({ targets: container, scale: 1, duration: 140, ease: "Quad.Out" });
+    scene.tweens.add({ targets: container, scale: 1, duration: 120 });
   });
   container.on("pointerdown", (pointer, _lx, _ly, event) => {
     event?.stopPropagation?.();
     onClick();
-    scene.tweens.add({
-      targets: container,
-      scale: 0.97,
-      duration: 80,
-      yoyo: true,
-    });
+    scene.tweens.add({ targets: container, scale: 0.94, duration: 80, yoyo: true });
   });
 
   container.setLabel = (next) => text.setText(next);
@@ -122,28 +170,62 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   return container;
 }
 
-export function addAdvanceHint(scene, text = "点击空白处或按空格继续") {
-  return scene.add
-    .text(W / 2, H - 28, text, uiText(16, { color: C.muted }))
+export function addAdvanceHint(scene, text = "点一下") {
+  const hint = scene.add
+    .text(W / 2, H - 26, text, uiText(16, { color: C.muted }))
     .setOrigin(0.5);
+  scene.tweens.add({
+    targets: hint,
+    y: H - 32,
+    duration: 700,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.InOut",
+  });
+  return hint;
 }
 
-export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 64, height = 78 }) {
+export function makeCharTile(scene, x, y, glyph, { width = 64, height = 64, seed = glyph } = {}) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  g.fillStyle(C.surface2, 1);
-  g.lineStyle(2, accent, 0.95);
-  g.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
+  const fill = stickerColor(seed);
+  drawSticker(g, -width / 2, -height / 2, width, height, 16, fill);
+  const t = scene.add.text(0, -2, glyph, monoText(26, { fontStyle: "700" })).setOrigin(0.5);
+  box.add([g, t]);
+  box.setSize(width, height);
+  box.setData("graphics", g);
+  box.setData("label", t);
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("fill", fill);
+  return box;
+}
 
-  const ch = scene.add
-    .text(0, -12, glyph, monoText(22, { fontStyle: "700" }))
-    .setOrigin(0.5);
-  const idText = scene.add
-    .text(0, 18, String(id), monoText(16, { color: C.goldCss }))
-    .setOrigin(0.5);
+export function setTileActive(tile, on) {
+  const g = tile.getData("graphics");
+  const width = tile.getData("width");
+  const height = tile.getData("height");
+  const fill = tile.getData("fill");
+  g.clear();
+  drawSticker(g, -width / 2, -height / 2, width, height, 16, on ? C.gold : fill, {
+    lineWidth: on ? 7 : 5,
+  });
+  tile.scene.tweens.add({
+    targets: tile,
+    scale: on ? 1.12 : 1,
+    duration: 140,
+    ease: "Back.Out",
+  });
+}
 
-  box.add([g, ch, idText]);
+export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, height = 82 } = {}) {
+  const box = scene.add.container(x, y);
+  const g = scene.add.graphics();
+  paintBadge(g, width, height, accent, false);
+  const clip = scene.add.rectangle(0, -height / 2 + 7, 16, 10, accent).setStrokeStyle(4, C.stroke);
+  const ch = scene.add.text(0, -10, glyph, monoText(22, { fontStyle: "700" })).setOrigin(0.5);
+  const idText = scene.add.text(0, 22, String(id), monoText(16, { fontStyle: "700" })).setOrigin(0.5);
+  box.add([g, clip, ch, idText]);
   box.setSize(width, height);
   box.setData("graphics", g);
   box.setData("accent", accent);
@@ -155,10 +237,10 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 64, 
 export function pulseChip(scene, chip) {
   scene.tweens.add({
     targets: chip,
-    scale: 1.12,
-    duration: 160,
+    scale: 1.16,
+    duration: 150,
     yoyo: true,
-    ease: "Quad.Out",
+    ease: "Back.Out",
   });
 }
 
@@ -168,47 +250,200 @@ export function highlightChip(scene, chip, on = true) {
   const width = chip.getData("width");
   const height = chip.getData("height");
   g.clear();
-  g.fillStyle(on ? 0x2c3d58 : C.surface2, 1);
-  g.lineStyle(on ? 3 : 2, on ? C.gold : accent, 1);
-  g.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
+  paintBadge(g, width, height, on ? C.gold : accent, on);
+  scene.tweens.add({
+    targets: chip,
+    scale: on ? 1.1 : 1,
+    duration: 140,
+    ease: "Back.Out",
+  });
 }
 
-export function makeCharTile(scene, x, y, glyph, { width = 62, height = 62 } = {}) {
+export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, width = 200, height = 96 }) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  g.fillStyle(C.surface, 1);
-  g.lineStyle(2, C.stroke, 1);
-  g.fillRoundedRect(-width / 2, -height / 2, width, height, 8);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 8);
-  const t = scene.add.text(0, 0, glyph, monoText(24, { fontStyle: "700" })).setOrigin(0.5);
-  box.add([g, t]);
+  drawSticker(g, -width / 2, -height / 2, width, height, 22, C.surface);
+  const stripe = scene.add.graphics();
+  stripe.fillStyle(accent, 1);
+  stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 14, height - 16, 8);
+  const valueText = scene.add.text(10, -14, value, displayText(28)).setOrigin(0.5);
+  const labelText = scene.add.text(10, 22, label, uiText(16, { color: C.muted })).setOrigin(0.5);
+  box.add([g, stripe, valueText, labelText]);
   box.setSize(width, height);
-  box.setData("graphics", g);
-  box.setData("label", t);
-  box.setData("width", width);
-  box.setData("height", height);
+  box.setData("valueText", valueText);
+  box.setValue = (next) => valueText.setText(next);
+  box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+  box.input.cursor = "pointer";
+  box.on("pointerdown", (pointer, _lx, _ly, event) => {
+    event?.stopPropagation?.();
+    showTooltip(scene, box.x, box.y - height / 2 - 18, tip || value);
+  });
   return box;
 }
 
-export function setTileActive(tile, on) {
-  const g = tile.getData("graphics");
-  const width = tile.getData("width");
-  const height = tile.getData("height");
-  g.clear();
-  g.fillStyle(on ? 0x2a3f3c : C.surface, 1);
-  g.lineStyle(on ? 3 : 2, on ? C.teal : C.stroke, 1);
-  g.fillRoundedRect(-width / 2, -height / 2, width, height, 8);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 8);
+export function showTooltip(scene, x, y, text) {
+  if (scene._tip) {
+    scene.tweens.killTweensOf(scene._tip);
+    scene._tip.destroy();
+  }
+  const tip = scene.add.container(x, y);
+  const label = scene.add.text(0, 0, text, uiText(16, { align: "center", wordWrap: { width: 280 } })).setOrigin(0.5);
+  const w = Math.max(80, label.width + 28);
+  const h = Math.max(36, label.height + 16);
+  const g = scene.add.graphics();
+  g.fillStyle(C.stroke, 0.9);
+  g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
+  label.setColor("#fff8ee");
+  tip.add([g, label]);
+  tip.setDepth(40);
+  tip.setAlpha(0);
+  scene._tip = tip;
+  scene.tweens.add({
+    targets: tip,
+    alpha: 1,
+    y: y - 8,
+    duration: 180,
+    hold: 1600,
+    yoyo: true,
+    onComplete: () => {
+      tip.destroy();
+      if (scene._tip === tip) scene._tip = null;
+    },
+  });
+}
+
+export function makeWindowFrame(scene, x, y, width, height, color = C.blue) {
+  const box = scene.add.container(x, y);
+  const g = scene.add.graphics();
+  const paint = (fill) => {
+    g.clear();
+    g.fillStyle(C.stroke, 0.12);
+    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 8, width, height, 22);
+    g.lineStyle(8, C.stroke, 1);
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, 22);
+    g.lineStyle(6, fill, 1);
+    g.strokeRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    g.fillStyle(fill, 0.14);
+    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    const dots = [C.coral, C.gold, C.teal];
+    dots.forEach((c, i) => {
+      g.fillStyle(c, 1);
+      g.lineStyle(4, C.stroke, 1);
+      g.fillCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
+      g.strokeCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
+    });
+  };
+  paint(color);
+  box.add(g);
+  box.setSize(width, height);
+  box.recolor = paint;
+  return box;
+}
+
+export function makeArrow(scene, x, y, { angle = 90, color = C.coral, label = "" } = {}) {
+  const box = scene.add.container(x, y);
+  const g = scene.add.graphics();
+  g.fillStyle(color, 1);
+  g.lineStyle(5, C.stroke, 1);
+  g.fillRoundedRect(-8, -22, 16, 28, 8);
+  g.strokeRoundedRect(-8, -22, 16, 28, 8);
+  g.fillTriangle(-18, 8, 18, 8, 0, 28);
+  g.strokeTriangle(-18, 8, 18, 8, 0, 28);
+  box.add(g);
+  if (label) {
+    box.add(scene.add.text(28, 0, label, displayText(18)).setOrigin(0, 0.5));
+  }
+  box.setAngle(angle - 90);
+  scene.tweens.add({
+    targets: box,
+    y: y + 6,
+    duration: 500,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.InOut",
+  });
+  return box;
+}
+
+export function makePairBoard(scene, x, y) {
+  const box = scene.add.container(x, y);
+  const g = scene.add.graphics();
+  drawSticker(g, -210, -58, 420, 116, 24, C.surface);
+  const from = scene.add.text(-120, -8, "", monoText(40, { fontStyle: "700" })).setOrigin(0.5);
+  const arrow = scene.add.text(0, -8, "→", displayText(42, { color: C.coralCss })).setOrigin(0.5);
+  const to = scene.add.text(120, -8, "", monoText(40, { fontStyle: "700" })).setOrigin(0.5);
+  const sub = scene.add.text(0, 34, "", uiText(16, { color: C.muted })).setOrigin(0.5);
+  box.add([g, from, arrow, to, sub]);
+  box.setAlpha(0);
+  box.show = (left, right, note) => {
+    from.setText(left);
+    to.setText(right);
+    sub.setText(note);
+    box.setAlpha(1);
+    box.setScale(0.86);
+    scene.tweens.add({ targets: box, scale: 1, duration: 200, ease: "Back.Out" });
+  };
+  box.hide = () => scene.tweens.add({ targets: box, alpha: 0, duration: 160 });
+  return box;
+}
+
+export function burstStars(scene, x, y) {
+  const colors = [C.gold, C.coral, C.teal, C.blue, C.pink];
+  for (let i = 0; i < 7; i += 1) {
+    const star = scene.textures.exists("deco-sparkle")
+      ? scene.add.image(x, y, "deco-sparkle").setScale(0.45)
+      : scene.add.star(x, y, 4, 3, 8, colors[i % colors.length]);
+    const a = (Math.PI * 2 * i) / 7;
+    scene.tweens.add({
+      targets: star,
+      x: x + Math.cos(a) * 46,
+      y: y + Math.sin(a) * 46,
+      alpha: 0,
+      scale: 0.1,
+      duration: 420,
+      onComplete: () => star.destroy(),
+    });
+  }
+}
+
+export function spawnConfetti(scene) {
+  const colors = [C.coral, C.gold, C.teal, C.blue, C.violet, C.pink];
+  for (let i = 0; i < 26; i += 1) {
+    const bit = scene.add.rectangle(
+      50 + Math.random() * (W - 100),
+      -30 - Math.random() * 120,
+      12,
+      18,
+      colors[i % colors.length],
+    );
+    bit.setStrokeStyle(3, C.stroke);
+    bit.setAngle(Math.random() * 360);
+    scene.tweens.add({
+      targets: bit,
+      y: H + 40,
+      angle: bit.angle + 240,
+      duration: 2400 + Math.random() * 1400,
+      delay: Math.random() * 600,
+      repeat: -1,
+    });
+  }
+}
+
+export function makeTag(scene, x, y, text, accent = C.blue) {
+  const tag = scene.add.container(x, y);
+  const label = scene.add.text(0, 0, text, displayText(16)).setOrigin(0.5);
+  const w = label.width + 24;
+  const h = 32;
+  const g = scene.add.graphics();
+  drawSticker(g, -w / 2, -h / 2, w, h, 12, accent, { lineWidth: 4, shadow: false });
+  tag.add([g, label]);
+  return tag;
 }
 
 export function makePanel(scene, x, y, width, height) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  g.fillStyle(C.surface, 0.97);
-  g.lineStyle(2, C.stroke, 1);
-  g.fillRoundedRect(-width / 2, -height / 2, width, height, 16);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 16);
+  drawSticker(g, -width / 2, -height / 2, width, height, 24, C.surface);
   box.add(g);
   return box;
 }
@@ -235,4 +470,25 @@ export function rowPositions(count, y, tile, gap) {
     x: start + i * (tile + gap),
     y,
   }));
+}
+
+export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
+  const stroke = opts.stroke ?? C.stroke;
+  const sw = opts.lineWidth ?? 6;
+  if (opts.shadow !== false) {
+    g.fillStyle(C.stroke, 0.2);
+    g.fillRoundedRect(x + 5, y + 8, w, h, r);
+  }
+  g.fillStyle(fill, 1);
+  g.lineStyle(sw, stroke, 1);
+  g.fillRoundedRect(x, y, w, h, r);
+  g.strokeRoundedRect(x, y, w, h, r);
+}
+
+function paintBadge(g, width, height, accent, on) {
+  drawSticker(g, -width / 2, -height / 2, width, height, 16, on ? 0xfff4c2 : C.surface, {
+    lineWidth: on ? 6 : 5,
+  });
+  g.fillStyle(accent, 1);
+  g.fillRoundedRect(-width / 2 + 6, height / 2 - 28, width - 12, 22, 8);
 }

@@ -5,24 +5,25 @@ import {
   DEMO_SNIPPET,
   VOCAB_SIZE,
   displayGlyph,
-  displayLabel,
 } from "../data/facts.js";
 import {
   addAdvanceHint,
-  addCaption,
   addHeader,
   bindAdvance,
+  burstStars,
   createButton,
+  makeArrow,
   makeCharTile,
   makeChip,
-  makePanel,
+  makeFactChip,
+  makeTag,
   paintBackdrop,
   pulseChip,
   rowPositions,
-  setCaption,
   setTileActive,
 } from "../ui/components.js";
-import { C, H, W, monoText, uiText } from "../ui/theme.js";
+import { addRobot, addScrollBuddy, addSpeechBubble, setSpeech } from "../ui/mascot.js";
+import { C, H, W, displayText } from "../ui/theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
 
@@ -33,40 +34,35 @@ export default class Level1Scene extends Phaser.Scene {
 
   create() {
     paintBackdrop(this);
-    addHeader(this, { level: 1, total: 2, title: "字符变 ID（prepare）" });
+    addHeader(this, { level: 1, total: 2, title: "字符变 ID" });
 
-    this.caption = addCaption(
-      this,
-      "语言模型吃整数，不是原文。prepare.py 把每个字符映射成 id（不用 BPE）。",
-    );
+    addRobot(this, 86, 168, { scale: 0.58 });
+    addScrollBuddy(this, 168, 178, { scale: 0.42 });
+    this.speech = addSpeechBubble(this, 340, 132, "点它变数字");
 
-    this.add
-      .text(64, 168, "演示原文（短句，便于看清动画）", uiText(16, { color: C.muted }))
-      .setOrigin(0, 0.5);
-
-    const srcPos = rowPositions(CHARS.length, 218, 62, 8);
+    makeTag(this, 88, 230, "原文", C.pink);
+    const srcPos = rowPositions(CHARS.length, 286, 62, 8);
     this.sourceTiles = CHARS.map((ch, i) =>
-      makeCharTile(this, srcPos[i].x, srcPos[i].y, displayGlyph(ch)),
+      makeCharTile(this, srcPos[i].x, srcPos[i].y, displayGlyph(ch), { seed: ch }),
     );
 
-    this.add
-      .text(64, 292, "encode → 整数序列（重复字符复用同一 id）", uiText(16, { color: C.muted }))
-      .setOrigin(0, 0.5);
+    this.downArrow = makeArrow(this, W / 2, 348, { angle: 90, color: C.coral, label: "" });
 
-    this.mapPos = rowPositions(CHARS.length, 368, 62, 8);
+    makeTag(this, 88, 400, "id", C.gold);
+    this.mapPos = rowPositions(CHARS.length, 456, 62, 8);
     this.mappedChips = new Array(CHARS.length).fill(null);
 
-    this.uniqueSeen = new Set();
-    this.uniqueLabel = this.add
-      .text(W / 2, 458, "本段已见唯一字符：0", uiText(20, { color: C.goldCss }))
-      .setOrigin(0.5);
-
-    this.vocabHint = this.add
-      .text(W / 2, 492, "完整数据的词表大小 = 唯一字符数（后面一页给出实测数字）", uiText(16, { color: C.muted }))
-      .setOrigin(0.5);
-
-    this.nextBtn = createButton(this, W - 180, H - 68, "下一步", () => this.advance(), {
-      width: 200,
+    this.uniqueChip = makeFactChip(this, W / 2, 568, {
+      value: "★ 0",
+      label: "本段唯一",
+      tip: "重复字母共用同一个 id",
+      accent: C.gold,
+      width: 180,
+      height: 78,
+    });
+    this.nextBtn = createButton(this, W - 170, H - 64, "下一步", () => this.advance(), {
+      width: 220,
+      height: 64,
     });
     this.nextBtn.setDepth(20);
     this.hint = addAdvanceHint(this);
@@ -75,23 +71,22 @@ export default class Level1Scene extends Phaser.Scene {
     this.step = 0;
     this.busy = false;
     this.factsShown = false;
+    this.uniqueSeen = new Set();
+    this.factChips = [];
 
     bindAdvance(this, () => this.advance());
   }
 
   advance() {
     if (this.busy) return;
-
     if (this.step < CHARS.length) {
       this.mapOne(this.step);
       return;
     }
-
     if (!this.factsShown) {
       this.showFacts();
       return;
     }
-
     this.scene.start("Level2");
   }
 
@@ -108,119 +103,150 @@ export default class Level1Scene extends Phaser.Scene {
       if (i !== index) setTileActive(other, false);
     });
 
-    setCaption(this.caption, captionFor(ch, id, isNew, this.uniqueSeen.size));
+    setSpeech(this.speech, speechFor(ch, id, isNew));
 
-    const from = { x: tile.x, y: tile.y };
+    const flyer = makeCharTile(this, tile.x, tile.y, displayGlyph(ch), {
+      width: 56,
+      height: 56,
+      seed: ch,
+    });
+    flyer.setDepth(12);
     const to = this.mapPos[index];
-    const flyer = this.add
-      .text(from.x, from.y, displayGlyph(ch), monoText(26, { fontStyle: "700", color: C.tealCss }))
-      .setOrigin(0.5);
 
     this.tweens.add({
       targets: flyer,
       x: to.x,
       y: to.y,
-      scale: 1.15,
-      duration: 420,
-      ease: "Cubic.Out",
+      scale: 0.2,
+      angle: 12,
+      duration: 380,
+      ease: "Cubic.In",
       onComplete: () => {
         flyer.destroy();
+        burstStars(this, to.x, to.y);
         const chip = makeChip(this, to.x, to.y, {
           glyph: displayGlyph(ch),
           id,
           accent: isNew ? C.teal : C.blue,
-          width: 62,
-          height: 78,
+          width: 60,
+          height: 80,
         });
-        chip.setScale(0.7);
-        chip.setAlpha(0);
+        chip.setScale(0.55);
         this.mappedChips[index] = chip;
-        this.tweens.add({
-          targets: chip,
-          scale: 1,
-          alpha: 1,
-          duration: 220,
-          ease: "Back.Out",
-        });
+        this.tweens.add({ targets: chip, scale: 1, duration: 220, ease: "Back.Out" });
+
+        this.refreshUnique();
 
         if (!isNew) {
           const first = CHARS.indexOf(ch);
-          if (this.mappedChips[first]) pulseChip(this, this.mappedChips[first]);
+          if (this.mappedChips[first]) {
+            pulseChip(this, this.mappedChips[first]);
+            this.flashReuse(this.mappedChips[first]);
+          }
         }
 
-        this.uniqueLabel.setText(`本段已见唯一字符：${this.uniqueSeen.size}`);
-
-        if (index === CHARS.length - 1) {
-          this.vocabHint.setText(`词表大小 = 唯一字符数。本段演示 ${this.uniqueSeen.size} 个；完整 shakespeare_char 是 ${VOCAB_SIZE}。`);
-          this.time.delayedCall(180, () => {
-            this.busy = false;
-          });
-        } else {
-          this.busy = false;
-        }
         this.step += 1;
+        this.busy = false;
       },
+    });
+  }
+
+  refreshUnique() {
+    const n = this.uniqueSeen.size;
+    this.uniqueChip.setValue(`★ ${n}`);
+    this.tweens.add({
+      targets: this.uniqueChip,
+      scale: 1.1,
+      duration: 120,
+      yoyo: true,
+      ease: "Back.Out",
+    });
+  }
+
+  flashReuse(chip) {
+    const stamp = this.add
+      .text(chip.x, chip.y - 50, "复用", displayText(20, { color: C.coralCss }))
+      .setOrigin(0.5)
+      .setScale(0.4);
+    this.tweens.add({
+      targets: stamp,
+      scale: 1,
+      y: chip.y - 58,
+      duration: 180,
+      hold: 420,
+      yoyo: true,
+      onComplete: () => stamp.destroy(),
     });
   }
 
   showFacts() {
     this.busy = true;
     this.factsShown = true;
-    setCaption(this.caption, "映射做完了。下面是 prepare.py 对完整数据集的实测事实（不是本局演示子集）。");
-
+    setSpeech(this.speech, "全量数据！");
     this.sourceTiles.forEach((t) => setTileActive(t, false));
+
     this.tweens.add({
-      targets: [this.uniqueLabel, this.vocabHint],
+      targets: [this.uniqueChip, this.downArrow],
       alpha: 0,
-      duration: 200,
+      duration: 180,
     });
 
-    const panel = makePanel(this, 500, 524, 880, 136);
-    panel.setAlpha(0);
-    panel.y += 24;
-    panel.setDepth(5);
-
-    const title = this.add
-      .text(-420, -48, "完整 shakespeare_char（prepare.py）", uiText(18, { color: C.tealCss, fontStyle: "700" }))
-      .setOrigin(0, 0.5);
-
-    const body = [
-      `长度 ${DATASET.chars.toLocaleString("en-US")} 字符　·　vocab_size = ${DATASET.vocab}`,
-      `切分 ${DATASET.split}　→　train ${DATASET.trainTokens.toLocaleString("en-US")} / val ${DATASET.valTokens.toLocaleString("en-US")} tokens`,
-      "写出 train.bin、val.bin（uint16 id）和 meta.pkl（vocab_size + stoi / itos）",
-    ];
-    const lines = body.map((line, i) =>
-      this.add.text(-420, -14 + i * 28, line, uiText(17)).setOrigin(0, 0.5),
-    );
-
-    panel.add([title, ...lines]);
-    this.tweens.add({
-      targets: panel,
-      alpha: 1,
-      y: 524,
-      duration: 360,
-      ease: "Cubic.Out",
-      onComplete: () => {
-        this.nextBtn.setLabel("明白了");
-        this.hint.setText("点「明白了」进入第 2 关");
-        this.children.bringToTop(this.nextBtn);
-        this.children.bringToTop(this.hint);
-        this.busy = false;
+    const facts = [
+      {
+        value: DATASET.chars.toLocaleString("en-US"),
+        label: "字符",
+        tip: "shakespeare_char 全文长度",
+        accent: C.coral,
       },
+      {
+        value: String(DATASET.vocab),
+        label: "词表",
+        tip: `vocab_size = 唯一字符数 = ${VOCAB_SIZE}`,
+        accent: C.gold,
+      },
+      {
+        value: DATASET.split,
+        label: "切分",
+        tip: `train ${DATASET.trainTokens.toLocaleString("en-US")} / val ${DATASET.valTokens.toLocaleString("en-US")}`,
+        accent: C.teal,
+      },
+      {
+        value: ".bin",
+        label: "产物",
+        tip: "train.bin · val.bin · meta.pkl",
+        accent: C.blue,
+      },
+    ];
+
+    facts.forEach((fact, i) => {
+      const chip = makeFactChip(this, 170 + i * 230, 562, { ...fact, width: 200, height: 86 });
+      chip.setAlpha(0);
+      chip.y += 24;
+      this.factChips.push(chip);
+      this.tweens.add({
+        targets: chip,
+        alpha: 1,
+        y: 562,
+        delay: i * 80,
+        duration: 280,
+        ease: "Back.Out",
+      });
+    });
+
+    this.time.delayedCall(360, () => {
+      this.nextBtn.setLabel("走起");
+      this.hint.setText("下一关");
+      this.children.bringToTop(this.nextBtn);
+      this.children.bringToTop(this.hint);
+      this.busy = false;
     });
   }
 }
 
-function captionFor(ch, id, isNew, uniqueCount) {
-  const label = displayLabel(ch);
-  if (ch === " ") {
-    return `空格也是字符：stoi[' '] = ${id}。本段唯一 ${uniqueCount}。`;
-  }
-  if (ch === "\n") {
-    return `换行 \\n 也在词表里（id 0）。本段唯一 ${uniqueCount}。`;
-  }
-  if (!isNew) {
-    return `「${label}」再次出现，复用 id ${id}，词表不膨胀。本段唯一仍是 ${uniqueCount}。`;
-  }
-  return `stoi['${label}'] = ${id}。本段已见 ${uniqueCount} 个不同字符。`;
+function speechFor(ch, id, isNew) {
+  if (ch === " ") return "空格也算";
+  if (ch === "\n") return "换行是 0";
+  if (!isNew) return "复用这个";
+  const glyph = displayGlyph(ch);
+  return `${glyph} → ${id}`;
 }
