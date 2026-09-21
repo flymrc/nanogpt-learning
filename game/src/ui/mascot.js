@@ -87,6 +87,7 @@ function paintBubble(g, w, h, pointer) {
   g.fillRoundedRect(-w / 2, -h / 2, w, h, 22);
   g.strokeRoundedRect(-w / 2, -h / 2, w, h, 22);
 
+  if (pointer === "none") return;
   const tipX = pointer === "left" ? -w / 2 + 28 : pointer === "right" ? w / 2 - 28 : 0;
   const tipY = h / 2;
   g.fillTriangle(tipX - 12, tipY - 2, tipX + 12, tipY - 2, tipX - 18, tipY + 18);

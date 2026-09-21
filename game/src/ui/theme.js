@@ -1,3 +1,4 @@
+/** Landscape design reference only — scenes should use getView(). */
 export const W = 1280;
 export const H = 720;
 

@@ -2,9 +2,13 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#f3ebe0" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>nanoGPT 闯关</title>
     <link rel="icon" href="./assets/robot.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,7 +20,14 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="game"></div>
+    <div id="safe-probe" aria-hidden="true"></div>
+    <div id="game-shell">
+      <div id="game"></div>
+    </div>
+    <div id="boot-splash" role="status" aria-live="polite">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <p class="boot-label">加载中…</p>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

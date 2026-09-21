@@ -1,16 +1,29 @@
 import Phaser from "phaser";
 import { applyMute, preloadAudio, readMuted } from "../audio/sound.js";
-import { C, H, W } from "../ui/theme.js";
+import { getView, hideBootSplash, watchResize } from "../ui/layout.js";
+import { drawSticker } from "../ui/components.js";
+import { C, displayText, uiText } from "../ui/theme.js";
 
 export default class BootScene extends Phaser.Scene {
   constructor() {
     super("Boot");
   }
 
+  init() {
+    this.game.registry.set("assetsReady", false);
+    this.progress = 0;
+    this.ui = null;
+  }
+
   preload() {
-    const g = this.add.graphics();
-    g.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, C.skyBot, 1);
-    g.fillRect(0, 0, W, H);
+    this.buildLoader();
+    hideBootSplash();
+    watchResize(this, { restart: false });
+
+    this.load.on("progress", (value) => this.setProgress(value));
+    this.load.on("loaderror", (file) => {
+      console.warn("asset failed", file?.key, file?.src);
+    });
 
     this.load.svg("deco-robot", "assets/robot.svg", { width: 200, height: 228 });
     this.load.svg("deco-robot-wow", "assets/robot-wow.svg", { width: 200, height: 228 });
@@ -23,8 +36,91 @@ export default class BootScene extends Phaser.Scene {
   }
 
   create() {
+    this.setProgress(1);
     applyMute(this.game, readMuted());
     this.sound.pauseOnBlur = true;
-    this.scene.start("Title");
+    this.game.registry.set("assetsReady", true);
+    this.time.delayedCall(220, () => this.scene.start("Title"));
+  }
+
+  relayout() {
+    this.buildLoader();
+    this.setProgress(this.progress ?? 0);
+  }
+
+  buildLoader() {
+    const v = getView(this);
+    if (this.ui?.root) {
+      this.tweens.killTweensOf(this.ui.spinner);
+      this.ui.root.destroy(true);
+    }
+
+    const root = this.add.container(0, 0);
+    const bg = this.add.graphics();
+    bg.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, C.skyBot, 1);
+    bg.fillRect(0, 0, v.w, v.h);
+    root.add(bg);
+
+    const cx = v.cx;
+    const cy = v.cy - 12;
+
+    const plate = this.add.graphics();
+    drawSticker(plate, cx - 36, cy - 150, 72, 72, 24, C.cream);
+    root.add(plate);
+
+    const spinner = this.add.graphics();
+    spinner.lineStyle(7, C.stroke, 1);
+    spinner.beginPath();
+    spinner.arc(0, 0, 18, 0.2, Math.PI * 1.4);
+    spinner.strokePath();
+    spinner.lineStyle(5, C.coral, 1);
+    spinner.beginPath();
+    spinner.arc(0, 0, 18, 0.2, Math.PI * 0.9);
+    spinner.strokePath();
+    spinner.setPosition(cx, cy - 114);
+    root.add(spinner);
+    this.tweens.add({
+      targets: spinner,
+      angle: 360,
+      duration: 900,
+      repeat: -1,
+      ease: "Linear",
+    });
+
+    const title = this.add
+      .text(cx, cy - 48, "nanoGPT 闯关", displayText(Math.min(40, Math.max(26, v.innerW / 8))))
+      .setOrigin(0.5);
+    const status = this.add.text(cx, cy - 8, "加载中", uiText(18, { color: C.muted })).setOrigin(0.5);
+    const percent = this.add.text(cx, cy + 28, "0%", displayText(36)).setOrigin(0.5);
+    root.add([title, status, percent]);
+
+    const barW = Math.min(320, v.innerW - 24);
+    const barH = 28;
+    const barX = cx - barW / 2;
+    const barY = cy + 64;
+    const barBg = this.add.graphics();
+    drawSticker(barBg, barX, barY, barW, barH, 14, C.surface, { lineWidth: 5 });
+    const barFill = this.add.graphics();
+    root.add([barBg, barFill]);
+
+    const hint = this.add.text(cx, barY + 48, "图片 · 音频", uiText(14, { color: C.muted })).setOrigin(0.5);
+    root.add(hint);
+
+    this.ui = { root, status, percent, barFill, barW, barH, barX, barY, spinner };
+  }
+
+  setProgress(value) {
+    this.progress = value;
+    if (!this.ui) this.buildLoader();
+    const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
+    this.ui.percent.setText(`${pct}%`);
+    this.ui.status.setText(pct >= 100 ? "就绪" : "加载中");
+    const { barFill, barW, barH, barX, barY } = this.ui;
+    barFill.clear();
+    const fillW = Math.max(0, (barW - 10) * (pct / 100));
+    if (fillW > 0) {
+      barFill.fillStyle(C.coral, 1);
+      barFill.fillRoundedRect(barX + 5, barY + 5, fillW, barH - 10, 10);
+    }
   }
 }

@@ -21,11 +21,11 @@ import {
   makeTag,
   paintBackdrop,
   pulseChip,
-  rowPositions,
   setTileActive,
 } from "../ui/components.js";
 import { addRobot, addScrollBuddy, addSpeechBubble, setSpeech } from "../ui/mascot.js";
-import { C, H, W, displayText } from "../ui/theme.js";
+import { TAP_MIN, flowPositions, getView, watchResize } from "../ui/layout.js";
+import { C, displayText } from "../ui/theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
 
@@ -35,39 +35,87 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
+    const v = getView(this);
+    this.view = v;
     paintBackdrop(this);
     addHeader(this, { level: 1, total: 2, title: "字符变 ID" });
 
-    addRobot(this, 56, 168, { scale: 0.38 });
-    addScrollBuddy(this, 52, 222, { scale: 0.28 });
-    this.speech = addSpeechBubble(this, 214, 118, "点它变数字", { maxWidth: 220 });
+    const robotScale = v.short ? 0.26 : v.compact ? 0.3 : 0.38;
+    const robotX = v.left + (v.compact ? 36 : 56);
+    const robotY = v.padTop + (v.short ? 92 : v.compact ? 118 : 168);
+    addRobot(this, robotX, robotY, { scale: robotScale });
+    if (!v.compact) addScrollBuddy(this, robotX, robotY + 54, { scale: 0.28 });
+    this.speech = addSpeechBubble(this, robotX + (v.compact ? 148 : 158), robotY - (v.compact ? 32 : 50), "点它变数字", {
+      maxWidth: v.compact ? 168 : 220,
+    });
     addMuteToggle(this);
     cueVoice(this, "vo-level1");
 
-    makeTag(this, 88, 230, "原文", C.pink);
-    const srcPos = rowPositions(CHARS.length, 286, 62, 8);
+    const tile = v.short ? 34 : v.compact ? 40 : 62;
+    const chipH = v.short ? 44 : v.compact ? 52 : 80;
+    const gap = v.compact ? 6 : 8;
+    const sourceY = v.padTop + v.innerH * (v.portrait ? 0.24 : 0.28);
+    makeTag(this, v.left + 40, sourceY - tile * 0.7, "原文", C.pink);
+    const srcPos = flowPositions(CHARS.length, {
+      y: sourceY,
+      tileW: tile,
+      tileH: tile,
+      gapX: gap,
+      gapY: gap + 4,
+      innerW: v.innerW,
+      cx: v.cx,
+    });
+    this.tileSize = tile;
+    this.chipH = chipH;
     this.sourceTiles = CHARS.map((ch, i) =>
-      makeCharTile(this, srcPos[i].x, srcPos[i].y, displayGlyph(ch), { seed: ch }),
+      makeCharTile(this, srcPos[i].x, srcPos[i].y, displayGlyph(ch), {
+        width: tile,
+        height: tile,
+        seed: ch,
+      }),
     );
 
-    this.downArrow = makeArrow(this, W / 2, 348, { angle: 90, color: C.coral, label: "" });
+    const srcRows = srcPos[0]?.rows ?? 1;
+    const arrowY = sourceY + srcRows * (tile + gap + 4) + 18;
+    this.downArrow = makeArrow(this, v.cx, arrowY, { angle: 90, color: C.coral, label: "" });
 
-    makeTag(this, 88, 400, "id", C.gold);
-    this.mapPos = rowPositions(CHARS.length, 456, 62, 8);
+    const mapY = arrowY + 56;
+    makeTag(this, v.left + 40, mapY - chipH * 0.55, "id", C.gold);
+    this.mapPos = flowPositions(CHARS.length, {
+      y: mapY,
+      tileW: tile,
+      tileH: chipH,
+      gapX: gap,
+      gapY: gap + 6,
+      innerW: v.innerW,
+      cx: v.cx,
+    });
     this.mappedChips = new Array(CHARS.length).fill(null);
 
-    this.uniqueChip = makeFactChip(this, W / 2, 568, {
+    const mapRows = this.mapPos[0]?.rows ?? 1;
+    const uniqueY = Math.min(
+      v.bottom - (v.portrait ? 168 : 118),
+      mapY + mapRows * (chipH + gap + 6) + 40,
+    );
+    this.uniqueChip = makeFactChip(this, v.cx, uniqueY, {
       value: "★ 0",
       label: "本段唯一",
       tip: "重复字母共用同一个 id",
       accent: C.gold,
-      width: 180,
-      height: 78,
+      width: Math.min(180, v.innerW - 40),
+      height: v.compact ? 70 : 78,
     });
-    this.nextBtn = createButton(this, W - 170, H - 64, "下一步", () => this.advance(), {
-      width: 220,
-      height: 64,
-    });
+
+    const btnW = Math.min(v.portrait ? v.innerW - 20 : 220, 280);
+    const btnH = Math.max(TAP_MIN, 60);
+    this.nextBtn = createButton(
+      this,
+      v.portrait ? v.cx : v.right - btnW / 2,
+      v.bottom - 36,
+      "下一步",
+      () => this.advance(),
+      { width: btnW, height: btnH },
+    );
     this.nextBtn.setDepth(20);
     this.hint = addAdvanceHint(this);
     this.hint.setDepth(20);
@@ -79,6 +127,44 @@ export default class Level1Scene extends Phaser.Scene {
     this.factChips = [];
 
     bindAdvance(this, () => this.advance());
+    watchResize(this, {
+      restart: true,
+      persist: () => {
+        this.registry.set("level1.progress", {
+          step: this.step,
+          factsShown: this.factsShown,
+          unique: [...this.uniqueSeen],
+        });
+      },
+    });
+
+    const saved = this.registry.get("level1.progress");
+    if (saved) {
+      this.registry.remove("level1.progress");
+      this.restoreProgress(saved);
+    }
+  }
+
+  restoreProgress(saved) {
+    this.uniqueSeen = new Set(saved.unique || []);
+    const limit = Math.min(CHARS.length, saved.step || 0);
+    for (let i = 0; i < limit; i += 1) {
+      const ch = CHARS[i];
+      const to = this.mapPos[i];
+      const chip = makeChip(this, to.x, to.y, {
+        glyph: displayGlyph(ch),
+        id: DEMO_IDS[i],
+        accent: this.uniqueSeen.has(ch) ? C.teal : C.blue,
+        width: this.tileSize,
+        height: this.chipH,
+      });
+      this.mappedChips[i] = chip;
+    }
+    this.step = limit;
+    this.refreshUnique();
+    if (saved.factsShown) {
+      this.showFacts({ instant: true });
+    }
   }
 
   advance() {
@@ -91,6 +177,7 @@ export default class Level1Scene extends Phaser.Scene {
       this.showFacts();
       return;
     }
+    this.registry.remove("level1.progress");
     this.scene.start("Level2");
   }
 
@@ -111,8 +198,8 @@ export default class Level1Scene extends Phaser.Scene {
     if (index === 0) cueVoice(this, "vo-map");
 
     const flyer = makeCharTile(this, tile.x, tile.y, displayGlyph(ch), {
-      width: 56,
-      height: 56,
+      width: this.tileSize,
+      height: this.tileSize,
       seed: ch,
     });
     flyer.setDepth(12);
@@ -134,8 +221,8 @@ export default class Level1Scene extends Phaser.Scene {
           glyph: displayGlyph(ch),
           id,
           accent: isNew ? C.teal : C.blue,
-          width: 60,
-          height: 80,
+          width: this.tileSize,
+          height: this.chipH,
         });
         chip.setScale(0.55);
         this.mappedChips[index] = chip;
@@ -185,7 +272,7 @@ export default class Level1Scene extends Phaser.Scene {
     });
   }
 
-  showFacts() {
+  showFacts({ instant = false } = {}) {
     this.busy = true;
     this.factsShown = true;
     setSpeech(this.speech, "全量数据！");
@@ -194,7 +281,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.tweens.add({
       targets: [this.uniqueChip, this.downArrow],
       alpha: 0,
-      duration: 180,
+      duration: instant ? 0 : 180,
     });
 
     const facts = [
@@ -224,22 +311,38 @@ export default class Level1Scene extends Phaser.Scene {
       },
     ];
 
+    const v = this.view;
+    const fw = v.portrait ? Math.min(168, (v.innerW - 12) / 2) : Math.min(200, (v.innerW - 36) / 4);
+    const fh = v.short ? 64 : v.compact ? 74 : 86;
+    const factY = v.bottom - (v.portrait ? 196 : 118);
+
     facts.forEach((fact, i) => {
-      const chip = makeFactChip(this, 170 + i * 230, 562, { ...fact, width: 200, height: 86 });
+      let x;
+      let y;
+      if (v.portrait) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        x = v.cx + (col === 0 ? -fw / 2 - 6 : fw / 2 + 6);
+        y = factY + row * (fh + 10);
+      } else {
+        x = v.cx + (i - 1.5) * (fw + 12);
+        y = factY;
+      }
+      const chip = makeFactChip(this, x, y, { ...fact, width: fw, height: fh });
       chip.setAlpha(0);
-      chip.y += 24;
+      chip.y += instant ? 0 : 24;
       this.factChips.push(chip);
       this.tweens.add({
         targets: chip,
         alpha: 1,
-        y: 562,
-        delay: i * 80,
-        duration: 280,
+        y,
+        delay: instant ? 0 : i * 80,
+        duration: instant ? 0 : 280,
         ease: "Back.Out",
       });
     });
 
-    this.time.delayedCall(360, () => {
+    this.time.delayedCall(instant ? 0 : 360, () => {
       this.nextBtn.setLabel("走起");
       this.hint.setText("下一关");
       this.children.bringToTop(this.nextBtn);
