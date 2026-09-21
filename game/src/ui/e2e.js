@@ -44,7 +44,13 @@ function collectBoxes(scene) {
   }
   if (frame?.lastTabs) boxes.push({ name: "tabs", ...offsetBand(frame.lastTabs, origin) });
   if (frame?.lastCard) boxes.push({ name: "body", ...offsetBand(frame.lastCard, origin) });
-  if (frame?.lastExample) boxes.push({ name: "tape", ...offsetBand(frame.lastExample, origin) });
+  if (frame?.tapeRows?.length) {
+    for (const row of frame.tapeRows) {
+      boxes.push({ name: row.name, ...offsetBand(row, origin) });
+    }
+  } else if (frame?.lastExample) {
+    boxes.push({ name: "tape", ...offsetBand(frame.lastExample, origin) });
+  }
   if (frame?.nextBtn) {
     const cta = phaserBox(frame.nextBtn, "cta", origin);
     if (cta) boxes.push(cta);
@@ -101,14 +107,35 @@ function assertLessonLayout(scene) {
   const phone = !isWidePcTutor();
   const dock = document.getElementById("tutor-dock");
   const live2dOn = dock && !dock.hidden && getComputedStyle(dock).display !== "none";
+  const orphans = collectOrphanOverlays(scene);
+  const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
+  const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
   return {
-    ok: overlaps.length === 0 && overflows.length === 0 && (phone ? !live2dOn : live2dOn),
+    ok:
+      overlaps.length === 0 &&
+      overflows.length === 0 &&
+      orphans.length === 0 &&
+      hudOk &&
+      (phone ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
     overlaps,
     overflows,
+    orphans,
     live2dOn: Boolean(live2dOn),
-    hudParent: document.getElementById("mute-toggle")?.parentElement?.id || null,
+    hudParent,
     layout: document.documentElement.dataset.layout,
   };
+}
+
+function collectOrphanOverlays(scene) {
+  if (isWidePcTutor()) return [];
+  const hits = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    if (obj.text === "挪一格") hits.push(obj.text);
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  return hits;
 }

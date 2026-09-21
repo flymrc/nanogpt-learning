@@ -231,7 +231,7 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
       0,
       compact ? -height * 0.18 : -height * 0.12,
       glyph,
-      monoText(Math.max(13, Math.round(width * (compact ? 0.42 : 0.44))), { fontStyle: "700" }),
+      monoText(Math.max(compact ? 8 : 13, Math.round(width * (compact ? 0.4 : 0.44))), { fontStyle: "700" }),
     )
     .setOrigin(0.5);
   const idText = scene.add
@@ -239,7 +239,7 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
       0,
       compact ? height * 0.22 : height * 0.26,
       String(id),
-      monoText(Math.max(12, Math.round(width * 0.3)), { fontStyle: "700" }),
+      monoText(Math.max(compact ? 7 : 12, Math.round(width * (compact ? 0.26 : 0.3))), { fontStyle: "700" }),
     )
     .setOrigin(0.5);
   parts.push(ch, idText);
@@ -555,10 +555,11 @@ export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
 
 function paintBadge(g, width, height, accent, on, opts = {}) {
   const compact = opts.compact;
-  const radius = Math.max(8, Math.min(16, width * 0.26));
-  const stripeH = Math.max(compact ? 10 : 12, height * (compact ? 0.24 : 0.28));
+  const radius = Math.max(compact ? 4 : 8, Math.min(16, width * 0.26));
+  const stripeH = Math.max(compact ? 8 : 12, height * (compact ? 0.22 : 0.28));
   drawSticker(g, -width / 2, -height / 2, width, height, radius, on ? 0xfff4c2 : C.surface, {
-    lineWidth: on ? 6 : Math.max(3, width * 0.08),
+    lineWidth: on ? 6 : Math.max(compact ? 2 : 3, width * 0.08),
+    shadow: !compact,
   });
   g.fillStyle(accent, 1);
   g.fillRoundedRect(-width / 2 + 4, height / 2 - stripeH - 3, width - 8, stripeH, Math.max(4, radius * 0.5));

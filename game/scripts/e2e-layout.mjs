@@ -2,8 +2,17 @@
  * Visual E2E for mobile 390×844 and PC 1440×900.
  * Fails if lesson bands overlap, chips overflow, or layout mode is wrong.
  */
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
+
+async function loadChromium() {
+  try {
+    return (await import("playwright")).chromium;
+  } catch {
+    const require = createRequire("/tmp/node_modules/playwright/package.json");
+    return require("playwright").chromium;
+  }
+}
 
 const OUT = process.env.E2E_OUT || "/tmp/nanogpt-e2e";
 mkdirSync(OUT, { recursive: true });
@@ -18,6 +27,7 @@ const JUMPS = [
   ["Level2", 7, 4, "l2-last"],
 ];
 
+const chromium = await loadChromium();
 const browser = await chromium.launch({
   executablePath: process.env.CHROME || "/usr/bin/google-chrome-stable",
   headless: true,

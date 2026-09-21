@@ -209,12 +209,20 @@ export function paintLessonStage(scene, beat, phase, onPick) {
   scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };
   scene.frame.lastCard = { left: scene.frame.stageBand.left, top: card.bottom - card.height, w: scene.frame.stageBand.w, h: card.height };
   scene.frame.lastExample = band;
+  scene.frame.tapeRows = [];
   return { tabs, card, band };
 }
 
 export function finishLessonStage(scene, band) {
   const bottom = layerBottom(scene.frame.stage, band.top);
-  placeLessonCta(scene.frame, Math.min(bottom, scene.frame.shell.footer.top - scene.frame.rhythm));
+  const cap = scene.frame.shell.footer.top - scene.frame.rhythm;
+  const usedBottom = Math.min(bottom, cap);
+  placeLessonCta(scene.frame, usedBottom);
+  scene.frame.lastExample = {
+    ...band,
+    bottom: usedBottom,
+    h: Math.max(16, usedBottom - band.top),
+  };
   installLayoutProbe(scene);
 }
 

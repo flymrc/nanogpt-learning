@@ -123,6 +123,10 @@ export function teach(scene, purposeUi, speech, beat, { index, total }) {
 
 export function clearLayer(layer) {
   if (!layer) return;
+  const scene = layer.scene;
+  for (const child of [...(layer.list || [])]) {
+    scene?.tweens?.killTweensOf(child);
+  }
   layer.removeAll(true);
 }
 

@@ -330,7 +330,7 @@ function layoutTokens(stage, { showX = false, showY = false } = {}) {
   const metrics = { tileW, tileH, gapX, font: Math.max(11, Math.round(tileW * 0.4)) };
   const total = count * tileW + (count - 1) * gapX;
   const startX = stage.left + (stage.w - total) / 2 + tileW / 2;
-  const tagSlot = phone ? 18 : 22;
+  const tagSlot = phone ? 30 : 28;
   const rhythm = phone ? 10 : 16;
   const rowPitch = tagSlot + tileH + rhythm;
   const streamY = stage.top + tagSlot + tileH / 2;
@@ -365,7 +365,8 @@ function drawWindowRows(
 ) {
   const layout = layoutTokens(stage, { showX, showY });
   const { metrics, phone } = layout;
-  scene.frame.stage.add(addSectionTag(scene, "纸带", C.violet, { left: stage.left, top: stage.top }));
+  const streamLabel = phone && notFromStart ? "纸带 · 前面还很长" : "纸带";
+  scene.frame.stage.add(addSectionTag(scene, streamLabel, C.violet, { left: stage.left, top: stage.top }));
 
   if (notFromStart && !phone) {
     const first = layout.streamPos[0];
@@ -382,10 +383,6 @@ function drawWindowRows(
     const tag = makeTag(scene, dotsX - 8, first.y - metrics.tileH * 0.7, "前面还很长", C.violet);
     tag.setAlpha(0.7);
     scene.frame.stage.add(tag);
-  } else if (notFromStart && phone) {
-    scene.frame.stage.add(
-      addSectionTag(scene, "前面还很长…", C.violet, { left: stage.left + 52, top: stage.top }),
-    );
   }
 
   STREAM.forEach((id, i) => {
@@ -468,6 +465,33 @@ function drawWindowRows(
     });
   }
   const lastY = showY ? layout.yY : showX ? layout.xY : layout.streamPos[0].y;
+  scene.frame.tapeRows = [
+    {
+      name: "row-stream",
+      left: stage.left,
+      top: layout.streamPos[0].y - metrics.tileH / 2,
+      w: stage.w,
+      h: metrics.tileH,
+    },
+    showX
+      ? {
+          name: "row-x",
+          left: stage.left,
+          top: layout.xY - metrics.tileH / 2,
+          w: stage.w,
+          h: metrics.tileH,
+        }
+      : null,
+    showY
+      ? {
+          name: "row-y",
+          left: stage.left,
+          top: layout.yY - metrics.tileH / 2,
+          w: stage.w,
+          h: metrics.tileH,
+        }
+      : null,
+  ].filter(Boolean);
   return { bottom: lastY + metrics.tileH / 2 };
 }
 
