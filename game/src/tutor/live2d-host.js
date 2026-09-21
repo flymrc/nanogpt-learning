@@ -1,3 +1,4 @@
+import { applyLayoutMode } from "../ui/mode.js";
 import { renderTutorBook } from "../ui/textbook.js";
 import { currentTutor, isWidePcTutor, onTutor } from "./bus.js";
 
@@ -109,6 +110,7 @@ export function syncTutorHost() {
 }
 
 function syncTutorLayout() {
+  applyLayoutMode();
   const layout = document.getElementById("app-layout");
   const dock = document.getElementById("tutor-dock");
   if (!layout || !dock) return;

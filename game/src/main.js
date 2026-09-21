@@ -12,6 +12,7 @@ import { mountGameCursor } from "./ui/cursor.js";
 import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
+import { applyLayoutMode } from "./ui/mode.js";
 
 const startCss = cssViewportSize();
 const startDpr = displayRatio();
@@ -94,13 +95,23 @@ async function boot() {
   }
 
   applyOuterViewport();
+  applyLayoutMode();
+  const bootCss = cssViewportSize();
+  const bootDpr = displayRatio();
+  const bootGame = gamePixelSize(bootCss, bootDpr);
+  config.width = bootGame.w;
+  config.height = bootGame.h;
+  config.scale.width = bootGame.w;
+  config.scale.height = bootGame.h;
+  config.scale.zoom = 1 / bootDpr;
+
   mountMuteHud(() => window.__nanoGPTGame);
   mountNotesHud();
   mountTutorBook();
   mountTutorHost();
 
   const game = new Phaser.Game(config);
-  game.registry.set("dpr", startDpr);
+  game.registry.set("dpr", bootDpr);
   game.registry.set("safeInsets", readSafeInsets());
   game.registry.set("assetsReady", false);
   applyMute(game, readMuted());
@@ -109,6 +120,7 @@ async function boot() {
 
   const syncSize = () => {
     applyOuterViewport();
+    applyLayoutMode();
     syncTutorHost();
     game.registry.set("safeInsets", readSafeInsets());
     applyGameSize(game);

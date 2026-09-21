@@ -78,5 +78,6 @@ export function setCursorHover(on) {
 }
 
 function canUseCustomCursor() {
+  if (document.documentElement.classList.contains("is-mobile")) return false;
   return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 }

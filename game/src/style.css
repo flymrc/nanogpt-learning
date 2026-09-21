@@ -25,14 +25,23 @@ body {
   background: #f3ebe0;
 }
 
+#app-layout.is-phone {
+  flex-direction: column;
+}
+
 #game-shell {
   position: relative;
   flex: 1 1 auto;
   min-width: 0;
-  height: 100%;
+  min-height: 0;
+  height: auto;
   box-sizing: border-box;
   background: #f3ebe0;
   overflow: hidden;
+}
+
+#app-layout.is-wide #game-shell {
+  height: 100%;
 }
 
 #game {
@@ -60,8 +69,12 @@ body {
   overflow: hidden;
 }
 
-#app-layout.is-wide #tutor-dock:not([hidden]) {
+html.is-pc #app-layout.is-wide #tutor-dock:not([hidden]) {
   display: block;
+}
+
+html.is-mobile #tutor-dock {
+  display: none !important;
 }
 
 #tutor-dock[hidden] {
@@ -134,7 +147,95 @@ body {
   margin: 12px auto 0;
 }
 
+#mobile-chrome {
+  display: none;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+  box-sizing: border-box;
+  background: #f3ebe0;
+  z-index: 20;
+}
+
+html.is-mobile #mobile-chrome:not([hidden]) {
+  display: flex;
+}
+
+html.is-pc #mobile-chrome {
+  display: none !important;
+}
+
+.mobile-chrome__badge {
+  flex: 0 0 auto;
+  min-width: 40px;
+  height: 36px;
+  padding: 0 10px;
+  border: 4px solid #3b2a2e;
+  border-radius: 14px;
+  background: #ff7a85;
+  color: #3b2a2e;
+  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", sans-serif;
+  font-size: 16px;
+  line-height: 28px;
+  text-align: center;
+}
+
+.mobile-chrome__badge[hidden] {
+  display: none !important;
+}
+
+.mobile-chrome__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", sans-serif;
+  font-size: 20px;
+  color: #3b2a2e;
+}
+
+.mobile-chrome__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+#pc-chrome {
+  display: none;
+}
+
+html.is-pc #pc-chrome:not([hidden]) {
+  display: block;
+}
+
+html.is-mobile #pc-chrome {
+  display: none !important;
+}
+
 .mute-toggle {
+  position: relative;
+}
+
+.mute-toggle,
+.notes-toggle,
+.book-toggle {
+  box-sizing: border-box;
+  border: 5px solid #3b2a2e;
+  border-radius: 18px;
+  background: #fff8ee;
+  color: #3b2a2e;
+  box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.2);
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#pc-chrome .mute-toggle {
   position: absolute;
   top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
   right: max(10px, calc(env(safe-area-inset-right, 0px) + 8px));
@@ -142,13 +243,6 @@ body {
   width: 52px;
   height: 52px;
   padding: 0;
-  border: 5px solid #3b2a2e;
-  border-radius: 18px;
-  background: #fff8ee;
-  color: #3b2a2e;
-  box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.2);
-  cursor: pointer;
-  touch-action: manipulation;
 }
 
 .mute-toggle:hover {
@@ -191,53 +285,44 @@ body {
   display: block;
 }
 
-.notes-toggle,
-.book-toggle {
+#pc-chrome .notes-toggle,
+#pc-chrome .book-toggle {
   position: absolute;
   top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
   z-index: 30;
   height: 52px;
   padding: 0 14px;
-  border: 5px solid #3b2a2e;
-  border-radius: 18px;
-  background: #fff8ee;
-  color: #3b2a2e;
-  box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.2);
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
   font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  touch-action: manipulation;
 }
 
-.notes-toggle {
+#pc-chrome .notes-toggle {
   right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 60px);
 }
 
-.book-toggle {
+#pc-chrome .book-toggle {
   right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 168px);
 }
 
-/* HUD lives in #game-shell only — never the tutor column. */
-#app-layout.is-wide .mute-toggle,
-#app-layout.is-wide .notes-toggle,
-#app-layout.is-wide .book-toggle {
-  z-index: 30;
+#mobile-actions .mute-toggle,
+#mobile-actions .notes-toggle,
+#mobile-actions .book-toggle {
+  position: static;
+  height: 36px;
+  padding: 0 8px;
+  border-width: 4px;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 rgba(59, 42, 46, 0.18);
+  font-size: 13px;
 }
 
-@media (max-width: 560px) {
-  .notes-toggle,
-  .book-toggle {
-    height: 44px;
-    padding: 0 8px;
-    font-size: 13px;
-  }
-  .notes-toggle {
-    right: calc(max(8px, env(safe-area-inset-right, 0px) + 6px) + 52px);
-  }
-  .book-toggle {
-    right: calc(max(8px, env(safe-area-inset-right, 0px) + 6px) + 132px);
-  }
+#mobile-actions .mute-toggle {
+  width: 36px;
+  padding: 0;
+}
+
+#mobile-actions .mute-toggle__speaker {
+  width: 20px;
+  height: 20px;
 }
 
 .notes-toggle:hover,
@@ -259,6 +344,14 @@ body {
   background: rgba(59, 42, 46, 0.22);
 }
 
+html.is-mobile #lesson-book-overlay {
+  position: fixed;
+  inset: 0;
+  padding: 10px;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
 #lesson-book-overlay[hidden] {
   display: none !important;
 }
@@ -273,6 +366,13 @@ body {
   border-radius: 22px;
   box-shadow: 6px 8px 0 rgba(59, 42, 46, 0.2);
   color: #3b2a2e;
+}
+
+html.is-mobile .lesson-book-card {
+  width: 100%;
+  max-height: none;
+  height: 100%;
+  border-radius: 18px;
 }
 
 .lesson-book-head {
@@ -298,6 +398,18 @@ body {
   justify-content: center;
   padding: 24px 16px;
   background: rgba(59, 42, 46, 0.28);
+}
+
+html.is-mobile #notes-overlay {
+  padding: 10px;
+  align-items: stretch;
+}
+
+html.is-mobile .notes-card {
+  width: 100%;
+  max-height: none;
+  height: 100%;
+  border-radius: 18px;
 }
 
 #notes-overlay[hidden] {

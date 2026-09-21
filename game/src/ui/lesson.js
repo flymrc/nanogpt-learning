@@ -3,25 +3,28 @@ import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
-import { C, displayText, uiText } from "./theme.js";
+import { syncMobileChrome } from "./mode.js";
+import { C, displayText, uiText, wrapToWidth } from "./theme.js";
 
 export function makeLessonFrame(scene, { level, total, title, startLabel = "下一步" }) {
-  const shell = makeShell(scene);
+  const phone = !isWidePcTutor();
+  const shell = makeShell(scene, phone ? { header: false, footerH: 84 } : {});
   const v = shell.v;
   paintBackdrop(scene);
-  addChrome(scene, { level, total, title, shell });
+  if (phone) syncMobileChrome({ level, total, title });
+  else addChrome(scene, { level, total, title, shell });
 
   const rhythm = lessonRhythm(v);
-  const purposeH = clamp(Math.round((v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), 64, 88);
+  const purposeH = clamp(Math.round((phone ? 68 : v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), phone ? 60 : 64, phone ? 76 : 88);
   const purposeBand = band(v.left, shell.content.top, v.innerW, purposeH);
   const stageTop = purposeBand.bottom + rhythm;
   const stageBand = band(v.left, stageTop, v.innerW, Math.max(80, shell.content.bottom - stageTop));
 
-  const purpose = addPurposeBanner(scene, purposeBand);
+  const purpose = addPurposeBanner(scene, purposeBand, { phone });
   const stage = scene.add.container(0, 0);
 
   const live2dOn = isWidePcTutor();
-  const showRobot = !live2dOn && !v.compact && stageBand.h > 280;
+  const showRobot = !live2dOn && !phone && !v.compact && stageBand.h > 280;
   let speech = null;
   if (showRobot) {
     const robotX = v.left + (v.compact ? 32 : 48);
@@ -66,38 +69,40 @@ export function layerBottom(layer, fallback) {
   return bottom;
 }
 
-export function addPurposeBanner(scene, rect) {
+export function addPurposeBanner(scene, rect, { phone = false } = {}) {
   const box = scene.add.container(rect.cx, rect.cy);
   const g = scene.add.graphics();
-  drawSticker(g, -rect.w / 2, -rect.h / 2, rect.w, rect.h, 20, C.surface);
+  drawSticker(g, -rect.w / 2, -rect.h / 2, rect.w, rect.h, phone ? 16 : 20, C.surface);
   const stripe = scene.add.graphics();
   stripe.fillStyle(C.gold, 1);
-  stripe.fillRoundedRect(-rect.w / 2 + 8, -rect.h / 2 + 8, 12, rect.h - 16, 7);
+  stripe.fillRoundedRect(-rect.w / 2 + 8, -rect.h / 2 + 8, 10, rect.h - 16, 6);
 
   const kicker = scene.add
-    .text(-rect.w / 2 + 32, -rect.h * 0.22, "这一步要干什么", uiText(13, { color: C.goldCss }))
+    .text(-rect.w / 2 + 26, -rect.h * 0.24, "这一步要干什么", uiText(phone ? 12 : 13, { color: C.goldCss }))
     .setOrigin(0, 0.5);
   const purpose = scene.add
-    .text(-rect.w / 2 + 32, rect.h * 0.16, "", displayText(Math.max(18, Math.round(rect.h * 0.28))))
+    .text(-rect.w / 2 + 26, rect.h * 0.16, "", displayText(Math.max(phone ? 16 : 18, Math.round(rect.h * 0.26))))
     .setOrigin(0, 0.5);
   const step = scene.add
-    .text(rect.w / 2 - 16, 0, "", uiText(14, { color: C.muted }))
+    .text(rect.w / 2 - 12, phone ? -rect.h * 0.24 : 0, "", uiText(phone ? 12 : 14, { color: C.muted }))
     .setOrigin(1, 0.5);
 
   box.add([g, stripe, kicker, purpose, step]);
   box.setSize(rect.w, rect.h);
   box.set = (text, index, total, extra = {}) => {
     kicker.setText(extra.kicker || "这一步要干什么");
-    purpose.setText(text);
-    const maxW = rect.w - 88;
-    let size = Math.max(18, Math.round(rect.h * 0.28));
-    purpose.setFontSize(size);
-    while (purpose.width > maxW && size > 13) {
-      size -= 1;
-      purpose.setFontSize(size);
-    }
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
+    const maxW = phone ? rect.w - 40 : rect.w - 88;
+    let size = Math.max(phone ? 15 : 18, Math.round(rect.h * 0.26));
+    const wrapped = wrapToWidth(scene, text, size, maxW, displayText);
+    purpose.setFontSize(size);
+    purpose.setText(wrapped);
+    while (purpose.height > rect.h * 0.58 && size > 13) {
+      size -= 1;
+      purpose.setFontSize(size);
+      purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
+    }
     purpose.setAlpha(0);
     scene.tweens.add({ targets: purpose, alpha: 1, duration: 140 });
   };

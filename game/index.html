@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="is-mobile" data-layout="mobile">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -21,54 +21,61 @@
   </head>
   <body>
     <div id="safe-probe" aria-hidden="true"></div>
-    <div id="app-layout">
+    <div id="app-layout" class="is-phone">
+      <header id="mobile-chrome" hidden>
+        <span id="mobile-badge" class="mobile-chrome__badge">1/2</span>
+        <p id="mobile-title" class="mobile-chrome__title">nanoGPT 闯关</p>
+        <div id="mobile-actions" class="mobile-chrome__actions"></div>
+      </header>
       <div id="game-shell">
-        <button
-          type="button"
-          id="mute-toggle"
-          class="mute-toggle"
-          aria-label="静音"
-          aria-pressed="false"
-          title="静音"
-        >
-          <svg class="mute-toggle__speaker" viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M3.5 9.2h3.1L11 5.4v13.2L6.6 14.8H3.5V9.2z"
-              fill="currentColor"
-            />
-            <path
-              class="mute-toggle__waves"
-              d="M14.2 8.4a4.2 4.2 0 0 1 0 7.2M16.8 6.2a7.2 7.2 0 0 1 0 11.6"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.2"
-              stroke-linecap="round"
-            />
-          </svg>
-          <span class="mute-toggle__slash" aria-hidden="true"></span>
-        </button>
-        <button
-          type="button"
-          id="notes-toggle"
-          class="notes-toggle"
-          aria-label="看不懂？"
-          aria-expanded="false"
-          aria-controls="notes-overlay"
-          title="看不懂？"
-        >
-          看不懂？
-        </button>
-        <button
-          type="button"
-          id="book-toggle"
-          class="book-toggle"
-          aria-label="详细笔记"
-          aria-expanded="false"
-          aria-controls="lesson-book-overlay"
-          title="详细笔记"
-        >
-          详细笔记
-        </button>
+        <div id="pc-chrome">
+          <button
+            type="button"
+            id="mute-toggle"
+            class="mute-toggle"
+            aria-label="静音"
+            aria-pressed="false"
+            title="静音"
+          >
+            <svg class="mute-toggle__speaker" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M3.5 9.2h3.1L11 5.4v13.2L6.6 14.8H3.5V9.2z"
+                fill="currentColor"
+              />
+              <path
+                class="mute-toggle__waves"
+                d="M14.2 8.4a4.2 4.2 0 0 1 0 7.2M16.8 6.2a7.2 7.2 0 0 1 0 11.6"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span class="mute-toggle__slash" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            id="notes-toggle"
+            class="notes-toggle"
+            aria-label="看不懂？"
+            aria-expanded="false"
+            aria-controls="notes-overlay"
+            title="看不懂？"
+          >
+            看不懂？
+          </button>
+          <button
+            type="button"
+            id="book-toggle"
+            class="book-toggle"
+            aria-label="详细笔记"
+            aria-expanded="false"
+            aria-controls="lesson-book-overlay"
+            title="详细笔记"
+          >
+            详细笔记
+          </button>
+        </div>
         <div id="game"></div>
         <div id="lesson-book-overlay" hidden>
           <div class="lesson-book-card" role="dialog" aria-modal="true" aria-labelledby="lesson-book-title">

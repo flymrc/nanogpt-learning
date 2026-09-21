@@ -1,10 +1,11 @@
 import Phaser from "phaser";
 import { TITLE_BEAT } from "../data/beats.js";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
-import { emitTutor } from "../tutor/bus.js";
+import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, paintBackdrop } from "../ui/components.js";
 import { fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText } from "../ui/theme.js";
 
 export default class TitleScene extends Phaser.Scene {
@@ -18,9 +19,11 @@ export default class TitleScene extends Phaser.Scene {
       return;
     }
 
-    const shell = makeShell(this, { twoRow: false, headerH: 56 });
+    const phone = !isWidePcTutor();
+    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
     const v = shell.v;
     paintBackdrop(this);
+    if (phone) syncMobileChrome({ title: "nanoGPT 闯关" });
     addMuteToggle(this, shell);
     watchResize(this, { restart: true });
 
