@@ -69,11 +69,11 @@ async function bootLive2d() {
     throw new Error("pixi-live2d-display did not attach");
   }
 
-  const { width, height } = dock.getBoundingClientRect();
+  const { width, height } = hostSize();
   pixiApp = new PIXI.Application({
     view: canvas,
-    width: Math.max(200, Math.round(width)),
-    height: Math.max(240, Math.round(height)),
+    width,
+    height,
     backgroundAlpha: 0,
     antialias: true,
     autoDensity: true,
@@ -85,7 +85,7 @@ async function bootLive2d() {
     autoUpdate: true,
   });
   pixiApp.stage.addChild(model);
-  model.anchor.set(0.5, 0.55);
+  model.anchor.set(0.5, 0.12);
   placeModel();
   model.on("hit", () => playMood("react"));
 
@@ -100,22 +100,33 @@ function modelUrl() {
   return `${import.meta.env.BASE_URL}assets/live2d/Hiyori/Hiyori.model3.json`;
 }
 
+function hostSize() {
+  const canvas = document.getElementById("tutor-canvas");
+  const box = canvas?.getBoundingClientRect();
+  return {
+    width: Math.max(180, Math.round(box?.width || 280)),
+    height: Math.max(220, Math.round(box?.height || 400)),
+  };
+}
+
 function resizePixi() {
-  const dock = document.getElementById("tutor-dock");
-  if (!pixiApp || !dock) return;
-  const { width, height } = dock.getBoundingClientRect();
-  pixiApp.renderer.resize(Math.max(200, Math.round(width)), Math.max(240, Math.round(height)));
+  if (!pixiApp) return;
+  const { width, height } = hostSize();
+  pixiApp.renderer.resize(width, height);
   placeModel();
 }
 
 function placeModel() {
   if (!pixiApp || !model) return;
-  const w = pixiApp.renderer.width;
-  const h = pixiApp.renderer.height;
-  const scale = Math.min(w / 900, h / 1600) * 1.55;
+  const { width: w, height: h } = hostSize();
+  if (w < 40 || h < 40) return;
+  // Crop to the face / upper body so the tutor is actually visible
+  // beside the lesson, not a floating torso.
+  const scale = Math.min(w / 1050, h / 820);
+  model.anchor.set(0.5, 0.1);
   model.scale.set(scale);
   model.x = w * 0.5;
-  model.y = h * 0.72;
+  model.y = Math.max(4, h * 0.04);
 }
 
 function teardownLive2d() {
