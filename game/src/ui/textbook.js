@@ -164,7 +164,7 @@ function phaseAccent(id) {
 }
 
 export function exampleBand(stage, cardBottom) {
-  const top = Math.min(cardBottom, stage.top + 120);
+  const top = Math.max(cardBottom, stage.top + 90);
   return {
     ...stage,
     top,
