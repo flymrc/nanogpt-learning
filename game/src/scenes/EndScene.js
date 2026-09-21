@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
-import { REAL_BATCH, REAL_BLOCK } from "../data/facts.js";
+import { VOCAB_SIZE } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
@@ -52,26 +52,26 @@ export default class EndScene extends Phaser.Scene {
     const cards = [
       {
         icon: "deco-badge",
-        fallback: "Aa",
-        title: "字符变 ID",
-        caption: "词表就是 65",
-        tip: "prepare.py：字符 → id，写出 train.bin / val.bin / meta.pkl",
+        fallback: "?",
+        title: "猜下一个字",
+        caption: "像输入法补全",
+        tip: "语言模型就是「下一个字的概率排行榜」。本游戏没有训练模型。",
         accent: C.teal,
       },
       {
         icon: "deco-window",
-        fallback: "▭",
-        title: "窗口右移",
-        caption: "y 是下一位",
-        tip: `x = data[i:i+T]，y = data[i+1:i+1+T]。正式 T=${REAL_BLOCK}，batch=${REAL_BATCH}`,
+        fallback: "号",
+        title: "字换成号码",
+        caption: `一共 ${VOCAB_SIZE} 种字`,
+        tip: "练习卷和检查卷是两串整数。源码里叫 train.bin / val.bin。",
         accent: C.blue,
       },
       {
         icon: "deco-star",
         fallback: "★",
-        title: "预测下一位",
-        caption: "65 类对齐",
-        tip: "F.cross_entropy 对齐 y[t]。本游戏没有训练模型。",
+        title: "往后挪一格",
+        caption: "猜错要罚分",
+        tip: "正确答案是后一位。源码里这个罚分叫交叉熵。本游戏没有训练。",
         accent: C.gold,
       },
     ];

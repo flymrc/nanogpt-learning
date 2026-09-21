@@ -27,14 +27,14 @@ TMP = OUT / "_tmp"
 
 VOICE = "zh-CN-XiaoxiaoNeural"
 VO_LINES = {
-    "vo-title": "一起闯关吧！",
-    "vo-level1": "第一关，把字符变成数字。",
-    "vo-map": "字符变成数字了。",
+    "vo-title": "一起猜下一个字吧！",
+    "vo-level1": "先想想手机输入法。",
+    "vo-map": "每个字都排进榜。",
     "vo-reuse": "同样的字，同一个号。",
-    "vo-level2": "第二关，先框住窗口。",
-    "vo-shift": "Y 往右挪一位。",
-    "vo-next": "看见这个，预测下一个。",
-    "vo-loss": "六十五类对齐。",
+    "vo-level2": "看见这个，猜下一个。",
+    "vo-shift": "正确答案往后挪一格。",
+    "vo-next": "看见S，下一字是e。",
+    "vo-loss": "猜得越离谱，罚分越大。",
     "vo-clear": "通关啦！",
 }
 
@@ -280,18 +280,20 @@ def make_voice(stem: str, text: str) -> None:
 
 
 def main() -> None:
+    vo_only = "--vo" in sys.argv or "--vo-only" in sys.argv
     OUT.mkdir(parents=True, exist_ok=True)
     if TMP.exists():
         shutil.rmtree(TMP)
     TMP.mkdir()
 
-    print("synthesizing BGM / SFX")
-    write_wav(TMP / "bgm.wav", make_bgm())
-    write_wav(TMP / "sfx-tap.wav", make_sfx_tap())
-    write_wav(TMP / "sfx-pop.wav", make_sfx_pop())
-    encode(TMP / "bgm.wav", "bgm")
-    encode(TMP / "sfx-tap.wav", "sfx-tap")
-    encode(TMP / "sfx-pop.wav", "sfx-pop")
+    if not vo_only:
+        print("synthesizing BGM / SFX")
+        write_wav(TMP / "bgm.wav", make_bgm())
+        write_wav(TMP / "sfx-tap.wav", make_sfx_tap())
+        write_wav(TMP / "sfx-pop.wav", make_sfx_pop())
+        encode(TMP / "bgm.wav", "bgm")
+        encode(TMP / "sfx-tap.wav", "sfx-tap")
+        encode(TMP / "sfx-pop.wav", "sfx-pop")
 
     print("synthesizing Chinese VO")
     for stem, text in VO_LINES.items():

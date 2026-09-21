@@ -7,7 +7,6 @@ import {
   DEMO_Y_IDS,
   REAL_BATCH,
   REAL_BLOCK,
-  TOKENS_PER_ITER,
   VOCAB_SIZE,
   displayGlyph,
 } from "../data/facts.js";
@@ -15,6 +14,7 @@ import {
   addSectionTag,
   highlightChip,
   makeChip,
+  makeFactChip,
   makePairBoard,
   makeTag,
   makeWindowFrame,
@@ -42,7 +42,7 @@ export default class Level2Scene extends Phaser.Scene {
     const frame = makeLessonFrame(this, {
       level: 2,
       total: 2,
-      title: "窗口与 (x, y)",
+      title: "往后挪一格",
     });
     this.frame = frame;
     this.view = frame.v;
@@ -82,7 +82,7 @@ export default class Level2Scene extends Phaser.Scene {
       total: LEVEL2_BEATS.length,
     });
     this.frame.nextBtn.setLabel(index === LEVEL2_BEATS.length - 1 ? "走起" : "下一步");
-    this.frame.nextBtn.setCaption(index === LEVEL2_BEATS.length - 1 ? "看契约" : "点一下");
+    this.frame.nextBtn.setCaption(index === LEVEL2_BEATS.length - 1 ? "通关" : "点一下");
     this.children.bringToTop(this.frame.nextBtn);
     clearLayer(this.frame.stage);
     RENDERERS[beat.id]?.(this, this.frame.stageBand, { instant });
@@ -90,44 +90,39 @@ export default class Level2Scene extends Phaser.Scene {
 }
 
 const RENDERERS = {
-  why: (scene, stage, opts) =>
-    drawIconRow(scene, stage, opts, [
-      { glyph: "带", label: "train.bin", accent: C.violet },
-      { glyph: "框", label: "切窗口", accent: C.blue },
-      { glyph: "下", label: "预测下一位", accent: C.gold },
-    ]),
-  stream: (scene, stage, opts) => drawStreamOnly(scene, stage, opts),
-  x: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: true, showY: false }),
-  y: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: true, showY: true }),
+  peek: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: false, showY: false }),
+  seen: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: true, showY: false }),
+  answer: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: true, showY: true }),
   "pair-se": (scene, stage, opts) => drawPair(scene, stage, opts, 0),
   "pair-ec": (scene, stage, opts) => drawPair(scene, stage, opts, 1),
   "pair-nw": (scene, stage, opts) => drawPair(scene, stage, opts, DEMO_BLOCK - 1),
   all: (scene, stage, opts) => drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true }),
-  block: (scene, stage, opts) =>
+  window: (scene, stage, opts) =>
     drawStats(scene, stage, opts, [
-      { value: String(DEMO_BLOCK), label: "演示 block", accent: C.blue },
-      { value: String(REAL_BLOCK), label: "正式 block_size", accent: C.gold },
+      { value: String(DEMO_BLOCK), label: "演示格子", accent: C.blue },
+      { value: String(REAL_BLOCK), label: "正式更长", accent: C.gold },
     ]),
-  batch: (scene, stage, opts) =>
+  many: (scene, stage, opts) =>
     drawStats(scene, stage, opts, [
-      { value: String(REAL_BATCH), label: "batch_size", accent: C.teal },
-      { value: `(${REAL_BATCH},${REAL_BLOCK})`, label: "x / y 形状", accent: C.blue },
+      { value: String(REAL_BATCH), label: "一次拿几段", accent: C.teal },
     ]),
-  tokens: (scene, stage, opts) =>
-    drawStats(scene, stage, opts, [
-      { value: String(TOKENS_PER_ITER), label: "单卡 tokens/iter", accent: C.gold },
-    ]),
-  loss: (scene, stage, opts) =>
-    drawStats(scene, stage, opts, [
-      { value: String(VOCAB_SIZE), label: "每个位置的类数", accent: C.coral },
-      { value: "CE", label: "对齐 y[t]", accent: C.gold },
-    ]),
-  contract: (scene, stage, opts) =>
+  score: (scene, stage, opts) =>
     drawIconRow(scene, stage, opts, [
-      { glyph: "x[t]", label: "输入", accent: C.blue },
-      { glyph: "65", label: "模型打分", accent: C.violet },
-      { glyph: "y[t]", label: "cross_entropy", accent: C.gold },
+      { glyph: "远", label: "猜得很离谱", accent: C.coral },
+      { glyph: "近", label: "猜得比较近", accent: C.teal },
+      { glyph: "分", label: "离谱罚得重", accent: C.gold },
     ]),
+  choices: (scene, stage, opts) =>
+    drawStats(scene, stage, opts, [
+      { value: String(VOCAB_SIZE), label: "每个位置的候选", accent: C.coral },
+      { value: "1", label: "正确答案只有一个", accent: C.gold },
+    ]),
+  shrink: (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: "罚", label: "猜错罚分", accent: C.coral },
+      { glyph: "↓", label: "一点点压小", accent: C.teal },
+    ]),
+  contract: (scene, stage, opts) => drawContract(scene, stage, opts),
 };
 
 function drawIconRow(scene, stage, { instant }, cards) {
@@ -171,25 +166,9 @@ function layoutTokens(stage) {
   };
 }
 
-function drawStreamOnly(scene, stage, { instant }) {
-  const layout = layoutTokens(stage);
-  scene.frame.stage.add(addSectionTag(scene, "带", C.violet, { left: stage.left, top: stage.top + 2 }));
-  STREAM.forEach((id, i) => {
-    const chip = makeChip(scene, layout.streamPos[i].x, layout.streamPos[i].y, {
-      glyph: displayGlyph(CHARS[i]),
-      id,
-      accent: C.violet,
-      width: layout.metrics.tileW,
-      height: layout.metrics.tileH,
-    });
-    scene.frame.stage.add(chip);
-    popIn(scene, chip, { instant, delay: i * 12 });
-  });
-}
-
 function drawWindowRows(scene, stage, { instant }, { showX, showY, highlight = -1, allOn = false }) {
   const layout = layoutTokens(stage);
-  scene.frame.stage.add(addSectionTag(scene, "带", C.violet, { left: stage.left, top: stage.top + 2 }));
+  scene.frame.stage.add(addSectionTag(scene, "号码串", C.violet, { left: stage.left, top: stage.top + 2 }));
   const streamChips = STREAM.map((id, i) => {
     const chip = makeChip(scene, layout.streamPos[i].x, layout.streamPos[i].y, {
       glyph: displayGlyph(CHARS[i]),
@@ -223,7 +202,7 @@ function drawWindowRows(scene, stage, { instant }, { showX, showY, highlight = -
 
   if (showX) {
     scene.frame.stage.add(
-      addSectionTag(scene, "x", C.blue, { left: stage.left, top: layout.xY - layout.metrics.tileH / 2 - 22 }),
+      addSectionTag(scene, "已经看到", C.blue, { left: stage.left, top: layout.xY - layout.metrics.tileH / 2 - 22 }),
     );
     DEMO_IDS.forEach((id, i) => {
       const chip = makeChip(scene, layout.xPos[i].x, layout.xPos[i].y, {
@@ -241,9 +220,9 @@ function drawWindowRows(scene, stage, { instant }, { showX, showY, highlight = -
 
   if (showY) {
     scene.frame.stage.add(
-      addSectionTag(scene, "y", C.gold, { left: stage.left, top: layout.yY - layout.metrics.tileH / 2 - 22 }),
+      addSectionTag(scene, "下一字", C.gold, { left: stage.left, top: layout.yY - layout.metrics.tileH / 2 - 22 }),
     );
-    const plus = makeTag(scene, win.x + winW / 2 + 18, first.y, "+1", C.gold);
+    const plus = makeTag(scene, win.x + winW / 2 + 18, first.y, "挪一格", C.gold);
     scene.frame.stage.add(plus);
     popIn(scene, plus, { instant });
     DEMO_Y_IDS.forEach((id, i) => {
@@ -273,7 +252,7 @@ function drawPair(scene, stage, opts, t) {
     height: boardH,
   });
   scene.frame.stage.add(board);
-  board.show(displayGlyph(CHARS[t]), displayGlyph(CHARS[t + 1]), `${DEMO_IDS[t]} → ${DEMO_Y_IDS[t]}`);
+  board.show(displayGlyph(CHARS[t]), displayGlyph(CHARS[t + 1]), "已经看到 → 下一字");
 }
 
 function drawStats(scene, stage, { instant }, facts) {
@@ -286,4 +265,22 @@ function drawStats(scene, stage, { instant }, facts) {
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 40 });
   });
+}
+
+function drawContract(scene, stage, { instant }) {
+  drawIconRow(scene, stage, { instant }, [
+    { glyph: "规", label: "只讲规矩", accent: C.blue },
+    { glyph: "停", label: "没有开训", accent: C.violet },
+    { glyph: "0", label: "不编造分数", accent: C.gold },
+  ]);
+  const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
+    value: "猜错罚分",
+    label: "源码里叫交叉熵",
+    tip: "看见前面，猜下一个。本游戏没有训练模型。",
+    accent: C.pink,
+    width: Math.min(280, stage.w - 12),
+    height: 52,
+  });
+  scene.frame.stage.add(tip);
+  popIn(scene, tip, { instant, delay: 80 });
 }

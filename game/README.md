@@ -1,17 +1,17 @@
 # nanoGPT 闯关
 
-用 [Phaser 3](https://phaser.io/) 做的点击推进小游戏，把 `notes/` 里第 1–2 步变成可看的动画。
+用 [Phaser 3](https://phaser.io/) 做的点击推进小游戏，把语言模型讲成非程序员也能跟上的微步骤。
 
-依据 [karpathy/nanoGPT](https://github.com/karpathy/nanoGPT) 的 `shakespeare_char` 路径：
+依据 [karpathy/nanoGPT](https://github.com/karpathy/nanoGPT) 的 `shakespeare_char` 事实，但**先讲生活类比，不先甩文件名**：
 
-- 第 1 关：`data/shakespeare_char/prepare.py`（不用 BPE；字符 → id；词表 = 唯一字符数 = 65；90/10 切分；`train.bin` / `val.bin` / `meta.pkl`）
-- 第 2 关：`train.py` 的 `get_batch`（`x` / `y` 右移 1）与 `model.py` 里的 `F.cross_entropy`（65 类）
+- 第 1 关：手机输入法也会「看到前面、猜下一个」→ 语言模型就是下一字的概率排行榜 → 电脑更认号码，莎士比亚剧本变成 65 种字的两串号码（练习卷 / 检查卷）
+- 第 2 关：一次只看一小段；左边是已经看到的，右边正确答案往后挪一格；猜错要罚分，目标是把罚分压小
 
 **本游戏不训练模型，也不编造 loss 或架构细节。**
 
-演示短句 `Second Citizen:\n` 与笔记中 `train.bin`、`i=1000`、`block=16` 的切片一致；正式训练配置仍是 `block_size=256`、`batch_size=64`。
+演示短句仍是 `Second Citizen:\n`（与笔记切片一致）。源码名如 train.bin、交叉熵只作为可选脚注出现。
 
-每一拍只讲一个想法：顶栏固定写「这一步在干什么」，旁边是一句短说明。第 1 关 12 拍、第 2 关 13 拍，不再连点 16 个相同的映射。
+每一拍只讲一个想法：顶栏固定写「这一步在干什么」，旁边一句短说明。第 1 关 13 拍、第 2 关 13 拍。
 
 ## 本地运行
 
@@ -52,14 +52,14 @@ CSS 宽度 ≥ 1024 且横屏、并且不是手机 UA 时，游戏左侧，右�
 | 资源 | 内容 | 何时播放 |
 |------|------|----------|
 | `public/audio/bgm.{ogg,mp3}` | 循环轻音乐（C 大调 4 小节） | 解锁后循环，音量低于配音 |
-| `vo-title` | 「一起闯关吧！」 | 标题页 |
-| `vo-level1` | 「第一关，把字符变成数字。」 | 第 1 关开场 |
-| `vo-map` | 「字符变成数字了。」 | encode 查表 |
-| `vo-reuse` | 「同样的字，同一个号。」 | 重复字符复用 id |
-| `vo-level2` | 「第二关，先框住窗口。」 | 第 2 关开场 / 框 x |
-| `vo-shift` | 「Y 往右挪一位。」 | 窗口右移 / y 行出现 |
-| `vo-next` | 「看见这个，预测下一个。」 | next-token 一对 |
-| `vo-loss` | 「六十五类对齐。」 | cross_entropy 契约 |
+| `vo-title` | 「一起猜下一个字吧！」 | 标题页 |
+| `vo-level1` | 「先想想手机输入法。」 | 第 1 关开场 |
+| `vo-map` | 「每个字都排进榜。」 | 概率排行 |
+| `vo-reuse` | 「同样的字，同一个号。」 | 重复字符复用号码 |
+| `vo-level2` | 「看见这个，猜下一个。」 | 第 2 关开场 |
+| `vo-shift` | 「正确答案往后挪一格。」 | 答案右移 |
+| `vo-next` | 「看见 S，下一字是 e。」 | 一对一对看 |
+| `vo-loss` | 「猜得越离谱，罚分越大。」 | 猜错罚分 |
 | `vo-clear` | 「通关啦！」 | 结算页 |
 | `sfx-tap` / `sfx-pop` | 轻点按、揭示音 | 按钮 / 空白点击、id 徽章落下 |
 

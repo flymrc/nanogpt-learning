@@ -48,7 +48,7 @@ code/           # 自己的改动 / 对照实现（待用）
 
 想把笔记变成可点的动画，进入 [`game/`](game/)：`cd game && npm install && npm run dev`。
 
-游戏第 1–2 关按微步骤讲「这一步在干什么」；宽屏电脑右侧会出 Live2D 助教，手机不加载。详情见 [`game/README.md`](game/README.md)。
+游戏第 1–2 关用「手机输入法 / 猜下一个字」把笔记讲成生活类比；宽屏电脑右侧会出 Live2D 助教，手机不加载。详情见 [`game/README.md`](game/README.md)。
 
 ## 参考
 

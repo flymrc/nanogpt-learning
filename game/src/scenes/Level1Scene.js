@@ -30,7 +30,7 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
-    const frame = makeLessonFrame(this, { level: 1, total: 2, title: "字符变 ID" });
+    const frame = makeLessonFrame(this, { level: 1, total: 2, title: "手机也会猜字" });
     this.frame = frame;
     this.view = frame.v;
     this.beat = 0;
@@ -79,49 +79,45 @@ export default class Level1Scene extends Phaser.Scene {
 }
 
 const RENDERERS = {
-  why: (scene, stage, opts) =>
+  phone: (scene, stage, opts) =>
     drawIconRow(scene, stage, opts, [
-      { glyph: "文", label: "原文", accent: C.pink },
-      { glyph: "→", label: "encode", accent: C.coral },
-      { glyph: "31", label: "整数 id", accent: C.gold },
+      { glyph: "前", label: "已经看到", accent: C.pink },
+      { glyph: "机", label: "输入法", accent: C.coral },
+      { glyph: "?", label: "猜下一个", accent: C.gold },
     ]),
-  "no-bpe": (scene, stage, opts) =>
+  rank: (scene, stage, opts) =>
     drawIconRow(scene, stage, opts, [
-      { glyph: "BPE", label: "GPT-2 不用", accent: C.violet },
-      { glyph: "Aa", label: "一个字符", accent: C.teal },
-      { glyph: "id", label: "一个整数", accent: C.blue },
+      { glyph: "下", label: "最可能", accent: C.gold },
+      { glyph: "好", label: "也常见", accent: C.teal },
+      { glyph: "啊", label: "比较少", accent: C.violet },
     ]),
-  snippet: (scene, stage, opts) => drawSnippet(scene, stage, opts, { highlight: -1 }),
+  lm: (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: "机", label: "语言模型", accent: C.blue },
+      { glyph: "榜", label: "下一字排行", accent: C.gold },
+    ]),
+  "no-letters": (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: "文", label: "字母", accent: C.pink },
+      { glyph: "→", label: "换成号", accent: C.coral },
+      { glyph: "31", label: "号码", accent: C.gold },
+    ]),
+  contact: (scene, stage, opts) => drawFocusChar(scene, stage, opts, 0, 31, "名片"),
   newline: (scene, stage, opts) => drawFocusChar(scene, stage, opts, CHARS.length - 1, 0, "换行"),
   space: (scene, stage, opts) => drawFocusChar(scene, stage, opts, 6, 1, "空格"),
-  encode: (scene, stage, opts) => drawFocusChar(scene, stage, opts, 0, 31, "S"),
   reuse: (scene, stage, opts) => drawReuse(scene, stage, opts),
+  snippet: (scene, stage, opts) => drawSnippet(scene, stage, opts, { highlight: -1 }),
   sentence: (scene, stage, opts) => drawMappedSentence(scene, stage, opts),
-  length: (scene, stage, opts) =>
-    drawStats(scene, stage, opts, [
-      {
-        value: DATASET.chars.toLocaleString("en-US"),
-        label: "全文字符",
-        accent: C.coral,
-      },
-    ]),
   vocab: (scene, stage, opts) =>
     drawStats(scene, stage, opts, [
-      { value: String(VOCAB_SIZE), label: "去重排序后", accent: C.gold },
-      { value: "stoi", label: "字符 → id", accent: C.teal },
+      { value: String(VOCAB_SIZE), label: "种不同的字", accent: C.gold },
     ]),
   split: (scene, stage, opts) =>
     drawStats(scene, stage, opts, [
-      { value: DATASET.split, label: "按字符下标切", accent: C.blue },
-      { value: DATASET.trainTokens.toLocaleString("en-US"), label: "train tokens", accent: C.teal },
-      { value: DATASET.valTokens.toLocaleString("en-US"), label: "val tokens", accent: C.gold },
+      { value: "九成", label: "练习卷", accent: C.teal },
+      { value: "一成", label: "检查卷", accent: C.gold },
     ]),
-  files: (scene, stage, opts) =>
-    drawIconRow(scene, stage, opts, [
-      { glyph: ".bin", label: "train.bin", accent: C.coral },
-      { glyph: ".bin", label: "val.bin", accent: C.gold },
-      { glyph: "pkl", label: "meta.pkl", accent: C.teal },
-    ]),
+  tapes: (scene, stage, opts) => drawTapes(scene, stage, opts),
 };
 
 function drawIconRow(scene, stage, { instant }, cards) {
@@ -138,7 +134,7 @@ function drawIconRow(scene, stage, { instant }, cards) {
 }
 
 function drawSnippet(scene, stage, { instant }, { highlight }) {
-  scene.frame.stage.add(addSectionTag(scene, "原文", C.pink, { left: stage.left, top: stage.top + 4 }));
+  scene.frame.stage.add(addSectionTag(scene, "台词", C.pink, { left: stage.left, top: stage.top + 4 }));
   const tile = Math.min(56, Math.max(28, Math.min(stage.w / 9, stage.h / 5)));
   const pos = flowPositions(CHARS.length, {
     y: stage.cy,
@@ -214,8 +210,8 @@ function drawReuse(scene, stage, { instant }) {
     if (i === 1) highlightChip(scene, chip, true);
   });
   const stamp = makeIconCard(scene, stage.cx, y, {
-    glyph: "复用",
-    label: "同一个 id",
+    glyph: "同号",
+    label: "见过就复用",
     accent: C.coral,
     width: Math.min(120, stage.w * 0.28),
     height: Math.min(96, tile + 28),
@@ -225,7 +221,7 @@ function drawReuse(scene, stage, { instant }) {
 }
 
 function drawMappedSentence(scene, stage, { instant }) {
-  scene.frame.stage.add(addSectionTag(scene, "id", C.gold, { left: stage.left, top: stage.top + 4 }));
+  scene.frame.stage.add(addSectionTag(scene, "号码", C.gold, { left: stage.left, top: stage.top + 4 }));
   const tile = Math.min(46, Math.max(26, stage.w / 10));
   const chipH = tile * 1.28;
   const pos = flowPositions(CHARS.length, {
@@ -256,20 +252,25 @@ function drawStats(scene, stage, { instant }, facts) {
   const h = Math.min(130, Math.max(90, stage.h * 0.42));
   facts.forEach((fact, i) => {
     const x = stage.cx + (i - (n - 1) / 2) * (w + 12);
-    const node = makeBigStat(scene, x, stage.cy, { ...fact, width: w, height: h });
+    const node = makeBigStat(scene, x, stage.cy - (n === 1 ? 10 : 0), { ...fact, width: w, height: h });
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 40 });
   });
-  if (facts.length === 1 && facts[0].value.includes("1,115")) {
-    const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
-      value: "shakespeare_char",
-      label: "prepare.py 打印的长度",
-      tip: "length of dataset in characters: 1,115,394",
-      accent: C.pink,
-      width: Math.min(280, stage.w - 12),
-      height: 52,
-    });
-    scene.frame.stage.add(tip);
-    popIn(scene, tip, { instant, delay: 80 });
-  }
+}
+
+function drawTapes(scene, stage, { instant }) {
+  drawIconRow(scene, stage, { instant }, [
+    { glyph: "长", label: "练习卷", accent: C.coral },
+    { glyph: "短", label: "检查卷", accent: C.gold },
+  ]);
+  const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
+    value: "约 111 万个字",
+    label: "源码里叫 train.bin / val.bin",
+    tip: `练习 ${DATASET.trainTokens.toLocaleString("zh-CN")} · 检查 ${DATASET.valTokens.toLocaleString("zh-CN")}`,
+    accent: C.pink,
+    width: Math.min(300, stage.w - 12),
+    height: 52,
+  });
+  scene.frame.stage.add(tip);
+  popIn(scene, tip, { instant, delay: 80 });
 }

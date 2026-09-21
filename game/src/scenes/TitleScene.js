@@ -3,9 +3,9 @@ import { TITLE_BEAT } from "../data/beats.js";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
 import { emitTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
+import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, paintBackdrop } from "../ui/components.js";
 import { fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
-import { C, displayText, stickerColor } from "../ui/theme.js";
+import { C, displayText } from "../ui/theme.js";
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -33,7 +33,7 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 520, ease: "Back.Out" });
 
     this.add
-      .text(v.cx, titles.bottom - titleSize * 0.35, "字符变数字", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
+      .text(v.cx, titles.bottom - titleSize * 0.35, "像手机输入法那样", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
       .setOrigin(0.5);
 
     this.playPreview(v, plan);
@@ -42,7 +42,7 @@ export default class TitleScene extends Phaser.Scene {
     const robotX = v.portrait ? v.left + 48 : v.left + 80;
     const robotY = mascot.cy;
     addRobot(this, robotX, robotY, { scale: plan.robotScale });
-    addSpeechBubble(this, robotX + (v.portrait ? 140 : 156), robotY - 8, "一起闯关吧！", {
+    addSpeechBubble(this, robotX + (v.portrait ? 140 : 156), robotY - 8, "一起猜下一个字！", {
       maxWidth: Math.min(v.compact ? 180 : 240, v.right - robotX - 80),
       fontSize: v.compact ? 18 : 24,
     });
@@ -69,68 +69,29 @@ export default class TitleScene extends Phaser.Scene {
 
   playPreview(v, plan) {
     const sample = ["S", "e", "c"];
-    const ids = [31, 43, 41];
     const tile = plan.tile;
     const preview = plan.slots.preview;
     const stack = plan.stackPreview;
-
-    if (stack) {
-      const yChars = preview.top + tile / 2 + 4;
-      const yChips = preview.bottom - (tile * 1.3) / 2 - 4;
-      const fromX = v.cx - tile - 8;
-      sample.forEach((ch, i) => {
-        makeCharTile(this, fromX + i * (tile + 8), yChars, ch, {
-          width: tile,
-          height: tile,
-          seed: ch,
-        });
-      });
-      this.add.text(v.cx, (yChars + yChips) / 2, "↓", displayText(28, { color: C.coralCss })).setOrigin(0.5);
-      this.spawnFlyers(sample, ids, fromX, yChars, fromX, yChips, tile);
-      return;
-    }
-
-    const y = preview.cy;
-    const fromX = v.cx - tile * 3.4;
-    const toX = v.cx + tile * 1.1;
+    const yChars = stack ? preview.top + tile / 2 + 4 : preview.cy;
+    const fromX = v.cx - tile * 2.2;
     sample.forEach((ch, i) => {
-      makeCharTile(this, fromX + i * (tile + 10), y, ch, { width: tile, height: tile, seed: ch });
-    });
-    this.add.text(v.cx, y, "→", displayText(32, { color: C.coralCss })).setOrigin(0.5);
-    this.spawnFlyers(sample, ids, fromX, y, toX, y, tile);
-  }
-
-  spawnFlyers(sample, ids, fromX, fromY, toX, toY, tile) {
-    const gap = tile + (toY === fromY ? 10 : 8);
-    sample.forEach((ch, i) => {
-      this.time.delayedCall(280 + i * 280, () => {
-        const flyer = makeCharTile(this, fromX + i * gap, fromY, ch, {
-          width: tile - 6,
-          height: tile - 6,
-          seed: ch,
-        });
-        this.tweens.add({
-          targets: flyer,
-          x: toX + i * gap,
-          y: toY,
-          scale: 0.2,
-          duration: 360,
-          ease: "Cubic.In",
-          onComplete: () => {
-            flyer.destroy();
-            const chip = makeChip(this, toX + i * gap, toY, {
-              glyph: ch,
-              id: ids[i],
-              accent: stickerColor(ch),
-              width: tile,
-              height: tile * 1.3,
-            });
-            chip.setScale(0.5);
-            this.tweens.add({ targets: chip, scale: 1, duration: 200, ease: "Back.Out" });
-          },
-        });
+      makeCharTile(this, fromX + i * (tile + 10), yChars, ch, {
+        width: tile,
+        height: tile,
+        seed: ch,
       });
     });
+    const qX = fromX + 3 * (tile + 10) + tile * 0.15;
+    this.add.text(qX - tile * 0.55, yChars, "→", displayText(28, { color: C.coralCss })).setOrigin(0.5);
+    const guess = makeCharTile(this, qX + tile * 0.35, yChars, "?", {
+      width: tile,
+      height: tile,
+      seed: "?",
+    });
+    guess.setAlpha(0.92);
+    this.add
+      .text(v.cx, stack ? preview.bottom - 8 : preview.bottom - 2, "下一字？", displayText(16, { color: C.muted }))
+      .setOrigin(0.5);
   }
 }
 
