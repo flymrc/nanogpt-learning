@@ -1,3 +1,5 @@
+import { displayRatio } from "./dpr.js";
+
 /** Landscape design reference only — scenes should use getView(). */
 export const W = 1280;
 export const H = 720;
@@ -40,31 +42,29 @@ export const FONT_DISPLAY =
   '"ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "PingFang SC", sans-serif';
 export const FONT_MONO = '"Fredoka", "Noto Sans SC", "IBM Plex Mono", monospace';
 
-export function uiText(size, extra = {}) {
+function textStyle(fontFamily, size, extra = {}) {
+  const { resolution, ...rest } = extra;
   return {
-    fontFamily: FONT_UI,
-    fontSize: `${size}px`,
+    fontFamily,
+    fontSize: `${Math.max(1, Math.round(size))}px`,
     color: C.text,
-    ...extra,
+    ...rest,
+    // Phaser Text rasterizes to an internal canvas; without this, retina
+    // just magnifies a 1× bitmap (the “马赛克” look).
+    resolution: resolution ?? displayRatio(),
   };
+}
+
+export function uiText(size, extra = {}) {
+  return textStyle(FONT_UI, size, extra);
 }
 
 export function displayText(size, extra = {}) {
-  return {
-    fontFamily: FONT_DISPLAY,
-    fontSize: `${size}px`,
-    color: C.text,
-    ...extra,
-  };
+  return textStyle(FONT_DISPLAY, size, extra);
 }
 
 export function monoText(size, extra = {}) {
-  return {
-    fontFamily: FONT_MONO,
-    fontSize: `${size}px`,
-    color: C.text,
-    ...extra,
-  };
+  return textStyle(FONT_MONO, size, extra);
 }
 
 export function stickerColor(seed) {

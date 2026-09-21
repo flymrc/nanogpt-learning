@@ -1,6 +1,8 @@
+import { cssViewportSize, displayRatio, syncRetinaCamera } from "./dpr.js";
 import { C } from "./theme.js";
 
 export const TAP_MIN = 48;
+export { cssViewportSize, displayRatio } from "./dpr.js";
 
 export function readSafeInsets() {
   if (typeof document === "undefined") {
@@ -19,14 +21,9 @@ export function readSafeInsets() {
   };
 }
 
+/** CSS-pixel viewport. Game backing-store size is this × devicePixelRatio. */
 export function viewportSize() {
-  const vv = window.visualViewport;
-  const w = Math.round(vv?.width ?? window.innerWidth);
-  const h = Math.round(vv?.height ?? window.innerHeight);
-  return {
-    w: Math.max(280, w),
-    h: Math.max(280, h),
-  };
+  return cssViewportSize();
 }
 
 export function clamp(n, min, max) {
@@ -34,8 +31,17 @@ export function clamp(n, min, max) {
 }
 
 export function getView(scene) {
-  const w = Math.max(280, Math.round(scene.scale.width || viewportSize().w));
-  const h = Math.max(280, Math.round(scene.scale.height || viewportSize().h));
+  const dpr = scene.game?.registry.get("dpr") || displayRatio();
+  const css = viewportSize();
+  const w = Math.max(
+    280,
+    Math.round((scene.scale.width || css.w * dpr) / dpr),
+  );
+  const h = Math.max(
+    280,
+    Math.round((scene.scale.height || css.h * dpr) / dpr),
+  );
+  syncRetinaCamera(scene, w, h, dpr);
   const safe = scene.game?.registry.get("safeInsets") || readSafeInsets();
   const portrait = h >= w * 0.92;
   const short = h < 640;
@@ -70,6 +76,7 @@ export function getView(scene) {
     innerH,
     uiScale,
     safe,
+    dpr,
   };
 }
 
@@ -154,7 +161,7 @@ export function stackSlots(items, { top, bottom, gap = 10, justify = "start" } =
  * Re-measure a layout at smaller scales until it fits `availableH`.
  * `measureFn(scale)` must return `{ h, ...plan }` at that scale.
  */
-export function fitMeasure(availableH, measureFn, { minScale = 0.52, maxScale = 1 } = {}) {
+export function fitMeasure(availableH, measureFn, { minScale = 0.7, maxScale = 1 } = {}) {
   let scale = maxScale;
   let plan = measureFn(scale);
   for (let i = 0; i < 6 && plan.h > availableH + 1 && scale > minScale + 0.001; i += 1) {
@@ -181,8 +188,12 @@ export function watchResize(scene, { restart = false, persist } = {}) {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       if (!scene.sys.isActive()) return;
+      const dpr = scene.game?.registry.get("dpr") || displayRatio();
       const prev = scene.registry.get("_viewSize") || { w: 0, h: 0 };
-      const next = { w: Math.round(gameSize.width), h: Math.round(gameSize.height) };
+      const next = {
+        w: Math.round(gameSize.width / dpr),
+        h: Math.round(gameSize.height / dpr),
+      };
       const dw = Math.abs(next.w - prev.w);
       const dh = Math.abs(next.h - prev.h);
       const flipped = prev.w && prev.h && next.w > next.h !== prev.w > prev.h;
@@ -198,9 +209,10 @@ export function watchResize(scene, { restart = false, persist } = {}) {
       }
     }, 160);
   };
+  const dpr = scene.game?.registry.get("dpr") || displayRatio();
   scene.registry.set("_viewSize", {
-    w: Math.round(scene.scale.width),
-    h: Math.round(scene.scale.height),
+    w: Math.round(scene.scale.width / dpr),
+    h: Math.round(scene.scale.height / dpr),
   });
   scene.scale.on("resize", handle);
   scene.events.once("shutdown", () => {
@@ -241,7 +253,7 @@ export function tokenMetrics(count, innerW, { maxW = 62, maxH = 82, minW = 24, g
     tileW,
     tileH,
     gapX,
-    font: Math.max(11, Math.round(tileW * 0.4)),
+    font: Math.max(13, Math.round(tileW * 0.4)),
   };
 }
 

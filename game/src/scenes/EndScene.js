@@ -10,6 +10,7 @@ import {
   spawnConfetti,
 } from "../ui/components.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
+import { textureScale } from "../ui/dpr.js";
 import { TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
@@ -91,7 +92,9 @@ export default class EndScene extends Phaser.Scene {
         panel.add(
           this.add
             .image(iconX, iconY, card.icon)
-            .setScale(card.icon === "deco-star" ? (stack ? 0.5 : 0.62) : stack ? 0.46 : 0.64),
+            .setScale(
+              textureScale(card.icon === "deco-star" ? (stack ? 0.5 : 0.62) : stack ? 0.46 : 0.64),
+            ),
         );
       } else {
         panel.add(this.add.text(iconX, iconY, card.fallback, displayText(28)).setOrigin(0.5));

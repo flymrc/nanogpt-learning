@@ -347,7 +347,7 @@ function layoutLevel2(v, shell) {
     const metrics = tokenMetrics(STREAM.length, v.innerW, {
       maxW: (landscapeShort ? 28 : v.short ? 32 : v.compact ? 36 : 54) * s,
       maxH: (landscapeShort ? 38 : v.short ? 44 : v.compact ? 50 : 72) * s,
-      minW: 18,
+      minW: 22,
       gap: (v.compact ? 3 : 6) * s,
     });
     const tagH = Math.round(26 * s);
