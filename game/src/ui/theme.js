@@ -39,7 +39,7 @@ export const STICKERS = [0xff8b94, 0xffd166, 0x7ee8d8, 0x8ec5ff, 0xe5b3ff, 0xffb
 export const FONT_UI =
   '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
 export const FONT_DISPLAY =
-  '"ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "PingFang SC", sans-serif';
+  '"ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "PingFang SC", "WenQuanYi Micro Hei", sans-serif';
 export const FONT_MONO = '"Fredoka", "Noto Sans SC", "IBM Plex Mono", monospace';
 
 function textStyle(fontFamily, size, extra = {}) {

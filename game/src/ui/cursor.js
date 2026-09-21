@@ -42,17 +42,32 @@ export function mountGameCursor(getGame) {
     true,
   );
 
-  const bindGame = () => {
-    const game = getGame?.() ?? window.__nanoGPTGame;
-    if (!game?.input || game.__nanoGPTCursorBound) return;
-    game.__nanoGPTCursorBound = true;
-    game.input.on("gameobjectover", () => setCursorHover(true));
-    game.input.on("gameobjectout", () => setCursorHover(false));
-    game.input.on("pointerdown", () => root.classList.add("is-down"));
-    game.input.on("pointerup", () => root.classList.remove("is-down"));
+  const attachScene = (scene) => {
+    if (!scene?.input || typeof scene.input.on !== "function" || scene.__nanoGPTCursorBound) return;
+    scene.__nanoGPTCursorBound = true;
+    scene.input.on("gameobjectover", () => setCursorHover(true));
+    scene.input.on("gameobjectout", () => setCursorHover(false));
+    scene.input.on("pointerdown", () => root.classList.add("is-down"));
+    scene.input.on("pointerup", () => root.classList.remove("is-down"));
   };
-  bindGame();
-  window.setTimeout(bindGame, 400);
+
+  const watch = () => {
+    const game = getGame?.() ?? window.__nanoGPTGame;
+    if (!game?.events || typeof game.events.on !== "function") return;
+    game.scene?.getScenes?.(true)?.forEach(attachScene);
+    if (game.__nanoGPTCursorWatch) return;
+    game.__nanoGPTCursorWatch = true;
+    game.events.on("step", () => {
+      game.scene?.getScenes?.(true)?.forEach(attachScene);
+    });
+  };
+
+  try {
+    watch();
+    window.setTimeout(watch, 400);
+  } catch {
+    /* DOM pointer already follows; Phaser hover is optional. */
+  }
 }
 
 export function setCursorHover(on) {

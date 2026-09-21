@@ -86,15 +86,16 @@
       </div>
     </div>
     <div id="game-cursor" hidden aria-hidden="true">
-      <svg class="game-cursor__pointer" viewBox="0 0 36 44" width="36" height="44">
+      <svg class="game-cursor__pointer" viewBox="0 0 48 60" width="48" height="60">
         <path
-          d="M4 3 L4 34 L12.2 26.2 L18.8 41.2 L24.4 38.8 L17.8 24.2 L28 24.2 Z"
-          fill="#fff8ee"
+          class="game-cursor__body"
+          d="M5 3 L5 42 L16.5 32.2 L24 56 L34.2 52.2 L25.6 29.4 L42 29.4 Z"
           stroke="#3b2a2e"
-          stroke-width="3.2"
+          stroke-width="4"
           stroke-linejoin="round"
         />
-        <path d="M8.2 9.2 L8.2 23.6 L13.2 19.2" fill="#ff7a85" />
+        <path class="game-cursor__core" d="M11 10 L11 29 L18.4 23.6 Z" />
+        <circle class="game-cursor__spark" cx="36" cy="14" r="5" />
       </svg>
     </div>
     <div id="boot-splash" role="status" aria-live="polite">
