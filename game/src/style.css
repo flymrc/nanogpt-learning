@@ -14,12 +14,22 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-#game-shell {
+#app-layout {
   position: fixed;
   inset: 0;
+  display: flex;
   width: 100vw;
   height: 100dvh;
   min-height: 100svh;
+  box-sizing: border-box;
+  background: #f3ebe0;
+}
+
+#game-shell {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
   box-sizing: border-box;
   background: #f3ebe0;
 }
@@ -31,11 +41,144 @@ body {
 
 #game canvas {
   display: block;
-  /* Fill the CSS box; backing-store pixels are set to CSS × DPR in JS.
-     Do not use image-rendering: pixelated — that makes UI text look mosaicked. */
   width: 100%;
   height: 100%;
   image-rendering: auto;
+}
+
+#tutor-dock {
+  display: none;
+  position: relative;
+  flex: 0 0 min(360px, 32vw);
+  width: min(360px, 32vw);
+  height: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(180deg, #f7f1e8 0%, #edd8c6 100%);
+  border-left: 4px solid #3b2a2e;
+  overflow: hidden;
+}
+
+#app-layout.is-wide #tutor-dock:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+
+#tutor-dock[hidden] {
+  display: none !important;
+}
+
+.tutor-bubble {
+  position: relative;
+  z-index: 2;
+  margin: 16px 14px 0;
+  padding: 12px 14px 14px;
+  background: #fffdf8;
+  border: 4px solid #3b2a2e;
+  border-radius: 18px;
+  box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.18);
+}
+
+.tutor-kicker {
+  margin: 0 0 4px;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #c48400;
+}
+
+.tutor-purpose {
+  margin: 0;
+  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", sans-serif;
+  font-size: 22px;
+  line-height: 1.25;
+  color: #3b2a2e;
+}
+
+.tutor-caption {
+  margin: 6px 0 0;
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+  font-size: 14px;
+  color: #8b6b5c;
+}
+
+.tutor-step {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  margin: 0;
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 12px;
+  color: #8b6b5c;
+}
+
+#tutor-canvas {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.tutor-fallback {
+  display: block;
+  width: 180px;
+  margin: 12px auto 0;
+}
+
+.mute-toggle {
+  position: absolute;
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  right: max(10px, calc(env(safe-area-inset-right, 0px) + 8px));
+  z-index: 30;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 5px solid #3b2a2e;
+  border-radius: 18px;
+  background: #fff8ee;
+  color: #3b2a2e;
+  box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mute-toggle:hover {
+  transform: scale(1.06);
+}
+
+.mute-toggle:active {
+  transform: scale(0.92);
+}
+
+.mute-toggle.is-muted {
+  background: #ffd0d4;
+}
+
+.mute-toggle__speaker {
+  width: 28px;
+  height: 28px;
+  display: block;
+  margin: 0 auto;
+}
+
+.mute-toggle.is-muted .mute-toggle__waves {
+  opacity: 0.15;
+}
+
+.mute-toggle__slash {
+  display: none;
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 30px;
+  height: 4px;
+  margin: -2px 0 0 -15px;
+  background: #e24b57;
+  border: 2px solid #3b2a2e;
+  border-radius: 3px;
+  transform: rotate(-38deg);
+}
+
+.mute-toggle.is-muted .mute-toggle__slash {
+  display: block;
 }
 
 #safe-probe {
