@@ -3,18 +3,18 @@ import { isWidePcTutor } from "../tutor/bus.js";
 /**
  * PC parchment composition.
  *
- * The lesson used to pad itself as if a tutor column were reserved on the
- * right. After the dock became a transparent overlay, that pad left the
- * cards on the far left and Hiyori on the window edge. One geometry now
- * places the lesson and her body as a single group centered on the page.
- * Mobile never calls this: every export returns 0.
+ * `left`/`right` are the lesson column (the same band as the phase card).
+ * Hiyori is placed in the right portion of that band. Her x is an offset
+ * from `right`, never from the viewport edge, so she moves when the column
+ * moves. Mobile never calls this: every export returns 0.
  *
- * `figure` is only the Live2D scale cap (full-height body, wide transparent
- * canvas). `figureCenter` is where the visible mesh sits.
+ * `figure` is only the Live2D scale cap. `figureCenter` is the visible mesh.
  */
 
 const BODY_W = 176;
 const OVERLAP = 56;
+/** Gap between her right side and the lesson column's right edge. */
+const FIGURE_INSET = 20;
 
 export function pcComposition(width, height) {
   if (typeof window === "undefined" || !isWidePcTutor()) return null;
@@ -25,27 +25,18 @@ export function pcComposition(width, height) {
   const groupW = column + BODY_W - OVERLAP;
   let left = Math.round(w / 2 - groupW / 2);
   left = Math.max(40, left);
-  let right = left + column;
-  let figureCenter = Math.round(right - OVERLAP + BODY_W / 2);
+  const right = left + column;
 
-  const minRight = 108;
-  const bodyRight = figureCenter + BODY_W / 2;
-  if (bodyRight > w - minRight) {
-    const shift = bodyRight - (w - minRight);
-    left -= shift;
-    right -= shift;
-    figureCenter -= shift;
-  }
-  if (left < 40) {
-    const shift = 40 - left;
-    left += shift;
-    right += shift;
-    figureCenter += shift;
-  }
+  // Inside the lesson column, against its right edge. Not window.right.
+  let figureCenter = Math.round(right - FIGURE_INSET - BODY_W / 2);
+  const minCenter = Math.round(left + BODY_W / 2 + 12);
+  const maxCenter = Math.round(right - BODY_W / 2 - 8);
+  figureCenter = Math.max(minCenter, Math.min(maxCenter, figureCenter));
 
   const fullH = Math.max(320, h - 12);
   const figure = Math.round(Math.min(w * 0.46, Math.max(480, fullH * 0.72)));
-  const hang = Math.round(Math.min(110, OVERLAP + 28));
+  const bodyLeft = figureCenter - BODY_W / 2;
+  const hang = Math.round(Math.min(200, Math.max(48, right - bodyLeft + 16)));
   const buttonsRight = Math.round(figureCenter - 124);
   const buttonsLeft = buttonsRight - 276;
   const chromeRight = Math.max(16, w - buttonsRight);

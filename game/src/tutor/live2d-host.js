@@ -321,9 +321,10 @@ function placeModel() {
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
   const drawnH = natural.h * scale;
-  // Visible mesh is the middle of a wide transparent canvas. Park that
-  // middle on the lesson's right edge, not on the window edge.
-  model.x = comp?.figureCenter ?? Math.round(w * 0.72);
+  // Anchor 0.5 is the middle of the mesh. That middle sits in the right
+  // portion of the lesson column (comp.left…comp.right), which is the same
+  // band as the phase card. It is not a fraction of the viewport width.
+  model.x = comp?.figureCenter ?? Math.round(w * 0.62);
   model.y = Math.max(4, (h - drawnH) * 0.04);
 }
 
@@ -558,6 +559,18 @@ function installDebugProbe() {
           }
         : null,
       dockBorder: dock ? getComputedStyle(dock).borderLeftWidth : "",
+      place: model
+        ? {
+            x: model.x,
+            y: model.y,
+            scale: model.scale?.x,
+            bounds: (() => {
+              const b = model.getBounds?.();
+              return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null;
+            })(),
+            column: pcComposition(box.w, box.h),
+          }
+        : null,
     };
   };
 }
