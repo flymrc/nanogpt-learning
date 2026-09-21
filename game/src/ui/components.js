@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
-import { TAP_MIN, getView, scaled } from "./layout.js";
+import { TAP_MIN, clamp, getView, makeShell, scaled } from "./layout.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
@@ -19,33 +19,67 @@ export function paintBackdrop(scene) {
   }
 }
 
-export function addHeader(scene, { level, total, title }) {
-  const v = getView(scene);
-  const y = v.padTop + (v.short ? 28 : 36);
-  const badge = scene.add.container(v.left + 38, y);
+export function addHeader(scene, { level, total, title, shell }) {
+  const page = shell ?? makeShell(scene);
+  const { v, header, twoRow } = page;
+  const muteSize = Math.max(TAP_MIN, Math.min(56, Math.round(header.h * (twoRow ? 0.52 : 0.78))));
+  const badgeW = clamp(Math.round(64 * v.uiScale), 56, 70);
+  const badgeH = clamp(Math.round(44 * v.uiScale), 38, 48);
+  const row1Y = twoRow ? header.top + badgeH / 2 + 4 : header.cy;
+  const row2Y = twoRow ? header.bottom - 22 : header.cy;
+
+  const badge = scene.add.container(header.left + badgeW / 2, row1Y);
   const g = scene.add.graphics();
-  drawSticker(g, -34, -24, 68, 48, 16, C.coral);
+  drawSticker(g, -badgeW / 2, -badgeH / 2, badgeW, badgeH, 16, C.coral);
   badge.add(g);
-  badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(20)).setOrigin(0.5));
+  badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(twoRow ? 18 : 20)).setOrigin(0.5));
 
-  const titleSize = v.compact ? 22 : 34;
-  const titleText = scene.add.text(v.left + 80, y, title, displayText(titleSize)).setOrigin(0, 0.5);
+  const titleLeft = twoRow ? header.left : header.left + badgeW + 10;
+  const titleMax = header.right - muteSize - 16 - titleLeft;
+  const titleSize = fitFontSize(title, titleMax, v.compact ? 22 : 32, 16);
+  const titleText = scene.add
+    .text(titleLeft, row2Y, title, displayText(titleSize))
+    .setOrigin(0, 0.5);
 
-  const muteReserve = TAP_MIN + 24;
-  let dotsX = v.left + 80 + titleText.width + 56;
-  if (dotsX > v.w - muteReserve - 8) {
-    dotsX = v.left + 80 + 36;
-  }
-  const dots = scene.add.container(dotsX, y);
-  for (let i = 0; i < total; i += 1) {
-    const on = i + 1 === level;
-    const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
-    if (key) {
-      dots.add(scene.add.image(i * 28, 0, key).setScale(on ? 0.48 : 0.32).setAlpha(on ? 1 : 0.35));
+  const starGap = twoRow ? 22 : 26;
+  const starsW = Math.max(0, total - 1) * starGap + 16;
+  let dotsX = titleLeft + titleText.width + 26;
+  const muteLeft = header.right - muteSize;
+  let dotsY = row2Y;
+  if (dotsX + starsW > muteLeft - 8) {
+    if (twoRow) {
+      dotsX = header.left + badgeW + 28;
+      dotsY = row1Y;
+      if (dotsX + starsW > muteLeft - 8) dotsX = -1;
     } else {
-      dots.add(scene.add.star(i * 28, 0, 5, on ? 8 : 6, on ? 16 : 12, on ? C.gold : 0xf3d9a2));
+      dotsX = -1;
     }
   }
+  if (dotsX > 0) {
+    const dots = scene.add.container(dotsX, dotsY);
+    for (let i = 0; i < total; i += 1) {
+      const on = i + 1 === level;
+      const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
+      if (key) {
+        dots.add(scene.add.image(i * starGap, 0, key).setScale(on ? 0.42 : 0.3).setAlpha(on ? 1 : 0.35));
+      } else {
+        dots.add(scene.add.star(i * starGap, 0, 5, on ? 7 : 5, on ? 14 : 10, on ? C.gold : 0xf3d9a2));
+      }
+    }
+  }
+}
+
+function fitFontSize(text, maxWidth, preferred, min) {
+  const approx = text.length * preferred * 0.62;
+  if (approx <= maxWidth) return preferred;
+  return clamp(Math.floor(preferred * (maxWidth / Math.max(1, approx))), min, preferred);
+}
+
+export function addChrome(scene, { level, total, title, shell }) {
+  const page = shell ?? makeShell(scene);
+  addHeader(scene, { level, total, title, shell: page });
+  const mute = addMuteToggle(scene, page);
+  return { shell: page, mute };
 }
 
 export function addBeat(scene, { title, caption }) {
@@ -70,8 +104,9 @@ export function setBeat(beat, { title, caption }) {
 }
 
 export function createButton(scene, x, y, label, onClick, opts = {}) {
+  const caption = opts.caption ?? "";
   const w = Math.max(opts.minWidth ?? 160, opts.width ?? 240);
-  const h = Math.max(TAP_MIN, opts.height ?? 68);
+  const h = Math.max(TAP_MIN, opts.height ?? (caption ? 76 : 68));
   const fill = opts.fill ?? C.coral;
   const container = scene.add.container(x, y);
 
@@ -83,10 +118,15 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   draw(false);
 
   const text = scene.add
-    .text(0, -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
+    .text(0, caption ? -12 : -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
     .setOrigin(0.5);
+  const cap = caption
+    ? scene.add
+        .text(0, 16, caption, uiText(opts.captionSize ?? 14, { color: opts.captionColor ?? C.muted }))
+        .setOrigin(0.5)
+    : null;
 
-  container.add([bg, text]);
+  container.add(cap ? [bg, text, cap] : [bg, text]);
   container.setSize(w, h);
   container.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
   container.input.cursor = "pointer";
@@ -108,6 +148,9 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   });
 
   container.setLabel = (next) => text.setText(next);
+  container.setCaption = (next) => {
+    if (cap) cap.setText(next ?? "");
+  };
   container.setEnabled = (enabled) => {
     container.setAlpha(enabled ? 1 : 0.45);
     if (enabled) container.setInteractive();
@@ -116,20 +159,19 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   return container;
 }
 
-export function addAdvanceHint(scene, text = "点一下") {
-  const v = getView(scene);
-  const hint = scene.add
-    .text(v.cx, v.bottom - 8, text, uiText(15, { color: C.muted }))
-    .setOrigin(0.5);
-  scene.tweens.add({
-    targets: hint,
-    y: v.bottom - 16,
-    duration: 700,
-    yoyo: true,
-    repeat: -1,
-    ease: "Sine.InOut",
+export function addFooterCta(scene, { shell, label, caption = "点一下", onClick, fill, width, height } = {}) {
+  const page = shell ?? makeShell(scene);
+  const { v, footer } = page;
+  const btnH = height ?? clamp(footer.h - 20, TAP_MIN, caption ? 80 : 70);
+  const btnW = width ?? Math.min(v.portrait ? footer.w - 8 : 280, 320);
+  const btn = createButton(scene, footer.cx, footer.cy, label, onClick, {
+    width: btnW,
+    height: btnH,
+    caption,
+    fill,
   });
-  return hint;
+  btn.setDepth(20);
+  return btn;
 }
 
 export function makeCharTile(scene, x, y, glyph, { width = 64, height = 64, seed = glyph } = {}) {
@@ -170,23 +212,40 @@ export function setTileActive(tile, on) {
 export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, height = 82 } = {}) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  paintBadge(g, width, height, accent, false);
-  const clipW = Math.max(10, width * 0.26);
-  const clip = scene.add
-    .rectangle(0, -height / 2 + Math.max(5, height * 0.08), clipW, Math.max(7, height * 0.12), accent)
-    .setStrokeStyle(Math.max(2, width * 0.06), C.stroke);
+  const compact = height < 50 || width < 34;
+  paintBadge(g, width, height, accent, false, { compact });
+  const parts = [g];
+  if (!compact) {
+    const clipW = Math.max(10, width * 0.26);
+    const clip = scene.add
+      .rectangle(0, -height / 2 + Math.max(5, height * 0.08), clipW, Math.max(7, height * 0.12), accent)
+      .setStrokeStyle(Math.max(2, width * 0.06), C.stroke);
+    parts.push(clip);
+  }
   const ch = scene.add
-    .text(0, -height * 0.12, glyph, monoText(Math.max(11, Math.round(width * 0.4)), { fontStyle: "700" }))
+    .text(
+      0,
+      compact ? -height * 0.18 : -height * 0.12,
+      glyph,
+      monoText(Math.max(10, Math.round(width * (compact ? 0.36 : 0.4))), { fontStyle: "700" }),
+    )
     .setOrigin(0.5);
   const idText = scene.add
-    .text(0, height * 0.26, String(id), monoText(Math.max(9, Math.round(width * 0.28)), { fontStyle: "700" }))
+    .text(
+      0,
+      compact ? height * 0.22 : height * 0.26,
+      String(id),
+      monoText(Math.max(8, Math.round(width * 0.26)), { fontStyle: "700" }),
+    )
     .setOrigin(0.5);
-  box.add([g, clip, ch, idText]);
+  parts.push(ch, idText);
+  box.add(parts);
   box.setSize(width, height);
   box.setData("graphics", g);
   box.setData("accent", accent);
   box.setData("width", width);
   box.setData("height", height);
+  box.setData("compact", compact);
   return box;
 }
 
@@ -206,7 +265,7 @@ export function highlightChip(scene, chip, on = true) {
   const width = chip.getData("width");
   const height = chip.getData("height");
   g.clear();
-  paintBadge(g, width, height, on ? C.gold : accent, on);
+  paintBadge(g, width, height, on ? C.gold : accent, on, { compact: chip.getData("compact") });
   scene.tweens.add({
     targets: chip,
     scale: on ? 1.1 : 1,
@@ -329,10 +388,10 @@ export function makeArrow(scene, x, y, { angle = 90, color = C.coral, label = ""
   return box;
 }
 
-export function makePairBoard(scene, x, y) {
+export function makePairBoard(scene, x, y, dims = {}) {
   const v = getView(scene);
-  const width = Math.min(420, v.innerW - 16);
-  const height = Math.max(88, Math.min(116, width * 0.28));
+  const width = dims.width ?? Math.min(420, v.innerW - 16);
+  const height = dims.height ?? Math.max(88, Math.min(116, width * 0.28));
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, 24, C.surface);
@@ -399,12 +458,20 @@ export function spawnConfetti(scene) {
 
 export function makeTag(scene, x, y, text, accent = C.blue) {
   const tag = scene.add.container(x, y);
-  const label = scene.add.text(0, 0, text, displayText(16)).setOrigin(0.5);
-  const w = label.width + 24;
-  const h = 32;
+  const label = scene.add.text(0, 0, text, displayText(14)).setOrigin(0.5);
+  const w = label.width + 20;
+  const h = 26;
   const g = scene.add.graphics();
-  drawSticker(g, -w / 2, -h / 2, w, h, 12, accent, { lineWidth: 4, shadow: false });
+  drawSticker(g, -w / 2, -h / 2, w, h, 10, accent, { lineWidth: 4, shadow: false });
   tag.add([g, label]);
+  tag.setSize(w, h);
+  return tag;
+}
+
+/** Label sits above a row, never on top of the first tile. */
+export function addSectionTag(scene, text, accent, { left, top }) {
+  const tag = makeTag(scene, 0, 0, text, accent);
+  tag.setPosition(left + tag.width / 2, top + tag.height / 2);
   return tag;
 }
 
@@ -416,12 +483,16 @@ export function makePanel(scene, x, y, width, height) {
   return box;
 }
 
-export function addMuteToggle(scene) {
+export function addMuteToggle(scene, shell) {
   applyMute(scene.game, readMuted());
 
   const v = getView(scene);
-  const size = Math.max(TAP_MIN, Math.min(64, Math.round(56 * v.uiScale)));
-  const box = scene.add.container(v.w - v.padRight - size / 2 - 2, v.padTop + size / 2 + 2);
+  const header = shell?.header;
+  const twoRow = shell?.twoRow;
+  const size = Math.max(TAP_MIN, Math.min(56, Math.round(header ? header.h * (twoRow ? 0.52 : 0.78) : 56 * v.uiScale)));
+  const x = header ? header.right - size / 2 : v.w - v.padRight - size / 2 - 2;
+  const y = header ? (twoRow ? header.top + size / 2 + 2 : header.cy) : v.padTop + size / 2 + 2;
+  const box = scene.add.container(x, y);
   const bg = scene.add.graphics();
   const icon = scene.add.graphics();
 
@@ -515,7 +586,7 @@ export function bindAdvance(scene, advance) {
   scene.input.on("pointerdown", (pointer, currentlyOver) => {
     if (currentlyOver?.length) return;
     const view = getView(scene);
-    if (pointer.x > view.w - 96 && pointer.y < view.padTop + 88) return;
+    if (pointer.x > view.w - 96 && pointer.y < view.padTop + 100) return;
     tryAdvance();
   });
 
@@ -545,9 +616,10 @@ export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
   g.strokeRoundedRect(x, y, w, h, r);
 }
 
-function paintBadge(g, width, height, accent, on) {
+function paintBadge(g, width, height, accent, on, opts = {}) {
+  const compact = opts.compact;
   const radius = Math.max(8, Math.min(16, width * 0.26));
-  const stripeH = Math.max(12, height * 0.28);
+  const stripeH = Math.max(compact ? 10 : 12, height * (compact ? 0.24 : 0.28));
   drawSticker(g, -width / 2, -height / 2, width, height, radius, on ? 0xfff4c2 : C.surface, {
     lineWidth: on ? 6 : Math.max(3, width * 0.08),
   });

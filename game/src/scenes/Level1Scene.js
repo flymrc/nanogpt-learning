@@ -8,23 +8,21 @@ import {
 } from "../data/facts.js";
 import { cueVoice, playSfx } from "../audio/sound.js";
 import {
-  addAdvanceHint,
-  addHeader,
-  addMuteToggle,
+  addChrome,
+  addFooterCta,
+  addSectionTag,
   bindAdvance,
   burstStars,
-  createButton,
   makeArrow,
   makeCharTile,
   makeChip,
   makeFactChip,
-  makeTag,
   paintBackdrop,
   pulseChip,
   setTileActive,
 } from "../ui/components.js";
 import { addRobot, addScrollBuddy, addSpeechBubble, setSpeech } from "../ui/mascot.js";
-import { TAP_MIN, flowPositions, getView, watchResize } from "../ui/layout.js";
+import { fitMeasure, flowPositions, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { C, displayText } from "../ui/theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
@@ -35,94 +33,61 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
-    const v = getView(this);
+    const shell = makeShell(this);
+    const v = shell.v;
     this.view = v;
+    this.shell = shell;
     paintBackdrop(this);
-    addHeader(this, { level: 1, total: 2, title: "字符变 ID" });
+    addChrome(this, { level: 1, total: 2, title: "字符变 ID", shell });
 
-    const robotScale = v.short ? 0.26 : v.compact ? 0.3 : 0.38;
-    const robotX = v.left + (v.compact ? 36 : 56);
-    const robotY = v.padTop + (v.short ? 92 : v.compact ? 118 : 168);
+    const plan = layoutLevel1(v, shell);
+    this.layout = plan;
+    this.tileSize = plan.tile;
+    this.chipH = plan.chipH;
+    this.mapPos = plan.mapPos;
+
+    const mascot = plan.slots.mascot;
+    const robotScale = plan.robotScale;
+    const robotX = v.left + (v.compact ? 32 : 52);
+    const robotY = mascot.cy;
     addRobot(this, robotX, robotY, { scale: robotScale });
     if (!v.compact) addScrollBuddy(this, robotX, robotY + 54, { scale: 0.28 });
-    this.speech = addSpeechBubble(
-      this,
-      robotX + (v.short && !v.portrait ? 210 : v.compact ? 148 : 158),
-      robotY - (v.short && !v.portrait ? 8 : v.compact ? 32 : 50),
-      "点它变数字",
-      { maxWidth: v.compact ? 168 : 220 },
-    );
-    addMuteToggle(this);
+    const speechMax = Math.min(v.compact ? 168 : 220, v.right - robotX - 70);
+    this.speech = addSpeechBubble(this, robotX + (v.compact ? 118 : 150), robotY - 8, "点它变数字", {
+      maxWidth: speechMax,
+      fontSize: v.compact ? 18 : 24,
+    });
     cueVoice(this, "vo-level1");
 
-    const tile = v.short ? 34 : v.compact ? 40 : 62;
-    const chipH = v.short ? 44 : v.compact ? 52 : 80;
-    const gap = v.compact ? 6 : 8;
-    const sourceY = v.padTop + v.innerH * (v.portrait ? 0.24 : 0.28);
-    makeTag(this, v.left + 40, sourceY - tile * 0.7, "原文", C.pink);
-    const srcPos = flowPositions(CHARS.length, {
-      y: sourceY,
-      tileW: tile,
-      tileH: tile,
-      gapX: gap,
-      gapY: gap + 4,
-      innerW: v.innerW,
-      cx: v.cx,
-    });
-    this.tileSize = tile;
-    this.chipH = chipH;
+    addSectionTag(this, "原文", C.pink, { left: v.left, top: plan.slots.source.top });
     this.sourceTiles = CHARS.map((ch, i) =>
-      makeCharTile(this, srcPos[i].x, srcPos[i].y, displayGlyph(ch), {
-        width: tile,
-        height: tile,
+      makeCharTile(this, plan.srcPos[i].x, plan.srcPos[i].y, displayGlyph(ch), {
+        width: plan.tile,
+        height: plan.tile,
         seed: ch,
       }),
     );
 
-    const srcRows = srcPos[0]?.rows ?? 1;
-    const arrowY = sourceY + srcRows * (tile + gap + 4) + 18;
-    this.downArrow = makeArrow(this, v.cx, arrowY, { angle: 90, color: C.coral, label: "" });
+    this.downArrow = makeArrow(this, v.cx, plan.slots.arrow.cy, { angle: 90, color: C.coral, label: "" });
 
-    const mapY = arrowY + 56;
-    makeTag(this, v.left + 40, mapY - chipH * 0.55, "id", C.gold);
-    this.mapPos = flowPositions(CHARS.length, {
-      y: mapY,
-      tileW: tile,
-      tileH: chipH,
-      gapX: gap,
-      gapY: gap + 6,
-      innerW: v.innerW,
-      cx: v.cx,
-    });
+    addSectionTag(this, "id", C.gold, { left: v.left, top: plan.slots.map.top });
     this.mappedChips = new Array(CHARS.length).fill(null);
 
-    const mapRows = this.mapPos[0]?.rows ?? 1;
-    const uniqueY = Math.min(
-      v.bottom - (v.portrait ? 168 : 118),
-      mapY + mapRows * (chipH + gap + 6) + 40,
-    );
-    this.uniqueChip = makeFactChip(this, v.cx, uniqueY, {
+    this.uniqueChip = makeFactChip(this, v.cx, plan.slots.dock.cy, {
       value: "★ 0",
       label: "本段唯一",
       tip: "重复字母共用同一个 id",
       accent: C.gold,
-      width: Math.min(180, v.innerW - 40),
-      height: v.compact ? 70 : 78,
+      width: Math.min(200, v.innerW - 32),
+      height: plan.uniqueH,
     });
 
-    const btnW = Math.min(v.portrait ? v.innerW - 20 : 220, 280);
-    const btnH = Math.max(TAP_MIN, 60);
-    this.nextBtn = createButton(
-      this,
-      v.portrait ? v.cx : v.right - btnW / 2,
-      v.bottom - 36,
-      "下一步",
-      () => this.advance(),
-      { width: btnW, height: btnH },
-    );
-    this.nextBtn.setDepth(20);
-    this.hint = addAdvanceHint(this);
-    this.hint.setDepth(20);
+    this.nextBtn = addFooterCta(this, {
+      shell,
+      label: "下一步",
+      caption: "点一下",
+      onClick: () => this.advance(),
+    });
 
     this.step = 0;
     this.busy = false;
@@ -131,6 +96,7 @@ export default class Level1Scene extends Phaser.Scene {
     this.factChips = [];
 
     bindAdvance(this, () => this.advance());
+
     watchResize(this, {
       restart: true,
       persist: () => {
@@ -262,13 +228,13 @@ export default class Level1Scene extends Phaser.Scene {
 
   flashReuse(chip) {
     const stamp = this.add
-      .text(chip.x, chip.y - 50, "复用", displayText(20, { color: C.coralCss }))
+      .text(chip.x, chip.y - this.chipH * 0.7, "复用", displayText(20, { color: C.coralCss }))
       .setOrigin(0.5)
       .setScale(0.4);
     this.tweens.add({
       targets: stamp,
       scale: 1,
-      y: chip.y - 58,
+      y: chip.y - this.chipH * 0.82,
       duration: 180,
       hold: 420,
       yoyo: true,
@@ -316,9 +282,9 @@ export default class Level1Scene extends Phaser.Scene {
     ];
 
     const v = this.view;
-    const fw = v.portrait ? Math.min(168, (v.innerW - 12) / 2) : Math.min(200, (v.innerW - 36) / 4);
-    const fh = v.short ? 64 : v.compact ? 74 : 86;
-    const factY = v.bottom - (v.portrait ? 196 : 118);
+    const dock = this.layout.slots.dock;
+    const fw = this.layout.factW;
+    const fh = this.layout.factH;
 
     facts.forEach((fact, i) => {
       let x;
@@ -327,10 +293,10 @@ export default class Level1Scene extends Phaser.Scene {
         const col = i % 2;
         const row = Math.floor(i / 2);
         x = v.cx + (col === 0 ? -fw / 2 - 6 : fw / 2 + 6);
-        y = factY + row * (fh + 10);
+        y = dock.top + fh / 2 + row * (fh + 10);
       } else {
         x = v.cx + (i - 1.5) * (fw + 12);
-        y = factY;
+        y = dock.cy;
       }
       const chip = makeFactChip(this, x, y, { ...fact, width: fw, height: fh });
       chip.setAlpha(0);
@@ -348,12 +314,113 @@ export default class Level1Scene extends Phaser.Scene {
 
     this.time.delayedCall(instant ? 0 : 360, () => {
       this.nextBtn.setLabel("走起");
-      this.hint.setText("下一关");
+      this.nextBtn.setCaption("下一关");
       this.children.bringToTop(this.nextBtn);
-      this.children.bringToTop(this.hint);
       this.busy = false;
     });
   }
+}
+
+function layoutLevel1(v, shell) {
+  const landscapeShort = v.short && !v.portrait;
+  const measured = fitMeasure(shell.content.h, (s) => {
+    const tile = Math.round((landscapeShort ? 28 : v.short ? 34 : v.compact ? 40 : 62) * s);
+    const chipH = Math.max(tile + 6, Math.round((landscapeShort ? 40 : v.short ? 48 : v.compact ? 56 : 80) * s));
+    const gap = Math.max(4, Math.round((v.compact ? 6 : 8) * s));
+    const tagH = Math.round(26 * s);
+    const srcProbe = flowPositions(CHARS.length, {
+      y: 0,
+      tileW: tile,
+      tileH: tile,
+      gapX: gap,
+      gapY: gap + 4,
+      innerW: v.innerW,
+      cx: v.cx,
+    });
+    const mapProbe = flowPositions(CHARS.length, {
+      y: 0,
+      tileW: tile,
+      tileH: chipH,
+      gapX: gap,
+      gapY: gap + 6,
+      innerW: v.innerW,
+      cx: v.cx,
+    });
+    const srcRows = srcProbe[0]?.rows ?? 1;
+    const mapRows = mapProbe[0]?.rows ?? 1;
+    const factW = v.portrait ? Math.min(168, (v.innerW - 12) / 2) : Math.min(200, (v.innerW - 36) / 4);
+    const factH = Math.round((v.short ? 62 : v.compact ? 70 : 82) * s);
+    const uniqueH = Math.round((v.compact ? 68 : 76) * s);
+    const dockH = v.portrait ? factH * 2 + 10 : Math.max(factH, uniqueH);
+    const mascotH = Math.round((landscapeShort ? 52 : v.short ? 64 : v.compact ? 74 : 90) * s);
+    const arrowH = Math.round((landscapeShort ? 36 : 48) * s);
+    const sourceH = tagH + 8 + srcRows * tile + Math.max(0, srcRows - 1) * (gap + 4);
+    const mapH = tagH + 8 + mapRows * chipH + Math.max(0, mapRows - 1) * (gap + 6);
+    const gapY = Math.round((landscapeShort ? 8 : 12) * s);
+    const items = [
+      { id: "mascot", h: mascotH },
+      { id: "source", h: sourceH },
+      { id: "arrow", h: arrowH },
+      { id: "map", h: mapH },
+      { id: "dock", h: dockH },
+    ];
+    const stacked = stackSlots(items, {
+      top: 0,
+      bottom: items.reduce((sum, it) => sum + it.h, 0) + gapY * (items.length - 1),
+      gap: gapY,
+      justify: "start",
+    });
+    return {
+      h: stacked.used,
+      items,
+      gapY,
+      tile,
+      chipH,
+      gap,
+      tagH,
+      factW,
+      factH,
+      uniqueH,
+      srcRows,
+      mapRows,
+      robotScale: (landscapeShort ? 0.22 : v.short ? 0.26 : v.compact ? 0.3 : 0.38) * Math.min(1, s + 0.15),
+    };
+  });
+
+  const stacked = stackSlots(measured.items, {
+    top: shell.content.top,
+    bottom: shell.content.bottom,
+    gap: measured.gapY,
+    justify: v.portrait ? "distribute" : "center",
+  });
+
+  const srcY = stacked.slots.source.top + measured.tagH + 8 + measured.tile / 2;
+  const mapY = stacked.slots.map.top + measured.tagH + 8 + measured.chipH / 2;
+  const srcPos = flowPositions(CHARS.length, {
+    y: srcY,
+    tileW: measured.tile,
+    tileH: measured.tile,
+    gapX: measured.gap,
+    gapY: measured.gap + 4,
+    innerW: v.innerW,
+    cx: v.cx,
+  });
+  const mapPos = flowPositions(CHARS.length, {
+    y: mapY,
+    tileW: measured.tile,
+    tileH: measured.chipH,
+    gapX: measured.gap,
+    gapY: measured.gap + 6,
+    innerW: v.innerW,
+    cx: v.cx,
+  });
+
+  return {
+    ...measured,
+    slots: stacked.slots,
+    srcPos,
+    mapPos,
+  };
 }
 
 function speechFor(ch, id, isNew) {

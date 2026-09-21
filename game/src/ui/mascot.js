@@ -36,10 +36,10 @@ export function addScrollBuddy(scene, x, y, { scale = 0.92 } = {}) {
   return root;
 }
 
-export function addSpeechBubble(scene, x, y, text, { pointer = "left", maxWidth = 260 } = {}) {
+export function addSpeechBubble(scene, x, y, text, { pointer = "left", maxWidth = 260, fontSize = 26 } = {}) {
   const box = scene.add.container(x, y);
   const label = scene.add
-    .text(0, -2, text, displayText(26, { align: "center", wordWrap: { width: maxWidth - 24 } }))
+    .text(0, -2, text, displayText(fontSize, { align: "center", wordWrap: { width: maxWidth - 24 } }))
     .setOrigin(0.5);
 
   const padX = 28;

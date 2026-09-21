@@ -14,11 +14,10 @@ import {
 } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
 import {
-  addAdvanceHint,
-  addHeader,
-  addMuteToggle,
+  addChrome,
+  addFooterCta,
+  addSectionTag,
   bindAdvance,
-  createButton,
   highlightChip,
   makeChip,
   makeFactChip,
@@ -28,7 +27,7 @@ import {
   paintBackdrop,
 } from "../ui/components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "../ui/mascot.js";
-import { TAP_MIN, getView, tokenMetrics, watchResize } from "../ui/layout.js";
+import { fitMeasure, makeShell, stackSlots, tokenMetrics, watchResize } from "../ui/layout.js";
 import { C } from "../ui/theme.js";
 
 const STREAM = DEMO_STREAM;
@@ -41,88 +40,70 @@ export default class Level2Scene extends Phaser.Scene {
   }
 
   create() {
-    const v = getView(this);
+    const shell = makeShell(this);
+    const v = shell.v;
     this.view = v;
+    this.shell = shell;
     paintBackdrop(this);
-    addHeader(this, { level: 2, total: 2, title: v.compact ? "窗口与 xy" : "窗口与 (x, y)" });
+    addChrome(this, { level: 2, total: 2, title: v.compact ? "窗口与 xy" : "窗口与 (x, y)", shell });
 
-    const robotX = v.left + (v.compact ? 36 : 56);
-    const robotY = v.padTop + (v.short ? 90 : v.compact ? 118 : 164);
-    addRobot(this, robotX, robotY, { scale: v.short ? 0.26 : v.compact ? 0.3 : 0.38 });
+    const plan = layoutLevel2(v, shell);
+    this.layout = plan;
+    this.metrics = plan.metrics;
+    this.streamPos = plan.streamPos;
+    this.xPos = plan.xPos;
+    this.yPos = plan.yPos;
+
+    const mascot = plan.slots.mascot;
+    const robotX = v.left + (v.compact ? 32 : 52);
+    const robotY = mascot.cy;
+    addRobot(this, robotX, robotY, { scale: plan.robotScale });
     this.speech = addSpeechBubble(
       this,
-      robotX + (v.short && !v.portrait ? 200 : v.compact ? 140 : 150),
-      robotY - (v.short && !v.portrait ? 8 : v.compact ? 30 : 46),
+      robotX + (v.compact ? 114 : 146),
+      robotY - 6,
       "先框住 x",
-      { maxWidth: v.compact ? 160 : 220 },
+      { maxWidth: Math.min(v.compact ? 160 : 220, v.right - robotX - 70), fontSize: v.compact ? 18 : 24 },
     );
-    addMuteToggle(this);
     cueVoice(this, "vo-level2");
 
-    const metrics = tokenMetrics(STREAM.length, v.innerW, {
-      maxW: v.short ? 32 : v.compact ? 36 : 54,
-      maxH: v.short ? 42 : v.compact ? 48 : 72,
-      minW: 20,
-      gap: v.compact ? 3 : 6,
-    });
-    this.metrics = metrics;
-    const streamY = v.padTop + v.innerH * (v.portrait ? 0.22 : 0.26);
-    makeTag(this, v.left + 36, streamY - metrics.tileH * 0.7, "带", C.violet);
-
-    const total = STREAM.length * metrics.tileW + (STREAM.length - 1) * metrics.gapX;
-    const startX = v.cx - total / 2 + metrics.tileW / 2;
-    this.streamPos = STREAM.map((_, i) => ({
-      x: startX + i * (metrics.tileW + metrics.gapX),
-      y: streamY,
-    }));
+    addSectionTag(this, "带", C.violet, { left: v.left, top: plan.slots.stream.top });
     this.streamChips = STREAM.map((id, i) =>
-      makeChip(this, this.streamPos[i].x, this.streamPos[i].y, {
+      makeChip(this, plan.streamPos[i].x, plan.streamPos[i].y, {
         glyph: displayGlyph(CHARS[i]),
         id,
         accent: C.violet,
-        width: metrics.tileW,
-        height: metrics.tileH,
+        width: plan.metrics.tileW,
+        height: plan.metrics.tileH,
       }),
     );
 
-    const first = this.streamPos[0];
-    const last = this.streamPos[DEMO_BLOCK - 1];
-    this.winW = last.x - first.x + metrics.tileW + 8;
-    this.winH = metrics.tileH + 28;
+    const first = plan.streamPos[0];
+    const last = plan.streamPos[DEMO_BLOCK - 1];
+    this.winW = last.x - first.x + plan.metrics.tileW + 8;
+    this.winH = plan.metrics.tileH + 20;
     this.winStartX = (first.x + last.x) / 2;
     this.winY = first.y;
     this.window = makeWindowFrame(this, this.winStartX, this.winY, this.winW, this.winH, C.blue);
     this.window.setAlpha(0);
 
-    this.shiftTag = this.add.container(0, 0);
-    this.shiftTag.setAlpha(0);
-
-    const xY = streamY + metrics.tileH + (v.short ? 36 : v.portrait ? 56 : 72);
-    const yY = xY + metrics.tileH + (v.short ? 36 : v.portrait ? 52 : 72);
-    makeTag(this, v.left + 36, xY - metrics.tileH * 0.55, "x", C.blue);
-    makeTag(this, v.left + 36, yY - metrics.tileH * 0.55, "y", C.gold);
+    addSectionTag(this, "x", C.blue, { left: v.left, top: plan.slots.xRow.top });
+    addSectionTag(this, "y", C.gold, { left: v.left, top: plan.slots.yRow.top });
 
     this.xRow = [];
     this.yRow = [];
-    this.xPos = this.streamPos.slice(0, DEMO_BLOCK).map((p) => ({ x: p.x, y: xY }));
-    this.yPos = this.streamPos.slice(1, DEMO_BLOCK + 1).map((p) => ({ x: p.x, y: yY }));
 
-    const pairY = Math.min(v.bottom - 118, yY + metrics.tileH + (v.short ? 36 : 48));
-    this.pairBoard = makePairBoard(this, v.cx, pairY);
+    this.pairBoard = makePairBoard(this, v.cx, plan.slots.dock.cy, {
+      width: Math.min(420, v.innerW - 16),
+      height: plan.pairH,
+    });
 
-    const btnW = Math.min(v.portrait ? v.innerW - 20 : 220, 280);
-    const btnH = Math.max(TAP_MIN, 60);
-    this.nextBtn = createButton(
-      this,
-      v.portrait ? v.cx : v.right - btnW / 2,
-      v.bottom - 36,
-      "下一步",
-      () => this.advance(),
-      { width: btnW, height: btnH },
-    );
-    this.nextBtn.setDepth(20);
-    this.hint = addAdvanceHint(this);
-    this.hint.setDepth(20);
+    this.nextBtn = addFooterCta(this, {
+      shell,
+      label: "下一步",
+      caption: "点一下",
+      onClick: () => this.advance(),
+    });
 
     this.phase = 0;
     this.busy = false;
@@ -226,7 +207,8 @@ export default class Level2Scene extends Phaser.Scene {
       duration: instant ? 0 : 460,
       ease: "Cubic.InOut",
       onComplete: () => {
-        const plus = makeTag(this, this.window.x + this.winW / 2 + 28, this.winY, "+1", C.gold);
+        const tagX = Math.min(this.view.right - 24, this.window.x + this.winW / 2 + 28);
+        const plus = makeTag(this, tagX, this.winY, "+1", C.gold);
         plus.setScale(instant ? 1 : 0.4);
         this.tweens.add({ targets: plus, scale: 1.05, duration: instant ? 0 : 220, ease: "Back.Out" });
       },
@@ -321,14 +303,14 @@ export default class Level2Scene extends Phaser.Scene {
     ];
 
     const v = this.view;
-    const stackFacts = v.portrait && v.innerW < 420;
-    const fw = stackFacts ? Math.min(260, v.innerW - 16) : Math.min(260, (v.innerW - 24) / 3);
-    const fh = v.short ? 62 : v.compact ? 70 : 86;
-    const baseY = v.bottom - (stackFacts ? 210 : 118);
+    const dock = this.layout.slots.dock;
+    const fw = this.layout.factW;
+    const fh = this.layout.factH;
+    const oneRow = this.layout.factsOneRow;
 
     facts.forEach((fact, i) => {
-      const x = stackFacts ? v.cx : v.cx + (i - 1) * (fw + 10);
-      const y = stackFacts ? baseY + i * (fh + 8) : baseY;
+      const x = oneRow ? v.cx + (i - 1) * (fw + 10) : v.cx;
+      const y = oneRow ? dock.cy : dock.top + fh / 2 + i * (fh + 8);
       const chip = makeFactChip(this, x, y, { ...fact, width: fw, height: fh });
       chip.setAlpha(0);
       chip.y += instant ? 0 : 20;
@@ -344,11 +326,82 @@ export default class Level2Scene extends Phaser.Scene {
 
     this.time.delayedCall(instant ? 0 : 360, () => {
       this.nextBtn.setLabel("走起");
-      this.hint.setText("看契约");
+      this.nextBtn.setCaption("看契约");
       this.children.bringToTop(this.nextBtn);
-      this.children.bringToTop(this.hint);
       this.done = true;
       this.busy = false;
     });
   }
+}
+
+function layoutLevel2(v, shell) {
+  const landscapeShort = v.short && !v.portrait;
+  const measured = fitMeasure(shell.content.h, (s) => {
+    const metrics = tokenMetrics(STREAM.length, v.innerW, {
+      maxW: (landscapeShort ? 28 : v.short ? 32 : v.compact ? 36 : 54) * s,
+      maxH: (landscapeShort ? 38 : v.short ? 44 : v.compact ? 50 : 72) * s,
+      minW: 18,
+      gap: (v.compact ? 3 : 6) * s,
+    });
+    const tagH = Math.round(26 * s);
+    const mascotH = Math.round((landscapeShort ? 50 : v.short ? 62 : 74) * s);
+    const streamH = tagH + 8 + metrics.tileH + 10;
+    const rowH = tagH + 8 + metrics.tileH;
+    const factW = Math.min(v.portrait ? 220 : 260, (v.innerW - 24) / (v.portrait && v.innerW < 360 ? 1 : 3));
+    const factsOneRow = factW * 3 + 20 <= v.innerW;
+    const factH = Math.round((v.short ? 60 : v.compact ? 68 : 82) * s);
+    const pairH = Math.max(72, Math.min(108, Math.min(420, v.innerW - 16) * 0.28) * s);
+    const dockH = factsOneRow ? Math.max(pairH, factH) : Math.max(pairH, factH * 3 + 16);
+    const gapY = Math.round((landscapeShort ? 8 : 12) * s);
+    const items = [
+      { id: "mascot", h: mascotH },
+      { id: "stream", h: streamH },
+      { id: "xRow", h: rowH },
+      { id: "yRow", h: rowH },
+      { id: "dock", h: dockH },
+    ];
+    const stacked = stackSlots(items, {
+      top: 0,
+      bottom: items.reduce((sum, it) => sum + it.h, 0) + gapY * (items.length - 1),
+      gap: gapY,
+      justify: "start",
+    });
+    return {
+      h: stacked.used,
+      items,
+      gapY,
+      metrics,
+      tagH,
+      factW,
+      factH,
+      pairH,
+      factsOneRow,
+      robotScale: (landscapeShort ? 0.22 : v.short ? 0.26 : v.compact ? 0.3 : 0.38) * Math.min(1, s + 0.15),
+    };
+  });
+
+  const stacked = stackSlots(measured.items, {
+    top: shell.content.top,
+    bottom: shell.content.bottom,
+    gap: measured.gapY,
+    justify: v.portrait ? "distribute" : "center",
+  });
+
+  const streamY = stacked.slots.stream.top + measured.tagH + 8 + measured.metrics.tileH / 2;
+  const xY = stacked.slots.xRow.top + measured.tagH + 8 + measured.metrics.tileH / 2;
+  const yY = stacked.slots.yRow.top + measured.tagH + 8 + measured.metrics.tileH / 2;
+  const total = STREAM.length * measured.metrics.tileW + (STREAM.length - 1) * measured.metrics.gapX;
+  const startX = v.cx - total / 2 + measured.metrics.tileW / 2;
+  const streamPos = STREAM.map((_, i) => ({
+    x: startX + i * (measured.metrics.tileW + measured.metrics.gapX),
+    y: streamY,
+  }));
+
+  return {
+    ...measured,
+    slots: stacked.slots,
+    streamPos,
+    xPos: streamPos.slice(0, DEMO_BLOCK).map((p) => ({ x: p.x, y: xY })),
+    yPos: streamPos.slice(1, DEMO_BLOCK + 1).map((p) => ({ x: p.x, y: yY })),
+  };
 }
