@@ -54,7 +54,7 @@ export function addPurposeBanner(scene, rect) {
   stripe.fillRoundedRect(-rect.w / 2 + 8, -rect.h / 2 + 8, 12, rect.h - 16, 7);
 
   const kicker = scene.add
-    .text(-rect.w / 2 + 32, -rect.h * 0.22, "这一步在干什么", uiText(13, { color: C.goldCss }))
+    .text(-rect.w / 2 + 32, -rect.h * 0.22, "这一步要干什么", uiText(13, { color: C.goldCss }))
     .setOrigin(0, 0.5);
   const purpose = scene.add
     .text(-rect.w / 2 + 32, rect.h * 0.16, "", displayText(Math.max(18, Math.round(rect.h * 0.28))))
@@ -65,7 +65,8 @@ export function addPurposeBanner(scene, rect) {
 
   box.add([g, stripe, kicker, purpose, step]);
   box.setSize(rect.w, rect.h);
-  box.set = (text, index, total) => {
+  box.set = (text, index, total, extra = {}) => {
+    kicker.setText(extra.kicker || "这一步要干什么");
     purpose.setText(text);
     const maxW = rect.w - 88;
     let size = Math.max(18, Math.round(rect.h * 0.28));
@@ -74,7 +75,8 @@ export function addPurposeBanner(scene, rect) {
       size -= 1;
       purpose.setFontSize(size);
     }
-    step.setText(`${index + 1} / ${total}`);
+    const detail = extra.detail ? ` · ${extra.detail}` : "";
+    step.setText(`${index + 1} / ${total}${detail}`);
     purpose.setAlpha(0);
     scene.tweens.add({ targets: purpose, alpha: 1, duration: 140 });
   };

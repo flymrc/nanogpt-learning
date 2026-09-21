@@ -53,8 +53,8 @@ export default class EndScene extends Phaser.Scene {
         icon: "deco-badge",
         fallback: "带",
         title: "台词拉成纸带",
-        caption: "一字一号，共 65 牌",
-        tip: "号码只是座位号。本局只有这套莎翁字符，不是宇宙词表。",
+        caption: "一字一号，65 张牌",
+        tip: "先拉纸带，再领号码。号码只是座位号。本局只有这套莎翁字符。",
         accent: C.teal,
       },
       {
