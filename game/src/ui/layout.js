@@ -4,6 +4,17 @@ import { C } from "./theme.js";
 export const TAP_MIN = 48;
 export { cssViewportSize, displayRatio } from "./dpr.js";
 
+/** Even 12–24px vertical rhythm for the lesson column. */
+export function lessonRhythm(v) {
+  return clamp(Math.round(16 * (v?.uiScale || 1)), 12, 24);
+}
+
+/** DOM 详细笔记 / 看不懂？ / mute sit in the lesson column, never the tutor dock. */
+export function hudReservePx(v) {
+  if (v.portrait || v.w < 720) return 148;
+  return 308;
+}
+
 export function readSafeInsets() {
   if (typeof document === "undefined") {
     return { top: 0, right: 0, bottom: 0, left: 0 };
@@ -112,7 +123,8 @@ export function makeShell(scene, opts = {}) {
     ? (opts.footerH ??
       clamp(Math.round((v.portrait ? 112 : v.short ? 88 : 100) * v.uiScale), 84, 128))
     : 0;
-  const gap = opts.gap ?? Math.round(clamp(12 * v.uiScale, 8, 16));
+  const gap = opts.gap ?? lessonRhythm(v);
+  const hudReserve = opts.hudReserve ?? hudReservePx(v);
 
   const header = headerH ? band(v.left, v.top, v.innerW, headerH) : band(v.left, v.top, v.innerW, 0);
   const footer = footerH ? band(v.left, v.bottom - footerH, v.innerW, footerH) : band(v.left, v.bottom, v.innerW, 0);
@@ -126,6 +138,7 @@ export function makeShell(scene, opts = {}) {
     content,
     footer,
     gap,
+    hudReserve,
     twoRow,
     uiScale: v.uiScale,
   };

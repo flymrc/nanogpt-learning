@@ -291,11 +291,13 @@ function placeModel() {
   if (w < 40 || h < 40) return;
   // Crop to the face / upper body so the tutor is actually visible
   // beside the lesson, not a floating torso.
-  const scale = Math.min(w / 1050, h / 820);
-  model.anchor.set(0.5, 0.1);
+  // The whole dock is hers. Keep a small cream gutter above the hair —
+  // never a speech card on the forehead.
+  const scale = Math.min(w / 920, h / 1280);
+  model.anchor.set(0.5, 0.06);
   model.scale.set(scale);
   model.x = w * 0.5;
-  model.y = Math.max(4, h * 0.04);
+  model.y = 18;
 }
 
 function teardownLive2d() {
@@ -406,7 +408,7 @@ function onPointerMove(event) {
   if (rect.width < 8 || rect.height < 8) return;
 
   const faceX = rect.left + rect.width * 0.5;
-  const faceY = rect.top + rect.height * 0.28;
+  const faceY = rect.top + Math.min(210, rect.height * 0.2);
   const reachX = Math.max(rect.width * 0.42, window.innerWidth * 0.32);
   const reachY = Math.max(rect.height * 0.4, window.innerHeight * 0.34);
   lookTarget.x = clamp((event.clientX - faceX) / reachX, -1, 1);

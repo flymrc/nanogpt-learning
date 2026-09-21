@@ -12,7 +12,7 @@ import {
   drawShiftExample,
 } from "../ui/examples.js";
 import { clearLayer, makeLessonFrame } from "../ui/lesson.js";
-import { drawPhaseCard, drawPhaseTabs, exampleBand, teachLesson } from "../ui/textbook.js";
+import { finishLessonStage, paintLessonStage, teachLesson } from "../ui/textbook.js";
 import { watchResize } from "../ui/layout.js";
 
 export default class Level2Scene extends Phaser.Scene {
@@ -87,10 +87,9 @@ export default class Level2Scene extends Phaser.Scene {
     this.children.bringToTop(this.frame.nextBtn);
 
     clearLayer(this.frame.stage);
-    drawPhaseTabs(this, this.frame.stageBand, this.phase, (next) => this.setPhase(next));
-    const card = drawPhaseCard(this, this.frame.stageBand, beat, this.phase);
-    const band = exampleBand(this.frame.stageBand, card.bottom);
+    const { band } = paintLessonStage(this, beat, this.phase, (next) => this.setPhase(next));
     RENDERERS[beat.id]?.(this, band, { instant, phase: this.phase });
+    finishLessonStage(this, band);
   }
 }
 

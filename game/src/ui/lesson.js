@@ -1,6 +1,6 @@
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
-import { clamp, band, makeShell } from "./layout.js";
+import { band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { C, displayText, uiText } from "./theme.js";
@@ -11,9 +11,10 @@ export function makeLessonFrame(scene, { level, total, title, startLabel = "ä¸‹ä
   paintBackdrop(scene);
   addChrome(scene, { level, total, title, shell });
 
-  const purposeH = clamp(Math.round((v.short ? 68 : v.compact ? 76 : 86) * v.uiScale), 62, 96);
+  const rhythm = lessonRhythm(v);
+  const purposeH = clamp(Math.round((v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), 64, 88);
   const purposeBand = band(v.left, shell.content.top, v.innerW, purposeH);
-  const stageTop = purposeBand.bottom + Math.max(8, shell.gap - 2);
+  const stageTop = purposeBand.bottom + rhythm;
   const stageBand = band(v.left, stageTop, v.innerW, Math.max(80, shell.content.bottom - stageTop));
 
   const purpose = addPurposeBanner(scene, purposeBand);
@@ -42,7 +43,27 @@ export function makeLessonFrame(scene, { level, total, title, startLabel = "ä¸‹ä
 
   bindAdvance(scene, () => scene.advance?.());
 
-  return { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot };
+  return { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
+}
+
+/** Sit the CTA 12â€“24px under the last lesson block, never below the shell footer. */
+export function placeLessonCta(frame, contentBottom) {
+  const btn = frame?.nextBtn;
+  if (!btn) return;
+  const rhythm = frame.rhythm || lessonRhythm(frame.v);
+  const hit = btn.input?.hitArea;
+  const h = hit?.height || 68;
+  const raw = (contentBottom || frame.stageBand.bottom) + rhythm + h / 2;
+  btn.y = Math.min(frame.shell.footer.cy, raw);
+}
+
+export function layerBottom(layer, fallback) {
+  let bottom = fallback || 0;
+  for (const child of layer?.list || []) {
+    const bounds = child.getBounds?.();
+    if (bounds) bottom = Math.max(bottom, bounds.bottom);
+  }
+  return bottom;
 }
 
 export function addPurposeBanner(scene, rect) {
