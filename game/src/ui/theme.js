@@ -2,11 +2,12 @@ export const W = 1280;
 export const H = 720;
 
 export const C = {
-  skyTop: 0x8ed8ff,
-  skyBot: 0xffe0c8,
+  skyTop: 0xf6efe4,
+  skyBot: 0xead6c4,
   hill: 0x86de7a,
   hillDark: 0x5fc46d,
   sun: 0xffe566,
+  page: 0xf3ebe0,
   surface: 0xfffdf6,
   surface2: 0xfff1d2,
   stroke: 0x3b2a2e,

@@ -3,7 +3,7 @@ body {
   margin: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(180deg, #8ed8ff 0%, #ffe0c8 70%, #ffd6e8 100%);
+  background: #f3ebe0;
   overflow: hidden;
   touch-action: manipulation;
   user-select: none;

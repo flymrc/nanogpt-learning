@@ -6,9 +6,11 @@ import {
   VOCAB_SIZE,
   displayGlyph,
 } from "../data/facts.js";
+import { cueVoice, playSfx } from "../audio/sound.js";
 import {
   addAdvanceHint,
   addHeader,
+  addMuteToggle,
   bindAdvance,
   burstStars,
   createButton,
@@ -36,9 +38,11 @@ export default class Level1Scene extends Phaser.Scene {
     paintBackdrop(this);
     addHeader(this, { level: 1, total: 2, title: "字符变 ID" });
 
-    addRobot(this, 86, 168, { scale: 0.58 });
-    addScrollBuddy(this, 168, 178, { scale: 0.42 });
-    this.speech = addSpeechBubble(this, 340, 132, "点它变数字");
+    addRobot(this, 56, 168, { scale: 0.38 });
+    addScrollBuddy(this, 52, 222, { scale: 0.28 });
+    this.speech = addSpeechBubble(this, 214, 118, "点它变数字", { maxWidth: 220 });
+    addMuteToggle(this);
+    cueVoice(this, "vo-level1");
 
     makeTag(this, 88, 230, "原文", C.pink);
     const srcPos = rowPositions(CHARS.length, 286, 62, 8);
@@ -104,6 +108,7 @@ export default class Level1Scene extends Phaser.Scene {
     });
 
     setSpeech(this.speech, speechFor(ch, id, isNew));
+    if (index === 0) cueVoice(this, "vo-map");
 
     const flyer = makeCharTile(this, tile.x, tile.y, displayGlyph(ch), {
       width: 56,
@@ -123,6 +128,7 @@ export default class Level1Scene extends Phaser.Scene {
       ease: "Cubic.In",
       onComplete: () => {
         flyer.destroy();
+        playSfx(this, "sfx-pop", 0.22);
         burstStars(this, to.x, to.y);
         const chip = makeChip(this, to.x, to.y, {
           glyph: displayGlyph(ch),

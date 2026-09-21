@@ -11,7 +11,10 @@ const config = {
   parent: "game",
   width: W,
   height: H,
-  backgroundColor: "#8ed8ff",
+  backgroundColor: "#f3ebe0",
+  audio: {
+    disableWebAudio: false,
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

@@ -1,86 +1,18 @@
 import Phaser from "phaser";
+import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
 import { C, H, W, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
   const g = scene.add.graphics();
-  g.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, 0xffd6e8, 1);
+  g.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, C.skyBot, 1);
   g.fillRect(0, 0, W, H);
 
-  g.fillStyle(C.sun, 1);
-  g.lineStyle(6, C.stroke, 1);
-  g.fillCircle(1140, 86, 52);
-  g.strokeCircle(1140, 86, 52);
-  for (let i = 0; i < 8; i += 1) {
-    const a = (Math.PI * 2 * i) / 8;
-    g.lineStyle(6, C.stroke, 1);
-    g.lineBetween(
-      1140 + Math.cos(a) * 64,
-      86 + Math.sin(a) * 64,
-      1140 + Math.cos(a) * 82,
-      86 + Math.sin(a) * 82,
-    );
-  }
-
-  g.fillStyle(C.hillDark, 1);
-  g.fillEllipse(220, 760, 780, 280);
-  g.fillStyle(C.hill, 1);
-  g.fillEllipse(980, 780, 900, 300);
-  g.lineStyle(6, C.stroke, 0.35);
-  g.strokeEllipse(220, 760, 780, 280);
-  g.strokeEllipse(980, 780, 900, 300);
-
-  spawnClouds(scene);
-  spawnTwinkles(scene);
-}
-
-function spawnClouds(scene) {
-  const spots = [
-    { x: 160, y: 72, s: 0.7 },
-    { x: 430, y: 48, s: 0.5 },
-    { x: 860, y: 70, s: 0.62 },
-  ];
-  spots.forEach((spot, i) => {
-    const cloud = scene.textures.exists("deco-cloud")
-      ? scene.add.image(spot.x, spot.y, "deco-cloud").setScale(spot.s).setAlpha(0.95)
-      : drawCloud(scene, spot.x, spot.y, spot.s);
-    scene.tweens.add({
-      targets: cloud,
-      x: spot.x + (i % 2 === 0 ? 24 : -20),
-      duration: 4200 + i * 500,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.InOut",
-    });
-  });
-}
-
-function drawCloud(scene, x, y, s) {
-  const g = scene.add.graphics();
-  g.fillStyle(C.white, 1);
-  g.lineStyle(5, C.stroke, 1);
-  g.fillCircle(x - 28 * s, y + 6 * s, 22 * s);
-  g.fillCircle(x + 8 * s, y - 4 * s, 28 * s);
-  g.fillCircle(x + 36 * s, y + 8 * s, 20 * s);
-  g.fillRoundedRect(x - 48 * s, y, 90 * s, 28 * s, 12 * s);
-  return g;
-}
-
-function spawnTwinkles(scene) {
-  for (let i = 0; i < 8; i += 1) {
-    const x = 80 + ((i * 157) % (W - 160));
-    const y = 30 + ((i * 83) % 140);
-    const star = scene.textures.exists("deco-star")
-      ? scene.add.image(x, y, "deco-star").setScale(0.28 + (i % 3) * 0.06).setAlpha(0.55)
-      : scene.add.star(x, y, 5, 4, 9, C.gold).setAlpha(0.5);
-    scene.tweens.add({
-      targets: star,
-      alpha: { from: 0.25, to: 0.8 },
-      scale: star.scale * 1.15,
-      duration: 1400 + i * 180,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.InOut",
-    });
+  const dots = [0x3b2a2e, 0xff7a85, 0xffc43d, 0x3dcec0, 0x5eb3ff, 0xc084fc];
+  for (let i = 0; i < 42; i += 1) {
+    const x = 28 + ((i * 97) % (W - 56));
+    const y = 24 + ((i * 61) % (H - 48));
+    g.fillStyle(dots[i % dots.length], 0.07 + (i % 5) * 0.012);
+    g.fillCircle(x, y, 2 + (i % 3));
   }
 }
 
@@ -93,7 +25,7 @@ export function addHeader(scene, { level, total, title }) {
 
   scene.add.text(132, 46, title, displayText(34)).setOrigin(0, 0.5);
 
-  const dots = scene.add.container(W - 64, 46);
+  const dots = scene.add.container(W - 140, 46);
   for (let i = 0; i < total; i += 1) {
     const on = i + 1 === level;
     const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
@@ -157,6 +89,8 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   });
   container.on("pointerdown", (pointer, _lx, _ly, event) => {
     event?.stopPropagation?.();
+    unlockAudio(scene);
+    playSfx(scene, "sfx-tap", 0.28);
     onClick();
     scene.tweens.add({ targets: container, scale: 0.94, duration: 80, yoyo: true });
   });
@@ -448,14 +382,102 @@ export function makePanel(scene, x, y, width, height) {
   return box;
 }
 
+export function addMuteToggle(scene) {
+  applyMute(scene.game, readMuted());
+
+  const size = 64;
+  const box = scene.add.container(W - 52, 48);
+  const bg = scene.add.graphics();
+  const icon = scene.add.graphics();
+
+  const paint = () => {
+    bg.clear();
+    drawSticker(bg, -size / 2, -size / 2, size, size, 20, scene.game.sound.mute ? C.surface2 : C.cream);
+    paintSpeaker(icon, scene.game.sound.mute);
+  };
+  paint();
+
+  box.add([bg, icon]);
+  box.setSize(size, size);
+  box.setDepth(60);
+  box.setInteractive(new Phaser.Geom.Rectangle(-size / 2, -size / 2, size, size), Phaser.Geom.Rectangle.Contains);
+  box.input.cursor = "pointer";
+
+  box.on("pointerover", () => {
+    scene.tweens.add({ targets: box, scale: 1.08, duration: 120, ease: "Back.Out" });
+  });
+  box.on("pointerout", () => {
+    scene.tweens.add({ targets: box, scale: 1, duration: 120 });
+  });
+  box.on("pointerdown", (_pointer, _lx, _ly, event) => {
+    event?.stopPropagation?.();
+    const locked = !scene.game.registry.get("audioUnlocked");
+    if (locked) {
+      applyMute(scene.game, false);
+    } else {
+      applyMute(scene.game, !scene.game.sound.mute);
+    }
+    unlockAudio(scene);
+    paint();
+    if (!scene.game.sound.mute) playSfx(scene, "sfx-tap", 0.28);
+    scene.tweens.add({ targets: box, scale: 0.92, duration: 80, yoyo: true });
+  });
+
+  if (!scene.game.registry.get("audioUnlocked")) {
+    const pulse = scene.tweens.add({
+      targets: box,
+      scale: 1.1,
+      duration: 520,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.InOut",
+    });
+    const onUnlock = (_parent, _key, value) => {
+      if (!value) return;
+      pulse.stop();
+      box.setScale(1);
+    };
+    scene.game.registry.events.on("changedata-audioUnlocked", onUnlock);
+    scene.events.once("shutdown", () => {
+      scene.game.registry.events.off("changedata-audioUnlocked", onUnlock);
+    });
+  }
+
+  return box;
+}
+
+function paintSpeaker(g, muted) {
+  g.clear();
+  g.fillStyle(C.stroke, 1);
+  g.lineStyle(4, C.stroke, 1);
+  g.fillRoundedRect(-16, -6, 10, 12, 3);
+  g.fillTriangle(-8, -11, -8, 11, 6, 16);
+  g.fillTriangle(-8, -11, -8, 11, 6, -16);
+  g.fillTriangle(-8, -11, -8, 11, 6, 0);
+  if (muted) {
+    g.lineStyle(5, C.coral, 1);
+    g.lineBetween(-18, 16, 18, -16);
+    return;
+  }
+  g.beginPath();
+  g.arc(8, 0, 8, -0.7, 0.7);
+  g.strokePath();
+  g.beginPath();
+  g.arc(8, 0, 14, -0.65, 0.65);
+  g.strokePath();
+}
+
 export function bindAdvance(scene, advance) {
   const tryAdvance = () => {
+    unlockAudio(scene);
     if (scene.busy) return;
+    playSfx(scene, "sfx-tap", 0.2);
     advance();
   };
 
-  scene.input.on("pointerdown", (_pointer, currentlyOver) => {
+  scene.input.on("pointerdown", (pointer, currentlyOver) => {
     if (currentlyOver?.length) return;
+    if (pointer.x > W - 96 && pointer.y < 92) return;
     tryAdvance();
   });
 

@@ -12,9 +12,11 @@ import {
   VOCAB_SIZE,
   displayGlyph,
 } from "../data/facts.js";
+import { cueVoice } from "../audio/sound.js";
 import {
   addAdvanceHint,
   addHeader,
+  addMuteToggle,
   bindAdvance,
   createButton,
   highlightChip,
@@ -42,8 +44,10 @@ export default class Level2Scene extends Phaser.Scene {
     paintBackdrop(this);
     addHeader(this, { level: 2, total: 2, title: "窗口与 (x, y)" });
 
-    addRobot(this, 86, 162, { scale: 0.55 });
-    this.speech = addSpeechBubble(this, 300, 128, "先框住 x");
+    addRobot(this, 56, 164, { scale: 0.38 });
+    this.speech = addSpeechBubble(this, 206, 118, "先框住 x", { maxWidth: 220 });
+    addMuteToggle(this);
+    cueVoice(this, "vo-level2");
 
     makeTag(this, 96, 214, "带", C.violet);
     const streamPos = rowPositions(STREAM.length, 268, 56, 6);
@@ -144,6 +148,7 @@ export default class Level2Scene extends Phaser.Scene {
   showYShift() {
     this.busy = true;
     setSpeech(this.speech, "y 往右挪");
+    cueVoice(this, "vo-shift");
 
     const shiftX = this.streamPos[1].x - this.streamPos[0].x;
     this.window.recolor(C.gold);

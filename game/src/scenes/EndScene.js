@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import { REAL_BATCH, REAL_BLOCK, VOCAB_SIZE } from "../data/facts.js";
+import { cueVoice } from "../audio/sound.js";
 import {
+  addMuteToggle,
   createButton,
   drawSticker,
   paintBackdrop,
@@ -19,8 +21,10 @@ export default class EndScene extends Phaser.Scene {
     paintBackdrop(this);
     spawnConfetti(this);
 
-    addRobot(this, W / 2, 168, { scale: 0.85, mood: "wow" });
-    addSpeechBubble(this, W / 2 + 170, 88, "通关啦！", { pointer: "left" });
+    addRobot(this, 88, 168, { scale: 0.52, mood: "wow" });
+    addSpeechBubble(this, 250, 78, "通关啦！", { pointer: "left" });
+    addMuteToggle(this);
+    cueVoice(this, "vo-clear");
 
     this.add.text(W / 2, 286, "通关！", displayText(56)).setOrigin(0.5);
 
