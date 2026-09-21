@@ -1,6 +1,5 @@
 import { applyLayoutMode } from "../ui/mode.js";
 import { renderTutorBook } from "../ui/textbook.js";
-import { pcComposition, tutorFigurePx } from "../ui/tutor-lane.js";
 import { currentTutor, isWidePcTutor, onTutor } from "./bus.js";
 
 const CUBISM_CORE = [
@@ -314,18 +313,18 @@ function placeModel() {
   if (w < 40 || h < 40) return;
   const natural = naturalSize(model);
   if (!natural) return;
-  const comp = pcComposition(w, h);
-  const figure = comp?.figure || tutorFigurePx() || Math.round(w * 0.42);
   const maxH = Math.max(120, h - 8);
-  const scale = Math.min(figure / natural.w, maxH / natural.h);
+  // Height-fit inside the tutor slot. x is local to #tutor-stage, which
+  // hangs 40px into the lesson. She meets the card; she is not placed
+  // from the browser's right edge.
+  const scale = maxH / natural.h;
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
   const drawnH = natural.h * scale;
-  // Anchor 0.5 is the middle of the mesh. That middle sits in the right
-  // portion of the lesson column (comp.left…comp.right), which is the same
-  // band as the phase card. It is not a fraction of the viewport width.
-  model.x = comp?.figureCenter ?? Math.round(w * 0.62);
-  model.y = Math.max(4, (h - drawnH) * 0.04);
+  const overlap = 40;
+  const bodyHalf = 76;
+  model.x = Math.round(overlap - 18 + bodyHalf);
+  model.y = Math.max(4, (h - drawnH) * 0.02);
 }
 
 function teardownLive2d() {
@@ -568,7 +567,7 @@ function installDebugProbe() {
               const b = model.getBounds?.();
               return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null;
             })(),
-            column: pcComposition(box.w, box.h),
+            slot: { w: box.w, h: box.h },
           }
         : null,
     };

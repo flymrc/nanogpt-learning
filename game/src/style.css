@@ -29,6 +29,36 @@ body {
   flex-direction: column;
 }
 
+/* One placement region on PC. Mobile uses it as a full-width column. */
+#pc-stage {
+  position: relative;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+}
+
+html.is-pc #app-layout.is-wide {
+  flex-direction: row;
+  justify-content: center;
+  align-items: stretch;
+}
+
+html.is-pc #app-layout.is-wide #pc-stage {
+  --tutor-slot: 220px;
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: stretch;
+  width: min(1160px, calc(100% - 72px));
+  max-width: 1160px;
+  height: 100%;
+  margin-inline: auto;
+}
+
 #game-shell {
   position: relative;
   flex: 1 1 auto;
@@ -58,11 +88,11 @@ body {
 
 #tutor-dock {
   display: none;
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  width: auto;
-  height: auto;
+  position: relative;
+  flex: 0 0 var(--tutor-slot, 320px);
+  width: var(--tutor-slot, 320px);
+  height: 100%;
+  z-index: 4;
   box-sizing: border-box;
   background: transparent;
   border: none;
@@ -123,9 +153,11 @@ html.is-mobile #tutor-dock {
 
 #tutor-stage {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  /* A little wider than the slot so she can meet the lesson card. */
+  width: calc(100% + 40px);
   min-height: 0;
   overflow: visible;
   background: transparent;
@@ -219,7 +251,7 @@ html.is-pc #pc-chrome:not([hidden]) {
   position: absolute;
   z-index: 30;
   top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: calc(var(--tutor-figure, 0px) + max(10px, env(safe-area-inset-right, 0px) + 8px));
+  right: calc(var(--tutor-slot, 220px) + 24px);
   pointer-events: none;
 }
 

@@ -427,6 +427,8 @@ function drawWindowRows(
     popIn(scene, win, { instant });
     if (showY) {
       const plus = makeTag(scene, win.x + winW / 2 + 22, first.y, "右移一格", C.gold);
+      const tagRight = plus.x + plus.width / 2;
+      if (tagRight > stage.right - 6) plus.x -= tagRight - (stage.right - 6);
       scene.frame.stage.add(plus);
       popIn(scene, plus, { instant });
     }

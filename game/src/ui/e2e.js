@@ -117,14 +117,30 @@ function assertLessonLayout(scene) {
   const dockZ = dockStyle ? Number.parseFloat(dockStyle.zIndex) : 0;
   const dockBg = dockStyle?.backgroundColor || "";
   const dockTransparent = dockBg === "transparent" || dockBg === "rgba(0, 0, 0, 0)";
-  const overlayOk =
-    phone ||
-    (live2dOn &&
-      dock.offsetWidth >= window.innerWidth * 0.9 &&
-      dockTransparent &&
-      dockStyle.overflow !== "hidden" &&
-      dockStyle.pointerEvents === "none" &&
-      chromeZ > dockZ);
+  const stage = document.getElementById("pc-stage");
+  const stageRect = stage?.getBoundingClientRect();
+  const dockRect = dock?.getBoundingClientRect();
+  const shellEl = document.getElementById("game-shell");
+  const stageGrouped =
+    !phone &&
+    live2dOn &&
+    stage &&
+    shellEl &&
+    stage.contains(dock) &&
+    stage.contains(shellEl) &&
+    dockTransparent &&
+    dockStyle.overflow !== "hidden" &&
+    dockStyle.pointerEvents === "none" &&
+    chromeZ > dockZ &&
+    dock.offsetWidth > 160 &&
+    dock.offsetWidth < window.innerWidth * 0.45 &&
+    stageRect &&
+    dockRect &&
+    Math.abs(dockRect.right - stageRect.right) < 4 &&
+    dockRect.left > stageRect.left + 200 &&
+    stageRect.left >= 12 &&
+    window.innerWidth - stageRect.right >= 12;
+  const overlayOk = phone || stageGrouped;
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
   const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
