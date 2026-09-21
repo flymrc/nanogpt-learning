@@ -58,21 +58,30 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
   const last = pos[pos.length - 1];
   const noteRaw = "空格写成 ␣，换行写成 ↵。Citizen 是 8 格，不是 1 个词。";
   const noteText = wrapToWidth(scene, noteRaw, 13, stage.w - 8, uiText);
-  const note = scene.add
-    .text(stage.cx, last.y + tile / 2 + rhythm + 6, noteText, uiText(13, { color: C.muted, align: "center" }))
-    .setOrigin(0.5, 0);
-  scene.frame.stage.add(note);
+  const noteY = last.y + tile / 2 + rhythm + 6;
+  if (noteY < stage.bottom - 8) {
+    const note = scene.add
+      .text(stage.cx, noteY, noteText, uiText(13, { color: C.muted, align: "center" }))
+      .setOrigin(0.5, 0);
+    scene.frame.stage.add(note);
+  }
 }
 
 export function drawEncodeExample(scene, stage, { instant } = {}) {
+  const phone = !isWidePcTutor();
   const rhythm = lessonRhythm(scene.frame.v);
   scene.frame.stage.add(
-    addSectionTag(scene, "一字一号", C.gold, { left: stage.left, top: stage.top, note: "plates" }),
+    addSectionTag(scene, phone ? "一字一号 · 按字符编号" : "一字一号", C.gold, {
+      left: stage.left,
+      top: stage.top,
+      note: "plates",
+    }),
   );
-  const tile = Math.min(42, Math.max(22, stage.w / 11));
+  const tile = Math.min(phone ? 32 : 42, Math.max(phone ? 20 : 22, stage.w / (phone ? 9 : 11)));
   const chipH = tile * 1.32;
   let rowY = stage.top + 26 + rhythm;
-  if (stage.h > 180) {
+  const needDemo = !phone && stage.h > 180;
+  if (needDemo) {
     const y = rowY + 28;
     const src = makeCharTile(scene, stage.cx - 78, y, "S", { width: 44, height: 44, seed: "S" });
     setTileActive(src, true);
@@ -104,8 +113,8 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     y: rowY + chipH / 2,
     tileW: tile,
     tileH: chipH,
-    gapX: 4,
-    gapY: 6,
+    gapX: phone ? 3 : 4,
+    gapY: phone ? 4 : 6,
     innerW: stage.w,
     cx: stage.cx,
   });
@@ -120,8 +129,9 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(chip);
     popIn(scene, chip, { instant, delay: i * 10 });
   });
+  if (phone) return;
   const last = pos[pos.length - 1];
-  const tip = makeFactChip(scene, stage.cx, last.y + chipH / 2 + rhythm + 24, {
+  placeFactInBand(scene, stage, last.y + chipH / 2 + rhythm + 24, {
     value: "按字符编号",
     label: "GPT-2 用 BPE，本课不用",
     note: "bpe",
@@ -130,7 +140,6 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     width: Math.min(320, stage.w - 12),
     height: 48,
   });
-  scene.frame.stage.add(tip);
 }
 
 export function drawSeatExample(scene, stage, { instant } = {}) {
@@ -140,7 +149,7 @@ export function drawSeatExample(scene, stage, { instant } = {}) {
     { glyph: "e", label: "Citizen 的 e", accent: C.teal },
   ];
   const row = drawIconRow(scene, stage, { instant }, cards);
-  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
+  placeFactInBand(scene, stage, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "43 ≠ 性格",
     label: "号码只是座位号",
     note: "plates",
@@ -149,7 +158,6 @@ export function drawSeatExample(scene, stage, { instant } = {}) {
     width: Math.min(300, stage.w - 12),
     height: 48,
   });
-  scene.frame.stage.add(tip);
 }
 
 export function drawVocabExample(scene, stage, { instant } = {}) {
@@ -173,7 +181,7 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
     const cell = makeCharTile(scene, x, y, displayGlyph(ch), { width: tile, height: tile, seed: ch });
     scene.frame.stage.add(cell);
   });
-  const tip = makeFactChip(scene, stage.right - Math.min(150, stage.w * 0.34), gridTop + tile + 28, {
+  placeFactInBand(scene, stage, gridTop + tile + 28, {
     value: "不是宇宙词表",
     label: "只数这套剧本",
     tip: "去重以后 65 个字符。",
@@ -181,7 +189,6 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
     width: Math.min(200, stage.w * 0.4),
     height: 48,
   });
-  scene.frame.stage.add(tip);
 }
 
 export function drawScrollExample(scene, stage, { instant } = {}) {
@@ -189,7 +196,7 @@ export function drawScrollExample(scene, stage, { instant } = {}) {
     { glyph: "练", label: `练习 ${DATASET.trainTokens.toLocaleString("zh-CN")}`, accent: C.coral },
     { glyph: "验", label: `验收 ${DATASET.valTokens.toLocaleString("zh-CN")}`, accent: C.gold },
   ]);
-  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
+  placeFactInBand(scene, stage, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "验收不是答题纸",
     label: "九成学 · 一成抽查",
     note: "scrolls",
@@ -198,7 +205,6 @@ export function drawScrollExample(scene, stage, { instant } = {}) {
     width: Math.min(320, stage.w - 12),
     height: 48,
   });
-  scene.frame.stage.add(tip);
 }
 
 export function drawClipExample(scene, stage, opts) {
@@ -221,10 +227,12 @@ export function drawShiftExample(scene, stage, opts) {
 
 export function drawBlankExample(scene, stage, opts) {
   const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: "填空线索", yTag: "每格一空" });
-  if (stage.h > 200) {
-    const board = makePairBoard(scene, stage.cx, (rows?.bottom || stage.top) + 40, {
+  const boardH = 58;
+  const boardY = (rows?.bottom || stage.top) + 40;
+  if (boardY + boardH / 2 <= stage.bottom) {
+    const board = makePairBoard(scene, stage.cx, boardY, {
       width: Math.min(340, stage.w - 16),
-      height: 58,
+      height: boardH,
     });
     scene.frame.stage.add(board);
     board.show("S", "e", "空1：看见 S，填右边的 e");
@@ -275,7 +283,7 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
     if (on) setTileActive(cell, true);
     scene.frame.stage.add(cell);
   });
-  const tip = makeFactChip(scene, stage.cx, startY + (rows - 1) * (tile + gap) + tile / 2 + rhythm + 24, {
+  const tip = placeFactInBand(scene, stage, startY + (rows - 1) * (tile + gap) + tile / 2 + rhythm + 24, {
     value: "真答案是 e",
     label: "不写假数字 · 押得矮就罚得多",
     note: "penalty",
@@ -284,8 +292,7 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
     width: Math.min(340, stage.w - 12),
     height: 46,
   });
-  scene.frame.stage.add(tip);
-  popIn(scene, tip, { instant, delay: 60 });
+  if (tip) popIn(scene, tip, { instant, delay: 60 });
 }
 
 export function drawMeanExample(scene, stage, { instant } = {}) {
@@ -294,7 +301,7 @@ export function drawMeanExample(scene, stage, { instant } = {}) {
     { glyph: "+", label: "整段加起来", accent: C.violet },
     { glyph: "均", label: "只看平均分", accent: C.gold },
   ]);
-  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
+  placeFactInBand(scene, stage, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "不编造分数",
     label: "通关 ≠ 已经训练好",
     note: "penalty",
@@ -303,7 +310,14 @@ export function drawMeanExample(scene, stage, { instant } = {}) {
     width: Math.min(320, stage.w - 12),
     height: 48,
   });
+}
+
+function placeFactInBand(scene, stage, y, opts) {
+  const h = opts.height ?? 48;
+  if (y + h / 2 > stage.bottom - 2) return null;
+  const tip = makeFactChip(scene, stage.cx, y, opts);
   scene.frame.stage.add(tip);
+  return tip;
 }
 
 function drawIconRow(scene, stage, { instant }, cards) {

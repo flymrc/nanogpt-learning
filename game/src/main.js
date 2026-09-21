@@ -13,6 +13,7 @@ import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
 import { applyLayoutMode } from "./ui/mode.js";
+import { LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT } from "./data/beats.js";
 
 const startCss = cssViewportSize();
 const startDpr = displayRatio();
@@ -161,6 +162,12 @@ async function boot() {
       active.scene.start("Title");
     }
     return active.sys.settings.key;
+  };
+
+  window.__nanoGPTSpine = {
+    l1: LEVEL1_BEATS.length,
+    l2: LEVEL2_BEATS.length,
+    phases: PHASE_COUNT,
   };
 
   window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
