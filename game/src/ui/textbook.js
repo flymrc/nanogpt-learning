@@ -2,6 +2,7 @@ import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/le
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
+import { installLayoutProbe } from "./e2e.js";
 import { layerBottom, placeLessonCta } from "./lesson.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
@@ -205,12 +206,16 @@ export function paintLessonStage(scene, beat, phase, onPick) {
   const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick);
   const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom });
   const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v);
+  scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };
+  scene.frame.lastCard = { left: scene.frame.stageBand.left, top: card.bottom - card.height, w: scene.frame.stageBand.w, h: card.height };
+  scene.frame.lastExample = band;
   return { tabs, card, band };
 }
 
 export function finishLessonStage(scene, band) {
   const bottom = layerBottom(scene.frame.stage, band.top);
-  placeLessonCta(scene.frame, bottom);
+  placeLessonCta(scene.frame, Math.min(bottom, scene.frame.shell.footer.top - scene.frame.rhythm));
+  installLayoutProbe(scene);
 }
 
 function phaseAccent(id) {
