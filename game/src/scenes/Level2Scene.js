@@ -60,8 +60,8 @@ export default class Level2Scene extends Phaser.Scene {
 
     const first = streamPos[0];
     const last = streamPos[DEMO_BLOCK - 1];
-    this.winW = last.x - first.x + 70;
-    this.winH = 96;
+    this.winW = last.x - first.x + 62;
+    this.winH = 100;
     this.winStartX = (first.x + last.x) / 2;
     this.winY = first.y;
     this.window = makeWindowFrame(this, this.winStartX, this.winY, this.winW, this.winH, C.blue);
@@ -113,6 +113,8 @@ export default class Level2Scene extends Phaser.Scene {
     this.window.setScale(0.86);
     this.tweens.add({ targets: this.window, alpha: 1, scale: 1, duration: 260, ease: "Back.Out" });
 
+    this.streamChips.forEach((chip, i) => chip.setAlpha(i < DEMO_BLOCK ? 1 : 0.28));
+
     DEMO_IDS.forEach((id, i) => {
       const chip = makeChip(this, this.streamPos[i].x, this.streamPos[i].y, {
         glyph: displayGlyph([...DEMO_SNIPPET][i]),
@@ -144,23 +146,19 @@ export default class Level2Scene extends Phaser.Scene {
     setSpeech(this.speech, "y 往右挪");
 
     const shiftX = this.streamPos[1].x - this.streamPos[0].x;
+    this.window.recolor(C.gold);
+    this.streamChips.forEach((chip, i) => chip.setAlpha(i >= 1 && i <= DEMO_BLOCK ? 1 : 0.28));
     this.tweens.add({
       targets: this.window,
       x: this.winStartX + shiftX,
-      duration: 420,
+      duration: 460,
       ease: "Cubic.InOut",
+      onComplete: () => {
+        const plus = makeTag(this, this.window.x + this.winW / 2 + 42, this.winY, "+1", C.gold);
+        plus.setScale(0.4);
+        this.tweens.add({ targets: plus, scale: 1.05, duration: 220, ease: "Back.Out" });
+      },
     });
-
-    const plus = this.add
-      .text(this.winStartX + this.winW / 2 + 18, this.winY, "+1", {
-        fontFamily: '"Fredoka", sans-serif',
-        fontSize: "28px",
-        color: C.goldCss,
-        fontStyle: "700",
-      })
-      .setOrigin(0, 0.5)
-      .setAlpha(0);
-    this.tweens.add({ targets: plus, alpha: 1, x: plus.x + 8, duration: 240 });
 
     DEMO_Y_IDS.forEach((id, i) => {
       const srcIndex = i + 1;

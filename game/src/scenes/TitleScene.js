@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { CHARSET, displayGlyph } from "../data/facts.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { createButton, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
-import { C, W, displayText, stickerColor } from "../ui/theme.js";
+import { C, H, W, displayText, stickerColor } from "../ui/theme.js";
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -43,7 +43,7 @@ export default class TitleScene extends Phaser.Scene {
         displayGlyph(ch),
         { width: 48, height: 48, seed: ch },
       );
-      tile.setAlpha(0.22);
+      tile.setAlpha(0.4);
       tile.setDepth(-1);
       this.tweens.add({
         targets: tile,
@@ -69,51 +69,33 @@ export default class TitleScene extends Phaser.Scene {
     );
     this.add.text(fromX + 212, y, "→", displayText(36, { color: C.coralCss })).setOrigin(0.5);
 
-    const run = () => {
-      sample.forEach((ch, i) => {
-        this.time.delayedCall(i * 260, () => {
-          const flyer = makeCharTile(this, tiles[i].x, tiles[i].y, ch, {
-            width: 48,
-            height: 48,
-            seed: ch,
-          });
-          this.tweens.add({
-            targets: flyer,
-            x: toX + i * 66,
-            scale: 0.2,
-            duration: 360,
-            ease: "Cubic.In",
-            onComplete: () => {
-              flyer.destroy();
-              const chip = makeChip(this, toX + i * 66, y, {
-                glyph: ch,
-                id: ids[i],
-                accent: stickerColor(ch),
-                width: 54,
-                height: 72,
-              });
-              chip.setScale(0.5);
-              this.tweens.add({
-                targets: chip,
-                scale: 1,
-                duration: 180,
-                ease: "Back.Out",
-                hold: 700,
-                onComplete: () => {
-                  this.tweens.add({
-                    targets: chip,
-                    alpha: 0,
-                    duration: 160,
-                    onComplete: () => chip.destroy(),
-                  });
-                },
-              });
-            },
-          });
+    sample.forEach((ch, i) => {
+      this.time.delayedCall(280 + i * 280, () => {
+        const flyer = makeCharTile(this, tiles[i].x, tiles[i].y, ch, {
+          width: 48,
+          height: 48,
+          seed: ch,
+        });
+        this.tweens.add({
+          targets: flyer,
+          x: toX + i * 66,
+          scale: 0.2,
+          duration: 360,
+          ease: "Cubic.In",
+          onComplete: () => {
+            flyer.destroy();
+            const chip = makeChip(this, toX + i * 66, y, {
+              glyph: ch,
+              id: ids[i],
+              accent: stickerColor(ch),
+              width: 54,
+              height: 72,
+            });
+            chip.setScale(0.5);
+            this.tweens.add({ targets: chip, scale: 1, duration: 200, ease: "Back.Out" });
+          },
         });
       });
-    };
-    run();
-    this.time.addEvent({ delay: 2400, loop: true, callback: run });
+    });
   }
 }

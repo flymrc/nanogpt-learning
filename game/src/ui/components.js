@@ -270,6 +270,8 @@ export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, 
   const labelText = scene.add.text(10, 22, label, uiText(16, { color: C.muted })).setOrigin(0.5);
   box.add([g, stripe, valueText, labelText]);
   box.setSize(width, height);
+  box.setData("valueText", valueText);
+  box.setValue = (next) => valueText.setText(next);
   box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
   box.input.cursor = "pointer";
   box.on("pointerdown", (pointer, _lx, _ly, event) => {
@@ -313,21 +315,28 @@ export function showTooltip(scene, x, y, text) {
 export function makeWindowFrame(scene, x, y, width, height, color = C.blue) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  g.lineStyle(8, C.stroke, 1);
-  g.strokeRoundedRect(-width / 2, -height / 2, width, height, 20);
-  g.lineStyle(5, color, 1);
-  g.strokeRoundedRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10, 16);
-  g.fillStyle(color, 0.12);
-  g.fillRoundedRect(-width / 2 + 5, -height / 2 + 5, width - 10, height - 10, 16);
-  const dots = [C.coral, C.gold, C.teal];
-  dots.forEach((c, i) => {
-    g.fillStyle(c, 1);
-    g.lineStyle(4, C.stroke, 1);
-    g.fillCircle(-width / 2 + 22 + i * 18, -height / 2 + 4, 7);
-    g.strokeCircle(-width / 2 + 22 + i * 18, -height / 2 + 4, 7);
-  });
+  const paint = (fill) => {
+    g.clear();
+    g.fillStyle(C.stroke, 0.12);
+    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 8, width, height, 22);
+    g.lineStyle(8, C.stroke, 1);
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, 22);
+    g.lineStyle(6, fill, 1);
+    g.strokeRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    g.fillStyle(fill, 0.14);
+    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    const dots = [C.coral, C.gold, C.teal];
+    dots.forEach((c, i) => {
+      g.fillStyle(c, 1);
+      g.lineStyle(4, C.stroke, 1);
+      g.fillCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
+      g.strokeCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
+    });
+  };
+  paint(color);
   box.add(g);
   box.setSize(width, height);
+  box.recolor = paint;
   return box;
 }
 
@@ -465,10 +474,10 @@ export function rowPositions(count, y, tile, gap) {
 
 export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
   const stroke = opts.stroke ?? C.stroke;
-  const sw = opts.lineWidth ?? 5;
+  const sw = opts.lineWidth ?? 6;
   if (opts.shadow !== false) {
-    g.fillStyle(C.stroke, 0.16);
-    g.fillRoundedRect(x + 4, y + 6, w, h, r);
+    g.fillStyle(C.stroke, 0.2);
+    g.fillRoundedRect(x + 5, y + 8, w, h, r);
   }
   g.fillStyle(fill, 1);
   g.lineStyle(sw, stroke, 1);

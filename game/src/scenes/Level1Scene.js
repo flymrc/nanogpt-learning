@@ -153,8 +153,7 @@ export default class Level1Scene extends Phaser.Scene {
 
   refreshUnique() {
     const n = this.uniqueSeen.size;
-    const texts = this.uniqueChip.list.filter((child) => child.type === "Text");
-    if (texts[0]) texts[0].setText(`★ ${n}`);
+    this.uniqueChip.setValue(`★ ${n}`);
     this.tweens.add({
       targets: this.uniqueChip,
       scale: 1.1,
