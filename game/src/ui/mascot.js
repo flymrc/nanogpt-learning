@@ -1,3 +1,4 @@
+import { textureScale } from "./dpr.js";
 import { C, displayText } from "./theme.js";
 
 export function addRobot(scene, x, y, { scale = 1, mood = "idle" } = {}) {
@@ -6,7 +7,7 @@ export function addRobot(scene, x, y, { scale = 1, mood = "idle" } = {}) {
 
   if (scene.textures.exists(key)) {
     const img = scene.add.image(0, 0, key);
-    img.setScale(scale);
+    img.setScale(textureScale(scale));
     root.add(img);
     root.setData("sprite", img);
   } else {
@@ -22,7 +23,7 @@ export function addScrollBuddy(scene, x, y, { scale = 0.92 } = {}) {
   const root = scene.add.container(x, y);
   if (scene.textures.exists("deco-scroll")) {
     const img = scene.add.image(0, 0, "deco-scroll");
-    img.setScale(scale);
+    img.setScale(textureScale(scale));
     root.add(img);
   } else {
     const g = scene.add.graphics();

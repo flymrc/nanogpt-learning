@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { applyMute, preloadAudio, readMuted } from "../audio/sound.js";
+import { displayRatio } from "../ui/dpr.js";
 import { getView, hideBootSplash, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { drawSticker } from "../ui/components.js";
 import { C, displayText, uiText } from "../ui/theme.js";
@@ -25,13 +26,15 @@ export default class BootScene extends Phaser.Scene {
       console.warn("asset failed", file?.key, file?.src);
     });
 
-    this.load.svg("deco-robot", "assets/robot.svg", { width: 200, height: 228 });
-    this.load.svg("deco-robot-wow", "assets/robot-wow.svg", { width: 200, height: 228 });
-    this.load.svg("deco-scroll", "assets/scroll.svg", { width: 150, height: 170 });
-    this.load.svg("deco-star", "assets/star.svg", { width: 64, height: 64 });
-    this.load.svg("deco-sparkle", "assets/sparkle.svg", { width: 40, height: 40 });
-    this.load.svg("deco-badge", "assets/badge.svg", { width: 80, height: 96 });
-    this.load.svg("deco-window", "assets/window-frame.svg", { width: 120, height: 80 });
+    const dpr = displayRatio();
+    const svg = (w, h) => ({ width: Math.round(w * dpr), height: Math.round(h * dpr) });
+    this.load.svg("deco-robot", "assets/robot.svg", svg(200, 228));
+    this.load.svg("deco-robot-wow", "assets/robot-wow.svg", svg(200, 228));
+    this.load.svg("deco-scroll", "assets/scroll.svg", svg(150, 170));
+    this.load.svg("deco-star", "assets/star.svg", svg(64, 64));
+    this.load.svg("deco-sparkle", "assets/sparkle.svg", svg(40, 40));
+    this.load.svg("deco-badge", "assets/badge.svg", svg(80, 96));
+    this.load.svg("deco-window", "assets/window-frame.svg", svg(120, 80));
     preloadAudio(this);
   }
 

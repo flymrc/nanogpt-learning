@@ -31,8 +31,11 @@ body {
 
 #game canvas {
   display: block;
+  /* Fill the CSS box; backing-store pixels are set to CSS × DPR in JS.
+     Do not use image-rendering: pixelated — that makes UI text look mosaicked. */
   width: 100%;
   height: 100%;
+  image-rendering: auto;
 }
 
 #safe-probe {

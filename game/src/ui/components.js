@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
+import { pointerToCss, textureScale } from "./dpr.js";
 import { TAP_MIN, clamp, getView, makeShell, scaled } from "./layout.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
@@ -61,7 +62,9 @@ export function addHeader(scene, { level, total, title, shell }) {
       const on = i + 1 === level;
       const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
       if (key) {
-        dots.add(scene.add.image(i * starGap, 0, key).setScale(on ? 0.42 : 0.3).setAlpha(on ? 1 : 0.35));
+        dots.add(
+          scene.add.image(i * starGap, 0, key).setScale(textureScale(on ? 0.42 : 0.3)).setAlpha(on ? 1 : 0.35),
+        );
       } else {
         dots.add(scene.add.star(i * starGap, 0, 5, on ? 7 : 5, on ? 14 : 10, on ? C.gold : 0xf3d9a2));
       }
@@ -180,7 +183,7 @@ export function makeCharTile(scene, x, y, glyph, { width = 64, height = 64, seed
   const fill = stickerColor(seed);
   drawSticker(g, -width / 2, -height / 2, width, height, 16, fill);
   const t = scene.add
-    .text(0, -2, glyph, monoText(Math.max(12, Math.round(width * 0.42)), { fontStyle: "700" }))
+    .text(0, -2, glyph, monoText(Math.max(14, Math.round(width * 0.44)), { fontStyle: "700" }))
     .setOrigin(0.5);
   box.add([g, t]);
   box.setSize(width, height);
@@ -227,7 +230,7 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
       0,
       compact ? -height * 0.18 : -height * 0.12,
       glyph,
-      monoText(Math.max(10, Math.round(width * (compact ? 0.36 : 0.4))), { fontStyle: "700" }),
+      monoText(Math.max(13, Math.round(width * (compact ? 0.42 : 0.44))), { fontStyle: "700" }),
     )
     .setOrigin(0.5);
   const idText = scene.add
@@ -235,7 +238,7 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
       0,
       compact ? height * 0.22 : height * 0.26,
       String(id),
-      monoText(Math.max(8, Math.round(width * 0.26)), { fontStyle: "700" }),
+      monoText(Math.max(12, Math.round(width * 0.3)), { fontStyle: "700" }),
     )
     .setOrigin(0.5);
   parts.push(ch, idText);
@@ -282,10 +285,10 @@ export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, 
   stripe.fillStyle(accent, 1);
   stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 14, height - 16, 8);
   const valueText = scene.add
-    .text(10, -height * 0.16, value, displayText(Math.max(16, Math.round(height * 0.3))))
+    .text(10, -height * 0.16, value, displayText(Math.max(18, Math.round(height * 0.3))))
     .setOrigin(0.5);
   const labelText = scene.add
-    .text(10, height * 0.24, label, uiText(Math.max(12, Math.round(height * 0.18)), { color: C.muted }))
+    .text(10, height * 0.24, label, uiText(Math.max(13, Math.round(height * 0.18)), { color: C.muted }))
     .setOrigin(0.5);
   box.add([g, stripe, valueText, labelText]);
   box.setSize(width, height);
@@ -417,7 +420,7 @@ export function burstStars(scene, x, y) {
   const colors = [C.gold, C.coral, C.teal, C.blue, C.pink];
   for (let i = 0; i < 7; i += 1) {
     const star = scene.textures.exists("deco-sparkle")
-      ? scene.add.image(x, y, "deco-sparkle").setScale(0.45)
+      ? scene.add.image(x, y, "deco-sparkle").setScale(textureScale(0.45))
       : scene.add.star(x, y, 4, 3, 8, colors[i % colors.length]);
     const a = (Math.PI * 2 * i) / 7;
     scene.tweens.add({
@@ -586,7 +589,8 @@ export function bindAdvance(scene, advance) {
   scene.input.on("pointerdown", (pointer, currentlyOver) => {
     if (currentlyOver?.length) return;
     const view = getView(scene);
-    if (pointer.x > view.w - 96 && pointer.y < view.padTop + 100) return;
+    const pt = pointerToCss(scene, pointer);
+    if (pt.x > view.w - 96 && pt.y < view.padTop + 100) return;
     tryAdvance();
   });
 
