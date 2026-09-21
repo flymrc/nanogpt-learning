@@ -1,7 +1,7 @@
 import { isWidePcTutor } from "../tutor/bus.js";
 import { cssViewportSize, displayRatio, syncRetinaCamera } from "./dpr.js";
 import { C } from "./theme.js";
-import { tutorHangPx, tutorLanePx } from "./tutor-lane.js";
+import { pcComposition } from "./tutor-lane.js";
 
 export const TAP_MIN = 48;
 export { cssViewportSize, displayRatio } from "./dpr.js";
@@ -14,8 +14,8 @@ export function lessonRhythm(v) {
 
 /** DOM 详细笔记 / 看不懂？ / mute sit left of Hiyori, never on her forehead. */
 export function hudReservePx(v) {
-  if (v.portrait || v.w < 720) return 148;
-  return 320 + tutorHangPx();
+  if (!v || v.portrait || v.w < 720) return 148;
+  return pcComposition(v.w, v.h)?.hud ?? 280;
 }
 
 export function readSafeInsets() {
@@ -61,8 +61,9 @@ export function getView(scene) {
   const portrait = phone || h >= w * 0.92;
   const short = h < 640;
   const compact = phone || w < 720 || short;
-  const padLeft = phone ? 12 : Math.max(14, safe.left + 10);
-  const padRight = (phone ? 12 : Math.max(14, safe.right + 10)) + tutorLanePx();
+  const comp = phone ? null : pcComposition(w, h);
+  const padLeft = phone ? 12 : comp.left + Math.max(0, safe.left);
+  const padRight = phone ? 12 : Math.max(14, w - comp.right + Math.max(0, safe.right));
   const padTop = phone ? 10 : Math.max(10, safe.top + 8);
   const padBottom = phone ? Math.max(12, safe.bottom + 8) : Math.max(16, safe.bottom + 12);
   const innerW = Math.max(200, w - padLeft - padRight);

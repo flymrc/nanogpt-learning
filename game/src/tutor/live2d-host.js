@@ -1,6 +1,6 @@
 import { applyLayoutMode } from "../ui/mode.js";
 import { renderTutorBook } from "../ui/textbook.js";
-import { tutorFigurePx, tutorHangPx } from "../ui/tutor-lane.js";
+import { pcComposition, tutorFigurePx } from "../ui/tutor-lane.js";
 import { currentTutor, isWidePcTutor, onTutor } from "./bus.js";
 
 const CUBISM_CORE = [
@@ -314,17 +314,16 @@ function placeModel() {
   if (w < 40 || h < 40) return;
   const natural = naturalSize(model);
   if (!natural) return;
-  const figure = tutorFigurePx() || Math.round(w * 0.42);
+  const comp = pcComposition(w, h);
+  const figure = comp?.figure || tutorFigurePx() || Math.round(w * 0.42);
   const maxH = Math.max(120, h - 8);
   const scale = Math.min(figure / natural.w, maxH / natural.h);
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
-  const drawnW = natural.w * scale;
   const drawnH = natural.h * scale;
-  // The mesh sits in the middle of a wide transparent canvas. Nudge her
-  // left so that visible body overlaps the lesson instead of floating
-  // in the padding.
-  model.x = w - 8 - drawnW / 2 - tutorHangPx() * 0.35;
+  // Visible mesh is the middle of a wide transparent canvas. Park that
+  // middle on the lesson's right edge, not on the window edge.
+  model.x = comp?.figureCenter ?? Math.round(w * 0.72);
   model.y = Math.max(4, (h - drawnH) * 0.04);
 }
 

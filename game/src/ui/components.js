@@ -3,7 +3,7 @@ import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
 import { openNote } from "./notes.js";
 import { pointerToCss, textureScale } from "./dpr.js";
 import { TAP_MIN, clamp, getView, hudReservePx, makeShell, scaled } from "./layout.js";
-import { tutorHangPx } from "./tutor-lane.js";
+import { tutorClickGuardLeft } from "./tutor-lane.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
@@ -530,7 +530,7 @@ export function bindAdvance(scene, advance) {
     if (
       document.documentElement.classList.contains("is-pc") &&
       pt.y < view.padTop + 78 &&
-      pt.x > view.right - (hudReservePx(view) - tutorHangPx())
+      pt.x > tutorClickGuardLeft(view)
     ) {
       return;
     }

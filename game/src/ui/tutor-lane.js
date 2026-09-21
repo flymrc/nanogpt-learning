@@ -1,26 +1,93 @@
 import { isWidePcTutor } from "../tutor/bus.js";
 
 /**
- * PC only. The Live2D canvas is the full parchment (no sidebar clip).
- * `tutorFigurePx` is how wide her drawing is allowed to be.
- * `tutorHangPx` is how far that drawing may cover the lesson.
- * `tutorLanePx` is the right padding that keeps widgets off her torso.
+ * PC parchment composition.
+ *
+ * The lesson used to pad itself as if a tutor column were reserved on the
+ * right. After the dock became a transparent overlay, that pad left the
+ * cards on the far left and Hiyori on the window edge. One geometry now
+ * places the lesson and her body as a single group centered on the page.
+ * Mobile never calls this: every export returns 0.
+ *
+ * `figure` is only the Live2D scale cap (full-height body, wide transparent
+ * canvas). `figureCenter` is where the visible mesh sits.
  */
-export function tutorFigurePx() {
-  if (typeof window === "undefined" || !isWidePcTutor()) return 0;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+
+const BODY_W = 176;
+const OVERLAP = 56;
+
+export function pcComposition(width, height) {
+  if (typeof window === "undefined" || !isWidePcTutor()) return null;
+  const w = Math.max(320, Math.round(width || window.innerWidth));
+  const h = Math.max(320, Math.round(height || window.innerHeight));
+
+  const column = Math.round(Math.min(1040, Math.max(760, w * 0.62)));
+  const groupW = column + BODY_W - OVERLAP;
+  let left = Math.round(w / 2 - groupW / 2);
+  left = Math.max(40, left);
+  let right = left + column;
+  let figureCenter = Math.round(right - OVERLAP + BODY_W / 2);
+
+  const minRight = 108;
+  const bodyRight = figureCenter + BODY_W / 2;
+  if (bodyRight > w - minRight) {
+    const shift = bodyRight - (w - minRight);
+    left -= shift;
+    right -= shift;
+    figureCenter -= shift;
+  }
+  if (left < 40) {
+    const shift = 40 - left;
+    left += shift;
+    right += shift;
+    figureCenter += shift;
+  }
+
   const fullH = Math.max(320, h - 12);
-  const naturalW = fullH * 0.72;
-  return Math.round(Math.min(w * 0.46, Math.max(480, naturalW)));
+  const figure = Math.round(Math.min(w * 0.46, Math.max(480, fullH * 0.72)));
+  const hang = Math.round(Math.min(110, OVERLAP + 28));
+  const buttonsRight = Math.round(figureCenter - 124);
+  const buttonsLeft = buttonsRight - 276;
+  const chromeRight = Math.max(16, w - buttonsRight);
+  const hud = Math.round(Math.min(column * 0.46, Math.max(168, right - buttonsLeft + 16)));
+
+  return {
+    w,
+    h,
+    left: Math.round(left),
+    right: Math.round(right),
+    column: Math.round(right - left),
+    figure,
+    figureCenter: Math.round(figureCenter),
+    hang,
+    chromeRight,
+    buttonsLeft: Math.round(buttonsLeft),
+    hud,
+  };
+}
+
+export function tutorFigurePx() {
+  return pcComposition()?.figure ?? 0;
 }
 
 export function tutorHangPx() {
-  const figure = tutorFigurePx();
-  if (!figure) return 0;
-  return Math.min(120, Math.round(figure * 0.18));
+  return pcComposition()?.hang ?? 0;
 }
 
+/** Extra right pad beyond the small safe inset. Prefer pcComposition(). */
 export function tutorLanePx() {
-  return Math.max(0, tutorFigurePx() - tutorHangPx());
+  const comp = pcComposition();
+  if (!comp) return 0;
+  return Math.max(0, comp.w - comp.right);
+}
+
+export function tutorChromeInsetPx() {
+  return pcComposition()?.chromeRight ?? 0;
+}
+
+/** CSS x where parchment clicks must not advance (the button cluster). */
+export function tutorClickGuardLeft(view) {
+  const comp = pcComposition(view?.w, view?.h);
+  if (!comp) return Number.POSITIVE_INFINITY;
+  return comp.buttonsLeft - 8;
 }
