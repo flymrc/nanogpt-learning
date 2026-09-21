@@ -392,7 +392,7 @@ export function addMuteToggle(scene) {
 
   const paint = () => {
     bg.clear();
-    drawSticker(bg, -size / 2, -size / 2, size, size, 20, scene.game.sound.mute ? C.surface2 : C.cream);
+    drawSticker(bg, -size / 2, -size / 2, size, size, 20, scene.game.sound.mute ? 0xffd0d4 : C.cream);
     paintSpeaker(icon, scene.game.sound.mute);
   };
   paint();
@@ -455,8 +455,10 @@ function paintSpeaker(g, muted) {
   g.fillTriangle(-8, -11, -8, 11, 6, -16);
   g.fillTriangle(-8, -11, -8, 11, 6, 0);
   if (muted) {
-    g.lineStyle(5, C.coral, 1);
-    g.lineBetween(-18, 16, 18, -16);
+    g.lineStyle(7, C.stroke, 1);
+    g.lineBetween(-20, 18, 20, -18);
+    g.lineStyle(4, C.coral, 1);
+    g.lineBetween(-20, 18, 20, -18);
     return;
   }
   g.beginPath();
