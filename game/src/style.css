@@ -32,6 +32,7 @@ body {
   height: 100%;
   box-sizing: border-box;
   background: #f3ebe0;
+  overflow: hidden;
 }
 
 #game {
@@ -53,8 +54,9 @@ body {
   width: min(360px, 32vw);
   height: 100%;
   box-sizing: border-box;
-  background: linear-gradient(180deg, #f7f1e8 0%, #edd8c6 100%);
-  border-left: 4px solid #3b2a2e;
+  /* Same cream as the game page — no wall / gutter between them. */
+  background: #f3ebe0;
+  border: none;
   overflow: hidden;
 }
 
@@ -111,12 +113,22 @@ body {
   color: #8b6b5c;
 }
 
-#tutor-canvas {
+#tutor-stage {
+  position: relative;
   flex: 1 1 auto;
-  width: 100%;
   min-height: 0;
-  height: auto;
+  width: 100%;
+  overflow: hidden;
+}
+
+#tutor-canvas {
   display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* Inline width/height come from JS (CSS px). Do not 100%-stretch
+     a mismatched backing store — that is what caused the 重影. */
+  image-rendering: auto;
 }
 
 .tutor-fallback {
