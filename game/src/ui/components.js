@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
 import { openNote } from "./notes.js";
 import { pointerToCss, textureScale } from "./dpr.js";
-import { TAP_MIN, clamp, getView, makeShell, scaled } from "./layout.js";
+import { TAP_MIN, clamp, getView, hudReservePx, makeShell, scaled } from "./layout.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
@@ -24,7 +24,7 @@ export function paintBackdrop(scene) {
 export function addHeader(scene, { level, total, title, shell }) {
   const page = shell ?? makeShell(scene);
   const { v, header, twoRow } = page;
-  const muteSize = Math.max(TAP_MIN, Math.min(56, Math.round(header.h * (twoRow ? 0.52 : 0.78))));
+  const muteSize = page.hudReserve ?? hudReservePx(v);
   const badgeW = clamp(Math.round(64 * v.uiScale), 56, 70);
   const badgeH = clamp(Math.round(44 * v.uiScale), 38, 48);
   const row1Y = twoRow ? header.top + badgeH / 2 + 4 : header.cy;

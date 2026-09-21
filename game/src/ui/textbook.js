@@ -1,6 +1,8 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
 import { emitTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
+import { lessonRhythm } from "./layout.js";
+import { layerBottom, placeLessonCta } from "./lesson.js";
 import { C, uiText } from "./theme.js";
 
 let bookMounted = false;
@@ -62,28 +64,12 @@ export function closeLessonBook() {
 
 export function renderTutorBook(beat) {
   const root = document.getElementById("tutor-book");
-  const purpose = document.getElementById("tutor-purpose");
-  const caption = document.getElementById("tutor-caption");
-  const kicker = document.querySelector(".tutor-kicker");
-  const step = document.getElementById("tutor-step");
-  if (kicker) kicker.textContent = "这一步要干什么";
+  if (!root) return;
   if (!beat) {
-    if (purpose) purpose.textContent = "点下一步，我跟着讲";
-    if (caption) caption.textContent = "宽屏才出现助教";
-    if (root) root.innerHTML = "";
-    if (step) step.textContent = "";
+    root.innerHTML = "";
     return;
   }
   const phase = Number.isFinite(beat.phase) ? beat.phase : 0;
-  if (purpose) purpose.textContent = beat.purpose || "";
-  if (caption) caption.textContent = lessonCaption(beat, phase);
-  if (step) {
-    step.textContent =
-      typeof beat.index === "number" && typeof beat.total === "number"
-        ? `${beat.index + 1}/${beat.total} · ${phase + 1}/${PHASE_COUNT}`
-        : "";
-  }
-  if (!root) return;
   root.innerHTML = "";
   const blocks = [
     ["这一步要干什么", beat.goal || beat.purpose, "goal"],
@@ -115,7 +101,7 @@ export function renderTutorBook(beat) {
 export function teachLesson(scene, frame, beat, { index, total, phase = 0, instant = false }) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   frame.purpose.set(beat.purpose, index, total, {
-    kicker: meta.kicker,
+    kicker: "这一步要干什么",
     detail: `${phase + 1} / ${PHASE_COUNT}`,
   });
   if (frame.speech) {
@@ -137,20 +123,20 @@ export function teachLesson(scene, frame, beat, { index, total, phase = 0, insta
 
 export function drawPhaseTabs(scene, stage, phase, onPick) {
   const n = LESSON_PHASES.length;
-  const gap = 6;
-  const w = Math.min(72, (stage.w - gap * (n - 1) - 8) / n);
-  const h = 28;
-  const y = stage.top + 16;
+  const gap = 8;
+  const h = 32;
+  const w = Math.min(78, (stage.w - gap * (n - 1) - 8) / n);
+  const y = stage.top + h / 2;
   const start = stage.cx - ((n - 1) * (w + gap)) / 2;
   LESSON_PHASES.forEach((item, i) => {
     const x = start + i * (w + gap);
     const tab = scene.add.container(x, y);
     const g = scene.add.graphics();
-    drawSticker(g, -w / 2, -h / 2, w, h, 10, i === phase ? C.gold : C.surface, {
+    drawSticker(g, -w / 2, -h / 2, w, h, 12, i === phase ? C.gold : C.surface, {
       lineWidth: 4,
       shadow: false,
     });
-    const label = scene.add.text(0, 0, item.label, uiText(11)).setOrigin(0.5);
+    const label = scene.add.text(0, 0, item.label, uiText(12)).setOrigin(0.5);
     tab.add([g, label]);
     tab.setSize(w, h);
     tab.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
@@ -161,15 +147,17 @@ export function drawPhaseTabs(scene, stage, phase, onPick) {
     });
     scene.frame.stage.add(tab);
   });
+  return { bottom: stage.top + h, height: h };
 }
 
-export function drawPhaseCard(scene, stage, beat, phase) {
+export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
-  const top = stage.top + 34;
+  const rhythm = lessonRhythm(scene.frame.v);
+  const cardTop = (top ?? stage.top) + rhythm;
   const width = Math.min(stage.w - 8, 640);
   const wrap = width - 36;
   const body = phaseText(beat, phase);
-  const maxH = meta.id === "example" ? stage.h * 0.34 : stage.h * 0.4;
+  const maxH = meta.id === "example" ? stage.h * 0.34 : stage.h * 0.38;
   const title = scene.add.text(0, 0, meta.kicker, uiText(13, { color: C.goldCss })).setOrigin(0.5, 0);
   let size = meta.id === "example" ? 14 : 15;
   const text = scene.add
@@ -188,7 +176,7 @@ export function drawPhaseCard(scene, stage, beat, phase) {
     extraH = footnote.height + 8;
   }
   const height = Math.min(maxH, Math.max(86, 36 + text.height + extraH + 16));
-  const box = scene.add.container(stage.cx, top + height / 2);
+  const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, 18, C.surface);
   const stripe = scene.add.graphics();
@@ -203,7 +191,19 @@ export function drawPhaseCard(scene, stage, beat, phase) {
   }
   box.setSize(width, height);
   scene.frame.stage.add(box);
-  return { bottom: top + height + 8, height };
+  return { bottom: cardTop + height, height };
+}
+
+export function paintLessonStage(scene, beat, phase, onPick) {
+  const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick);
+  const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom });
+  const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v);
+  return { tabs, card, band };
+}
+
+export function finishLessonStage(scene, band) {
+  const bottom = layerBottom(scene.frame.stage, band.top);
+  placeLessonCta(scene.frame, bottom);
 }
 
 function phaseAccent(id) {
@@ -214,8 +214,9 @@ function phaseAccent(id) {
   return C.blue;
 }
 
-export function exampleBand(stage, cardBottom) {
-  const top = Math.max(cardBottom, stage.top + 90);
+export function exampleBand(stage, cardBottom, v) {
+  const rhythm = lessonRhythm(v);
+  const top = cardBottom + rhythm;
   const inset = 16;
   return {
     ...stage,
@@ -224,6 +225,6 @@ export function exampleBand(stage, cardBottom) {
     right: stage.right - inset,
     w: Math.max(80, stage.w - inset * 2),
     h: Math.max(80, stage.bottom - top),
-    cy: (top + stage.bottom) / 2,
+    cy: top + Math.max(40, (stage.bottom - top) / 2),
   };
 }

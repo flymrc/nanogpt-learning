@@ -24,7 +24,7 @@ import {
   setTileActive,
 } from "./components.js";
 import { makeBigStat, makeIconCard, popIn } from "./lesson.js";
-import { flowPositions, tokenMetrics } from "./layout.js";
+import { flowPositions, lessonRhythm, tokenMetrics } from "./layout.js";
 import { C, uiText } from "./theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
@@ -32,10 +32,12 @@ const STREAM = DEMO_STREAM;
 const STREAM_GLYPHS = STREAM_CHARS;
 
 export function drawTapeExample(scene, stage, { instant } = {}) {
-  scene.frame.stage.add(addSectionTag(scene, "纸带 16 格", C.pink, { left: stage.left, top: stage.top + 2 }));
+  const rhythm = lessonRhythm(scene.frame.v);
+  scene.frame.stage.add(addSectionTag(scene, "纸带 16 格", C.pink, { left: stage.left, top: stage.top }));
   const tile = Math.min(48, Math.max(24, Math.min(stage.w / 10, stage.h / 5)));
+  const rowY = stage.top + 26 + rhythm + tile / 2;
   const pos = flowPositions(CHARS.length, {
-    y: stage.cy - 8,
+    y: rowY,
     tileW: tile,
     tileH: tile,
     gapX: 5,
@@ -52,40 +54,28 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 12 });
   });
+  const last = pos[pos.length - 1];
   const note = scene.add
-    .text(stage.cx, stage.bottom - 18, "空格写成 ␣，换行写成 ↵。Citizen 是 8 格，不是 1 个词。", uiText(14, { color: C.muted }))
-    .setOrigin(0.5);
+    .text(
+      stage.cx,
+      last.y + tile / 2 + rhythm + 6,
+      "空格写成 ␣，换行写成 ↵。Citizen 是 8 格，不是 1 个词。",
+      uiText(14, { color: C.muted }),
+    )
+    .setOrigin(0.5, 0);
   scene.frame.stage.add(note);
 }
 
 export function drawEncodeExample(scene, stage, { instant } = {}) {
+  const rhythm = lessonRhythm(scene.frame.v);
   scene.frame.stage.add(
-    addSectionTag(scene, "一字一号", C.gold, { left: stage.left, top: stage.top + 2, note: "plates" }),
+    addSectionTag(scene, "一字一号", C.gold, { left: stage.left, top: stage.top, note: "plates" }),
   );
   const tile = Math.min(42, Math.max(22, stage.w / 11));
   const chipH = tile * 1.32;
-  const pos = flowPositions(CHARS.length, {
-    y: stage.cy + 10,
-    tileW: tile,
-    tileH: chipH,
-    gapX: 4,
-    gapY: 6,
-    innerW: stage.w,
-    cx: stage.cx,
-  });
-  CHARS.forEach((ch, i) => {
-    const chip = makeChip(scene, pos[i].x, pos[i].y, {
-      glyph: displayGlyph(ch),
-      id: DEMO_IDS[i],
-      accent: i === 0 || i === 1 || i === 15 ? C.coral : C.teal,
-      width: tile,
-      height: chipH,
-    });
-    scene.frame.stage.add(chip);
-    popIn(scene, chip, { instant, delay: i * 10 });
-  });
-  if (stage.h > 220) {
-    const y = stage.top + Math.min(56, stage.h * 0.2);
+  let rowY = stage.top + 26 + rhythm;
+  if (stage.h > 180) {
+    const y = rowY + 28;
     const src = makeCharTile(scene, stage.cx - 78, y, "S", { width: 44, height: 44, seed: "S" });
     setTileActive(src, true);
     const arrow = makeIconCard(scene, stage.cx, y, {
@@ -110,8 +100,30 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
       playSfx(scene, "sfx-pop", 0.14);
       burstStars(scene, stage.cx + 78, y);
     }
+    rowY = y + 28 + rhythm;
   }
-  const tip = makeFactChip(scene, stage.cx, stage.bottom - 30, {
+  const pos = flowPositions(CHARS.length, {
+    y: rowY + chipH / 2,
+    tileW: tile,
+    tileH: chipH,
+    gapX: 4,
+    gapY: 6,
+    innerW: stage.w,
+    cx: stage.cx,
+  });
+  CHARS.forEach((ch, i) => {
+    const chip = makeChip(scene, pos[i].x, pos[i].y, {
+      glyph: displayGlyph(ch),
+      id: DEMO_IDS[i],
+      accent: i === 0 || i === 1 || i === 15 ? C.coral : C.teal,
+      width: tile,
+      height: chipH,
+    });
+    scene.frame.stage.add(chip);
+    popIn(scene, chip, { instant, delay: i * 10 });
+  });
+  const last = pos[pos.length - 1];
+  const tip = makeFactChip(scene, stage.cx, last.y + chipH / 2 + rhythm + 24, {
     value: "按字符编号",
     label: "GPT-2 用 BPE，本课不用",
     note: "bpe",
@@ -129,8 +141,8 @@ export function drawSeatExample(scene, stage, { instant } = {}) {
     { glyph: "43", label: "同一座位", accent: C.gold },
     { glyph: "e", label: "Citizen 的 e", accent: C.teal },
   ];
-  drawIconRow(scene, stage, { instant }, cards);
-  const tip = makeFactChip(scene, stage.cx, stage.bottom - 30, {
+  const row = drawIconRow(scene, stage, { instant }, cards);
+  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "43 ≠ 性格",
     label: "号码只是座位号",
     note: "plates",
@@ -143,24 +155,27 @@ export function drawSeatExample(scene, stage, { instant } = {}) {
 }
 
 export function drawVocabExample(scene, stage, { instant } = {}) {
-  const node = makeBigStat(scene, stage.cx, stage.cy - 18, {
+  const rhythm = lessonRhythm(scene.frame.v);
+  const statH = Math.min(110, Math.max(78, Math.min(stage.h * 0.32, 110)));
+  const node = makeBigStat(scene, stage.cx, stage.top + statH / 2 + 4, {
     value: String(VOCAB_SIZE),
     label: "换行+空格+标点+A-Z+a-z",
     width: Math.min(280, stage.w * 0.72),
-    height: Math.min(110, Math.max(78, stage.h * 0.32)),
+    height: statH,
     accent: C.gold,
   });
   scene.frame.stage.add(node);
   popIn(scene, node, { instant });
   const sample = [...CHARSET].filter((ch) => ch !== "\n").slice(0, 18);
   const tile = Math.min(28, stage.w / 20);
+  const gridTop = stage.top + statH + rhythm + 8;
   sample.forEach((ch, i) => {
     const x = stage.left + 16 + (i % 9) * (tile + 4);
-    const y = stage.bottom - 58 + Math.floor(i / 9) * (tile + 4);
+    const y = gridTop + Math.floor(i / 9) * (tile + 4);
     const cell = makeCharTile(scene, x, y, displayGlyph(ch), { width: tile, height: tile, seed: ch });
     scene.frame.stage.add(cell);
   });
-  const tip = makeFactChip(scene, stage.right - Math.min(150, stage.w * 0.34), stage.bottom - 36, {
+  const tip = makeFactChip(scene, stage.right - Math.min(150, stage.w * 0.34), gridTop + tile + 28, {
     value: "不是宇宙词表",
     label: "只数这套剧本",
     tip: "去重以后 65 个字符。",
@@ -172,11 +187,11 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
 }
 
 export function drawScrollExample(scene, stage, { instant } = {}) {
-  drawIconRow(scene, stage, { instant }, [
+  const row = drawIconRow(scene, stage, { instant }, [
     { glyph: "练", label: `练习 ${DATASET.trainTokens.toLocaleString("zh-CN")}`, accent: C.coral },
     { glyph: "验", label: `验收 ${DATASET.valTokens.toLocaleString("zh-CN")}`, accent: C.gold },
   ]);
-  const tip = makeFactChip(scene, stage.cx, stage.bottom - 30, {
+  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "验收不是答题纸",
     label: "九成学 · 一成抽查",
     note: "scrolls",
@@ -209,7 +224,7 @@ export function drawShiftExample(scene, stage, opts) {
 export function drawBlankExample(scene, stage, opts) {
   drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: "填空线索", yTag: "每格一空" });
   if (stage.h > 200) {
-    const board = makePairBoard(scene, stage.cx, stage.bottom - 36, {
+    const board = makePairBoard(scene, stage.cx, stage.top + Math.min(stage.h - 40, 168), {
       width: Math.min(340, stage.w - 16),
       height: 58,
     });
@@ -226,7 +241,7 @@ export function drawChoiceExample(scene, stage, { instant } = {}) {
     { value: "1", label: "真答案只有 e", accent: C.gold },
   ].forEach((fact, i) => {
     const x = stage.cx + (i - 0.5) * (w + 12);
-    const node = makeBigStat(scene, x, stage.cy - 8, { ...fact, width: w, height: h });
+    const node = makeBigStat(scene, x, stage.top + h / 2 + 8, { ...fact, width: w, height: h });
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 40 });
   });
@@ -237,8 +252,9 @@ export function drawDeskExample(scene, stage, opts) {
 }
 
 export function drawScoreExample(scene, stage, { instant } = {}) {
+  const rhythm = lessonRhythm(scene.frame.v);
   scene.frame.stage.add(
-    addSectionTag(scene, "只点亮真答案", C.coral, { left: stage.left, top: stage.top + 2, note: "penalty" }),
+    addSectionTag(scene, "只点亮真答案", C.coral, { left: stage.left, top: stage.top, note: "penalty" }),
   );
   const cols = 13;
   const rows = 5;
@@ -246,7 +262,7 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
   const tile = Math.min(28, (stage.w - 20) / cols - gap);
   const gridW = cols * (tile + gap) - gap;
   const startX = stage.cx - gridW / 2 + tile / 2;
-  const startY = stage.cy - ((rows - 1) * (tile + gap)) / 2;
+  const startY = stage.top + 26 + rhythm + tile / 2;
   const trueChar = "e";
   [...CHARSET].forEach((ch, i) => {
     const col = i % cols;
@@ -261,7 +277,7 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
     if (on) setTileActive(cell, true);
     scene.frame.stage.add(cell);
   });
-  const tip = makeFactChip(scene, stage.cx, stage.bottom - 28, {
+  const tip = makeFactChip(scene, stage.cx, startY + (rows - 1) * (tile + gap) + tile / 2 + rhythm + 24, {
     value: "真答案是 e",
     label: "不写假数字 · 押得矮就罚得多",
     note: "penalty",
@@ -275,12 +291,12 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
 }
 
 export function drawMeanExample(scene, stage, { instant } = {}) {
-  drawIconRow(scene, stage, { instant }, [
+  const row = drawIconRow(scene, stage, { instant }, [
     { glyph: "16", label: "每格一题", accent: C.blue },
     { glyph: "+", label: "整段加起来", accent: C.violet },
     { glyph: "均", label: "只看平均分", accent: C.gold },
   ]);
-  const tip = makeFactChip(scene, stage.cx, stage.bottom - 30, {
+  const tip = makeFactChip(scene, stage.cx, row.bottom + lessonRhythm(scene.frame.v) + 24, {
     value: "不编造分数",
     label: "通关 ≠ 已经训练好",
     note: "penalty",
@@ -295,13 +311,15 @@ export function drawMeanExample(scene, stage, { instant } = {}) {
 function drawIconRow(scene, stage, { instant }, cards) {
   const n = cards.length;
   const w = Math.min(150, (stage.w - 20) / n - 8);
-  const h = Math.min(108, Math.max(78, stage.h * 0.36));
+  const h = Math.min(108, Math.max(78, Math.min(stage.h * 0.36, 108)));
+  const y = stage.top + h / 2 + 8;
   cards.forEach((card, i) => {
     const x = stage.cx + (i - (n - 1) / 2) * (w + 12);
-    const node = makeIconCard(scene, x, stage.cy - 6, { ...card, width: w, height: h });
+    const node = makeIconCard(scene, x, y, { ...card, width: w, height: h });
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 40 });
   });
+  return { bottom: y + h / 2, height: h };
 }
 
 function layoutTokens(stage) {
