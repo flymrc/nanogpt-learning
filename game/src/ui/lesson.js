@@ -49,15 +49,54 @@ export function makeLessonFrame(scene, { level, total, title, startLabel = "下�
   return { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
 }
 
-/** Sit the CTA 12–24px under the last lesson block, never below the shell footer. */
+/** Bottom of lesson content must stay this far above the CTA. */
+export function ctaClearance(frame) {
+  return Math.max(12, frame?.rhythm || lessonRhythm(frame?.v));
+}
+
+/** Highest Y a Phaser label/chip may occupy (CTA top minus gap). */
+export function ctaCeiling(frame) {
+  const btn = frame?.nextBtn;
+  const gap = ctaClearance(frame);
+  const footerTop = frame?.shell?.footer?.top ?? 0;
+  const bounds = btn?.getBounds?.();
+  const ctaTop = bounds && bounds.height > 2 ? bounds.top : footerTop;
+  return Math.min(footerTop, ctaTop) - gap;
+}
+
+/** Sit the CTA in the footer. On phone it stays pinned so example art cannot share that band. */
 export function placeLessonCta(frame, contentBottom) {
   const btn = frame?.nextBtn;
   if (!btn) return;
+  const phone = !isWidePcTutor();
+  if (phone) {
+    btn.y = frame.shell.footer.cy;
+    return;
+  }
   const rhythm = frame.rhythm || lessonRhythm(frame.v);
   const hit = btn.input?.hitArea;
   const h = hit?.height || 68;
   const raw = (contentBottom || frame.stageBand.bottom) + rhythm + h / 2;
   btn.y = Math.min(frame.shell.footer.cy, raw);
+}
+
+/** Drop or nudge example-layer children that would sit on the CTA. */
+export function keepStageAboveCta(scene, band, ceiling) {
+  const layer = scene.frame?.stage;
+  if (!layer) return;
+  for (const child of [...(layer.list || [])]) {
+    const bounds = child.getBounds?.();
+    if (!bounds || bounds.height < 2) continue;
+    if (bounds.bottom <= ceiling + 1) continue;
+    if (bounds.bottom <= (band?.top || 0) + 8) continue;
+    const dy = ceiling - bounds.bottom;
+    if (bounds.top + dy >= (band?.top || 0) + 2) {
+      child.y += dy;
+    } else {
+      scene.tweens?.killTweensOf(child);
+      child.destroy();
+    }
+  }
 }
 
 export function layerBottom(layer, fallback) {

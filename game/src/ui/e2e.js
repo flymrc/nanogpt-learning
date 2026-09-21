@@ -96,12 +96,16 @@ function assertLessonLayout(scene) {
   const origin = canvasOrigin(scene);
   const shell = document.getElementById("game-shell")?.getBoundingClientRect();
   const overflows = [];
+  const cta = scene.frame?.nextBtn ? phaserBox(scene.frame.nextBtn, "cta", origin) : null;
+  const labels = [];
   for (const child of scene.frame?.stage?.list || []) {
     const box = phaserBox(child, child.name || "stage-child", origin);
-    if (!box || !shell) continue;
-    if (box.x + box.w > shell.right + 6 || box.x < shell.left - 6) {
+    if (!box) continue;
+    labels.push(box);
+    if (shell && (box.x + box.w > shell.right + 6 || box.x < shell.left - 6)) {
       overflows.push({ name: box.name, right: box.x + box.w, shellRight: shell.right });
     }
+    if (cta && intersects(box, cta)) overlaps.push(["label", "cta"]);
   }
 
   const phone = !isWidePcTutor();
@@ -119,6 +123,7 @@ function assertLessonLayout(scene) {
       (phone ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
+    labels: labels.length,
     overlaps,
     overflows,
     orphans,

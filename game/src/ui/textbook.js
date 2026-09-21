@@ -3,7 +3,7 @@ import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
 import { installLayoutProbe } from "./e2e.js";
-import { layerBottom, placeLessonCta } from "./lesson.js";
+import { ctaCeiling, keepStageAboveCta, layerBottom, placeLessonCta } from "./lesson.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
 let bookMounted = false;
@@ -161,7 +161,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const wrap = width - (phone ? 44 : 48);
   const body = phaseText(beat, phase);
   const maxH = phone
-    ? Math.min(stage.h * 0.42, 220)
+    ? Math.min(stage.h * 0.3, 148)
     : meta.id === "example"
       ? stage.h * 0.34
       : stage.h * 0.38;
@@ -214,14 +214,14 @@ export function paintLessonStage(scene, beat, phase, onPick) {
 }
 
 export function finishLessonStage(scene, band) {
-  const bottom = layerBottom(scene.frame.stage, band.top);
-  const cap = scene.frame.shell.footer.top - scene.frame.rhythm;
-  const usedBottom = Math.min(bottom, cap);
-  placeLessonCta(scene.frame, usedBottom);
+  placeLessonCta(scene.frame, band.top);
+  const ceiling = ctaCeiling(scene.frame);
+  keepStageAboveCta(scene, band, ceiling);
+  const bottom = Math.min(layerBottom(scene.frame.stage, band.top), ceiling);
   scene.frame.lastExample = {
     ...band,
-    bottom: usedBottom,
-    h: Math.max(16, usedBottom - band.top),
+    bottom,
+    h: Math.max(16, bottom - band.top),
   };
   installLayoutProbe(scene);
 }
@@ -238,13 +238,16 @@ export function exampleBand(stage, cardBottom, v) {
   const rhythm = lessonRhythm(v);
   const top = cardBottom + rhythm;
   const inset = isWidePcTutor() ? 16 : 8;
+  const reserve = isWidePcTutor() ? 0 : 12;
+  const bottom = stage.bottom - reserve;
   return {
     ...stage,
     top,
     left: stage.left + inset,
     right: stage.right - inset,
+    bottom,
     w: Math.max(80, stage.w - inset * 2),
-    h: Math.max(80, stage.bottom - top),
-    cy: top + Math.max(40, (stage.bottom - top) / 2),
+    h: Math.max(64, bottom - top),
+    cy: top + Math.max(32, (bottom - top) / 2),
   };
 }
