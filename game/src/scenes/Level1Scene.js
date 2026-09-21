@@ -45,9 +45,13 @@ export default class Level1Scene extends Phaser.Scene {
     const robotY = v.padTop + (v.short ? 92 : v.compact ? 118 : 168);
     addRobot(this, robotX, robotY, { scale: robotScale });
     if (!v.compact) addScrollBuddy(this, robotX, robotY + 54, { scale: 0.28 });
-    this.speech = addSpeechBubble(this, robotX + (v.compact ? 148 : 158), robotY - (v.compact ? 32 : 50), "点它变数字", {
-      maxWidth: v.compact ? 168 : 220,
-    });
+    this.speech = addSpeechBubble(
+      this,
+      robotX + (v.short && !v.portrait ? 210 : v.compact ? 148 : 158),
+      robotY - (v.short && !v.portrait ? 8 : v.compact ? 32 : 50),
+      "点它变数字",
+      { maxWidth: v.compact ? 168 : 220 },
+    );
     addMuteToggle(this);
     cueVoice(this, "vo-level1");
 

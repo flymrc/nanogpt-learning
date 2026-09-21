@@ -49,9 +49,13 @@ export default class Level2Scene extends Phaser.Scene {
     const robotX = v.left + (v.compact ? 36 : 56);
     const robotY = v.padTop + (v.short ? 90 : v.compact ? 118 : 164);
     addRobot(this, robotX, robotY, { scale: v.short ? 0.26 : v.compact ? 0.3 : 0.38 });
-    this.speech = addSpeechBubble(this, robotX + (v.compact ? 140 : 150), robotY - (v.compact ? 30 : 46), "先框住 x", {
-      maxWidth: v.compact ? 160 : 220,
-    });
+    this.speech = addSpeechBubble(
+      this,
+      robotX + (v.short && !v.portrait ? 200 : v.compact ? 140 : 150),
+      robotY - (v.short && !v.portrait ? 8 : v.compact ? 30 : 46),
+      "先框住 x",
+      { maxWidth: v.compact ? 160 : 220 },
+    );
     addMuteToggle(this);
     cueVoice(this, "vo-level2");
 

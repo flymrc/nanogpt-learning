@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addMuteToggle, createButton, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
+import { addMuteToggle, bindAdvance, createButton, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
 import { TAP_MIN, getView, watchResize } from "../ui/layout.js";
 import { C, displayText, stickerColor } from "../ui/theme.js";
 
@@ -58,10 +58,10 @@ export default class TitleScene extends Phaser.Scene {
       fontSize: v.compact ? 26 : 28,
     });
     startBtn.setDepth(20);
+    this.startBtn = startBtn;
+    bindAdvance(this, () => this.advance());
 
     cueVoice(this, "vo-title");
-    this.input.keyboard?.once("keydown-SPACE", () => this.advance());
-    this.input.keyboard?.once("keydown-ENTER", () => this.advance());
   }
 
   playPreview(v) {
