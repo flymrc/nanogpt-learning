@@ -29,6 +29,10 @@ export function viewportSize() {
   };
 }
 
+export function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
 export function getView(scene) {
   const w = Math.max(280, Math.round(scene.scale.width || viewportSize().w));
   const h = Math.max(280, Math.round(scene.scale.height || viewportSize().h));
@@ -39,7 +43,7 @@ export function getView(scene) {
   const padLeft = Math.max(14, safe.left + 10);
   const padRight = Math.max(14, safe.right + 10);
   const padTop = Math.max(10, safe.top + 8);
-  const padBottom = Math.max(14, safe.bottom + 10);
+  const padBottom = Math.max(16, safe.bottom + 12);
   const innerW = Math.max(200, w - padLeft - padRight);
   const innerH = Math.max(200, h - padTop - padBottom);
   const uiScale = portrait
@@ -67,6 +71,97 @@ export function getView(scene) {
     uiScale,
     safe,
   };
+}
+
+/** Axis-aligned band used by the header / content / footer shell. */
+export function band(left, top, width, height) {
+  return {
+    left,
+    right: left + width,
+    top,
+    bottom: top + height,
+    w: width,
+    h: height,
+    cx: left + width / 2,
+    cy: top + height / 2,
+  };
+}
+
+/**
+ * Flex-like page shell. Every scene places chrome in `header`, the CTA in
+ * `footer`, and everything else in `content`. Positions come from the live
+ * scale size, never from a single hardcoded aspect ratio.
+ */
+export function makeShell(scene, opts = {}) {
+  const v = getView(scene);
+  const twoRow = Boolean(opts.twoRow ?? (v.portrait && v.innerW < 540 && opts.header !== false));
+  const headerH =
+    opts.header === false
+      ? 0
+      : (opts.headerH ??
+        clamp(Math.round((twoRow ? 92 : v.portrait ? 72 : 58) * v.uiScale), twoRow ? 80 : 52, twoRow ? 104 : 80));
+  const wantFooter = opts.footer !== false;
+  const footerH = wantFooter
+    ? (opts.footerH ??
+      clamp(Math.round((v.portrait ? 112 : v.short ? 88 : 100) * v.uiScale), 84, 128))
+    : 0;
+  const gap = opts.gap ?? Math.round(clamp(12 * v.uiScale, 8, 16));
+
+  const header = headerH ? band(v.left, v.top, v.innerW, headerH) : band(v.left, v.top, v.innerW, 0);
+  const footer = footerH ? band(v.left, v.bottom - footerH, v.innerW, footerH) : band(v.left, v.bottom, v.innerW, 0);
+  const contentTop = header.bottom + (headerH ? gap : 0);
+  const contentBottom = footer.top - (footerH ? gap : 0);
+  const content = band(v.left, contentTop, v.innerW, Math.max(64, contentBottom - contentTop));
+
+  return {
+    v,
+    header,
+    content,
+    footer,
+    gap,
+    twoRow,
+    uiScale: v.uiScale,
+  };
+}
+
+/** Vertical stack. If the items overflow the band, they shrink as a group. */
+export function stackSlots(items, { top, bottom, gap = 10, justify = "start" } = {}) {
+  const available = Math.max(0, bottom - top);
+  const raw = items.reduce((sum, item) => sum + item.h, 0) + gap * Math.max(0, items.length - 1);
+  const scale = raw > available ? available / Math.max(1, raw) : 1;
+  const used =
+    items.reduce((sum, item) => sum + item.h * scale, 0) + gap * scale * Math.max(0, items.length - 1);
+
+  let y = top;
+  if (justify === "center") y += (available - used) / 2;
+  else if (justify === "end") y += available - used;
+  else if (justify === "distribute" && items.length > 1 && scale >= 0.999) {
+    const extra = (available - used) / (items.length + 1);
+    y += extra;
+    gap += extra;
+  }
+
+  const slots = {};
+  items.forEach((item) => {
+    const h = item.h * scale;
+    slots[item.id] = { top: y, bottom: y + h, cy: y + h / 2, h, scale };
+    y += h + gap * scale;
+  });
+  return { slots, scale, used, available };
+}
+
+/**
+ * Re-measure a layout at smaller scales until it fits `availableH`.
+ * `measureFn(scale)` must return `{ h, ...plan }` at that scale.
+ */
+export function fitMeasure(availableH, measureFn, { minScale = 0.52, maxScale = 1 } = {}) {
+  let scale = maxScale;
+  let plan = measureFn(scale);
+  for (let i = 0; i < 6 && plan.h > availableH + 1 && scale > minScale + 0.001; i += 1) {
+    scale = Math.max(minScale, scale * (availableH / Math.max(1, plan.h)) * 0.97);
+    plan = measureFn(scale);
+  }
+  return { ...plan, scale };
 }
 
 export function scaled(scene, size) {
@@ -141,7 +236,7 @@ export function tokenMetrics(count, innerW, { maxW = 62, maxH = 82, minW = 24, g
   if (total(tileW) > innerW) {
     tileW = Math.max(minW, (innerW - Math.max(0, count - 1) * gapX) / count);
   }
-  const tileH = Math.max(30, tileW * (maxH / maxW));
+  const tileH = Math.max(32, tileW * (maxH / maxW));
   return {
     tileW,
     tileH,

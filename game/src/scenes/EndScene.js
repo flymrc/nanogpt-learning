@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { REAL_BATCH, REAL_BLOCK, VOCAB_SIZE } from "../data/facts.js";
+import { REAL_BATCH, REAL_BLOCK } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
 import {
   addMuteToggle,
@@ -10,7 +10,7 @@ import {
   spawnConfetti,
 } from "../ui/components.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { TAP_MIN, getView, watchResize } from "../ui/layout.js";
+import { TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
 export default class EndScene extends Phaser.Scene {
@@ -19,26 +19,31 @@ export default class EndScene extends Phaser.Scene {
   }
 
   create() {
-    const v = getView(this);
+    const shell = makeShell(this, { twoRow: false, headerH: 56 });
+    const v = shell.v;
+    this.shell = shell;
     paintBackdrop(this);
     spawnConfetti(this);
     watchResize(this, { restart: true });
-
-    const robotX = v.portrait ? v.cx : v.left + 88;
-    const robotY = v.portrait ? v.padTop + 110 : v.padTop + (v.short ? 86 : 140);
-    addRobot(this, robotX, robotY, { scale: v.compact ? 0.4 : 0.52, mood: "wow" });
-    addSpeechBubble(
-      this,
-      v.portrait ? v.cx + 8 : robotX + 162,
-      v.portrait ? robotY + 78 : 78,
-      "通关啦！",
-      { pointer: v.portrait ? "none" : "left" },
-    );
-    addMuteToggle(this);
+    addMuteToggle(this, shell);
     cueVoice(this, "vo-clear");
 
-    const titleY = v.portrait ? robotY + 130 : v.padTop + v.innerH * 0.28;
-    this.add.text(v.cx, titleY, "通关！", displayText(v.compact ? 40 : 56)).setOrigin(0.5);
+    const plan = layoutEnd(v, shell);
+    const hero = plan.slots.hero;
+
+    const robotX = v.portrait ? v.cx : v.left + 80;
+    const robotY = v.portrait ? hero.top + plan.robotH / 2 : hero.cy;
+    addRobot(this, robotX, robotY, { scale: plan.robotScale, mood: "wow" });
+    addSpeechBubble(
+      this,
+      v.portrait ? v.cx + 8 : robotX + 150,
+      v.portrait ? robotY + plan.robotH * 0.42 : hero.top + 28,
+      "通关啦！",
+      { pointer: v.portrait ? "none" : "left", fontSize: v.compact ? 20 : 26, maxWidth: 200 },
+    );
+
+    const titleY = v.portrait ? hero.bottom - plan.titleSize * 0.55 : hero.cy + 10;
+    this.add.text(v.cx, titleY, "通关！", displayText(plan.titleSize)).setOrigin(0.5);
 
     const cards = [
       {
@@ -67,35 +72,35 @@ export default class EndScene extends Phaser.Scene {
       },
     ];
 
-    const cardW = v.portrait ? Math.min(300, v.innerW - 12) : Math.min(320, (v.innerW - 24) / 3);
-    const cardH = v.portrait ? 112 : v.short ? 120 : 176;
-    const stack = v.portrait;
-    const startY = stack ? titleY + 90 : v.bottom - cardH / 2 - 84;
+    const cardBand = plan.slots.cards;
+    const cardW = plan.cardW;
+    const cardH = plan.cardH;
+    const stack = plan.stackCards;
 
     cards.forEach((card, i) => {
-      const x = stack ? v.cx : v.cx + (i - 1) * Math.min(390, v.innerW / 3 + 20);
-      const y = stack ? startY + i * (cardH + 12) : startY;
+      const x = stack ? v.cx : v.cx + (i - 1) * Math.min(cardW + 16, v.innerW / 3 + 8);
+      const y = stack ? cardBand.top + cardH / 2 + i * (cardH + plan.cardGap) : cardBand.cy;
       const panel = this.add.container(x, y);
       const g = this.add.graphics();
       drawSticker(g, -cardW / 2, -cardH / 2, cardW, cardH, 22, C.surface);
       panel.add(g);
 
       const iconX = stack ? -cardW / 2 + 46 : 0;
-      const iconY = stack ? 0 : -46;
+      const iconY = stack ? 0 : -cardH * 0.28;
       if (this.textures.exists(card.icon)) {
         panel.add(
           this.add
             .image(iconX, iconY, card.icon)
-            .setScale(card.icon === "deco-star" ? (stack ? 0.55 : 0.7) : stack ? 0.5 : 0.72),
+            .setScale(card.icon === "deco-star" ? (stack ? 0.5 : 0.62) : stack ? 0.46 : 0.64),
         );
       } else {
-        panel.add(this.add.text(iconX, iconY, card.fallback, displayText(32)).setOrigin(0.5));
+        panel.add(this.add.text(iconX, iconY, card.fallback, displayText(28)).setOrigin(0.5));
       }
       const textX = stack ? 28 : 0;
-      panel.add(this.add.text(textX, stack ? -16 : 18, card.title, displayText(stack ? 20 : 26)).setOrigin(0.5));
+      panel.add(this.add.text(textX, stack ? -14 : cardH * 0.12, card.title, displayText(stack ? 18 : 22)).setOrigin(0.5));
       panel.add(
         this.add
-          .text(textX, stack ? 16 : 50, card.caption, uiText(14, { color: C.muted }))
+          .text(textX, stack ? 14 : cardH * 0.34, card.caption, uiText(13, { color: C.muted }))
           .setOrigin(0.5),
       );
 
@@ -106,7 +111,7 @@ export default class EndScene extends Phaser.Scene {
       );
       panel.on("pointerdown", (pointer, _lx, _ly, event) => {
         event?.stopPropagation?.();
-        showTooltip(this, x, y - cardH / 2 - 12, card.tip);
+        showTooltip(this, x, Math.max(shell.content.top + 20, y - cardH / 2 - 12), card.tip);
       });
 
       panel.setAlpha(0);
@@ -121,16 +126,16 @@ export default class EndScene extends Phaser.Scene {
       });
     });
 
-    const btnW = Math.min(200, (v.innerW - 16) / 2);
-    const btnH = Math.max(TAP_MIN, 60);
-    const btnY = v.bottom - 36;
-    createButton(this, v.cx - btnW / 2 - 8, btnY, "再玩", () => {
+    const btnW = Math.min(168, (shell.footer.w - 16) / 2);
+    const btnH = clamp(shell.footer.h - 24, TAP_MIN, 68);
+    const btnY = shell.footer.cy;
+    createButton(this, shell.footer.cx - btnW / 2 - 8, btnY, "再玩", () => {
       this.scene.start("Title");
     }, { width: btnW, height: btnH });
 
     const stub = createButton(
       this,
-      v.cx + btnW / 2 + 8,
+      shell.footer.cx + btnW / 2 + 8,
       btnY,
       "下一关",
       () => this.toast(),
@@ -140,7 +145,56 @@ export default class EndScene extends Phaser.Scene {
   }
 
   toast() {
-    const v = getView(this);
-    showTooltip(this, v.cx, v.bottom - 110, "Attention 还在路上");
+    const v = this.shell ? this.shell.v : makeShell(this).v;
+    showTooltip(this, v.cx, this.shell.footer.top - 24, "Attention 还在路上");
   }
+}
+
+function layoutEnd(v, shell) {
+  const landscapeShort = v.short && !v.portrait;
+  const stackCards = v.portrait;
+  const measured = fitMeasure(shell.content.h, (s) => {
+    const titleSize = (v.compact ? 36 : 52) * s;
+    const robotScale = (v.compact ? 0.36 : 0.48) * Math.min(1, s + 0.08);
+    const robotH = 200 * robotScale;
+    const heroH = v.portrait ? robotH + 36 + titleSize : Math.max(robotH, titleSize + 24);
+    const cardW = stackCards ? Math.min(300, v.innerW - 8) : Math.min(280, (v.innerW - 24) / 3);
+    const cardGap = Math.round(10 * s);
+    const cardH = stackCards
+      ? clamp((shell.content.h - heroH - 24) / 3 - cardGap, 72, 112)
+      : clamp(140 * s, 88, 160);
+    const cardsH = stackCards ? cardH * 3 + cardGap * 2 : cardH;
+    const gapY = Math.round(12 * s);
+    const items = [
+      { id: "hero", h: heroH },
+      { id: "cards", h: cardsH },
+    ];
+    const stacked = stackSlots(items, {
+      top: 0,
+      bottom: items.reduce((sum, it) => sum + it.h, 0) + gapY,
+      gap: gapY,
+      justify: "start",
+    });
+    return {
+      h: stacked.used,
+      items,
+      gapY,
+      titleSize,
+      robotScale,
+      robotH,
+      cardW,
+      cardH,
+      cardGap,
+      stackCards,
+    };
+  });
+
+  const stacked = stackSlots(measured.items, {
+    top: shell.content.top,
+    bottom: shell.content.bottom,
+    gap: measured.gapY,
+    justify: landscapeShort ? "center" : "distribute",
+  });
+
+  return { ...measured, slots: stacked.slots };
 }

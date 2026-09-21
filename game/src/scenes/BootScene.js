@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { applyMute, preloadAudio, readMuted } from "../audio/sound.js";
-import { getView, hideBootSplash, watchResize } from "../ui/layout.js";
+import { getView, hideBootSplash, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { drawSticker } from "../ui/components.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
@@ -61,11 +61,26 @@ export default class BootScene extends Phaser.Scene {
     bg.fillRect(0, 0, v.w, v.h);
     root.add(bg);
 
-    const cx = v.cx;
-    const cy = v.cy - 12;
+    const shell = makeShell(this, { header: false, footer: false, gap: 0 });
+    const titleSize = Math.min(40, Math.max(24, v.innerW / 8));
+    const items = [
+      { id: "spin", h: 80 },
+      { id: "title", h: titleSize + 8 },
+      { id: "status", h: 28 },
+      { id: "pct", h: 44 },
+      { id: "bar", h: 36 },
+      { id: "hint", h: 28 },
+    ];
+    const { slots } = stackSlots(items, {
+      top: shell.content.top,
+      bottom: shell.content.bottom,
+      gap: v.short ? 10 : 14,
+      justify: "center",
+    });
 
+    const cx = v.cx;
     const plate = this.add.graphics();
-    drawSticker(plate, cx - 36, cy - 150, 72, 72, 24, C.cream);
+    drawSticker(plate, cx - 36, slots.spin.cy - 36, 72, 72, 24, C.cream);
     root.add(plate);
 
     const spinner = this.add.graphics();
@@ -77,7 +92,7 @@ export default class BootScene extends Phaser.Scene {
     spinner.beginPath();
     spinner.arc(0, 0, 18, 0.2, Math.PI * 0.9);
     spinner.strokePath();
-    spinner.setPosition(cx, cy - 114);
+    spinner.setPosition(cx, slots.spin.cy);
     root.add(spinner);
     this.tweens.add({
       targets: spinner,
@@ -88,22 +103,22 @@ export default class BootScene extends Phaser.Scene {
     });
 
     const title = this.add
-      .text(cx, cy - 48, "nanoGPT 闯关", displayText(Math.min(40, Math.max(26, v.innerW / 8))))
+      .text(cx, slots.title.cy, "nanoGPT 闯关", displayText(titleSize))
       .setOrigin(0.5);
-    const status = this.add.text(cx, cy - 8, "加载中", uiText(18, { color: C.muted })).setOrigin(0.5);
-    const percent = this.add.text(cx, cy + 28, "0%", displayText(36)).setOrigin(0.5);
+    const status = this.add.text(cx, slots.status.cy, "加载中", uiText(18, { color: C.muted })).setOrigin(0.5);
+    const percent = this.add.text(cx, slots.pct.cy, "0%", displayText(36)).setOrigin(0.5);
     root.add([title, status, percent]);
 
     const barW = Math.min(320, v.innerW - 24);
     const barH = 28;
     const barX = cx - barW / 2;
-    const barY = cy + 64;
+    const barY = slots.bar.cy - barH / 2;
     const barBg = this.add.graphics();
     drawSticker(barBg, barX, barY, barW, barH, 14, C.surface, { lineWidth: 5 });
     const barFill = this.add.graphics();
     root.add([barBg, barFill]);
 
-    const hint = this.add.text(cx, barY + 48, "图片 · 音频", uiText(14, { color: C.muted })).setOrigin(0.5);
+    const hint = this.add.text(cx, slots.hint.cy, "图片 · 音频", uiText(14, { color: C.muted })).setOrigin(0.5);
     root.add(hint);
 
     this.ui = { root, status, percent, barFill, barW, barH, barX, barY, spinner };
