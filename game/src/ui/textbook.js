@@ -214,7 +214,14 @@ export function paintLessonStage(scene, beat, phase, onPick) {
 }
 
 export function finishLessonStage(scene, band) {
-  placeLessonCta(scene.frame, band.top);
+  const phone = !isWidePcTutor();
+  const measured = layerBottom(scene.frame.stage, band.top);
+  if (phone) {
+    placeLessonCta(scene.frame, measured);
+  } else {
+    const cap = scene.frame.shell.footer.top - scene.frame.rhythm;
+    placeLessonCta(scene.frame, Math.min(measured, cap));
+  }
   const ceiling = ctaCeiling(scene.frame);
   keepStageAboveCta(scene, band, ceiling);
   const bottom = Math.min(layerBottom(scene.frame.stage, band.top), ceiling);
