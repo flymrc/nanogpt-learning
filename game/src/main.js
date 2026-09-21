@@ -4,6 +4,9 @@ import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
 import EndScene from "./scenes/EndScene.js";
+import { applyMute, readMuted } from "./audio/sound.js";
+import { mountMuteHud } from "./audio/mute-hud.js";
+import { mountTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
 
@@ -42,6 +45,23 @@ const config = {
   scene: [BootScene, TitleScene, Level1Scene, Level2Scene, EndScene],
 };
 
+function applyOuterViewport() {
+  const layout = document.getElementById("app-layout");
+  const vv = window.visualViewport;
+  if (!layout) return;
+  if (vv) {
+    layout.style.width = `${Math.round(vv.width)}px`;
+    layout.style.height = `${Math.round(vv.height)}px`;
+    layout.style.left = `${Math.round(vv.offsetLeft)}px`;
+    layout.style.top = `${Math.round(vv.offsetTop)}px`;
+  } else {
+    layout.style.width = "";
+    layout.style.height = "";
+    layout.style.left = "";
+    layout.style.top = "";
+  }
+}
+
 function applyGameSize(game) {
   const css = cssViewportSize();
   const dpr = displayRatio();
@@ -69,24 +89,21 @@ async function boot() {
       new Promise((resolve) => window.setTimeout(resolve, 2000)),
     ]);
   }
+
+  applyOuterViewport();
+  mountMuteHud(() => window.__nanoGPTGame);
+  mountTutorHost();
+
   const game = new Phaser.Game(config);
   game.registry.set("dpr", startDpr);
   game.registry.set("safeInsets", readSafeInsets());
   game.registry.set("assetsReady", false);
+  applyMute(game, readMuted());
   window.__nanoGPTGame = game;
 
-  const shell = document.getElementById("game-shell");
   const syncSize = () => {
-    const css = cssViewportSize();
-    const vv = window.visualViewport;
-    if (shell) {
-      shell.style.width = `${css.w}px`;
-      shell.style.height = `${css.h}px`;
-      if (vv) {
-        shell.style.left = `${Math.round(vv.offsetLeft)}px`;
-        shell.style.top = `${Math.round(vv.offsetTop)}px`;
-      }
-    }
+    applyOuterViewport();
+    mountTutorHost();
     game.registry.set("safeInsets", readSafeInsets());
     applyGameSize(game);
   };

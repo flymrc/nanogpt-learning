@@ -1,5 +1,7 @@
 import Phaser from "phaser";
+import { TITLE_BEAT } from "../data/beats.js";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
+import { emitTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
 import { fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
@@ -62,6 +64,7 @@ export default class TitleScene extends Phaser.Scene {
     bindAdvance(this, () => this.advance());
 
     cueVoice(this, "vo-title");
+    emitTutor(TITLE_BEAT);
   }
 
   playPreview(v, plan) {

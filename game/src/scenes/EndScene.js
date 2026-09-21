@@ -1,6 +1,8 @@
 import Phaser from "phaser";
+import { END_BEAT } from "../data/beats.js";
 import { REAL_BATCH, REAL_BLOCK } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
+import { emitTutor } from "../tutor/bus.js";
 import {
   addMuteToggle,
   createButton,
@@ -28,6 +30,7 @@ export default class EndScene extends Phaser.Scene {
     watchResize(this, { restart: true });
     addMuteToggle(this, shell);
     cueVoice(this, "vo-clear");
+    emitTutor(END_BEAT);
 
     const plan = layoutEnd(v, shell);
     const hero = plan.slots.hero;

@@ -8,8 +8,16 @@ export function displayRatio() {
   return Math.min(MAX_DPR, Math.max(1, raw));
 }
 
-/** CSS-pixel viewport (what fingers and `100dvh` see). */
+/** CSS-pixel viewport of the Phaser host (not the Live2D dock). */
 export function cssViewportSize() {
+  const host = typeof document !== "undefined" ? document.getElementById("game-shell") : null;
+  if (host) {
+    const w = Math.round(host.clientWidth);
+    const h = Math.round(host.clientHeight);
+    if (w > 0 && h > 0) {
+      return { w: Math.max(280, w), h: Math.max(280, h) };
+    }
+  }
   const vv = typeof window !== "undefined" ? window.visualViewport : null;
   const w = Math.round(vv?.width ?? window.innerWidth);
   const h = Math.round(vv?.height ?? window.innerHeight);

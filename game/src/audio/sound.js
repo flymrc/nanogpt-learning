@@ -5,12 +5,17 @@ export const AUDIO_KEYS = [
   "vo-title",
   "vo-level1",
   "vo-map",
+  "vo-reuse",
   "vo-level2",
   "vo-shift",
+  "vo-next",
+  "vo-loss",
   "vo-clear",
   "sfx-tap",
   "sfx-pop",
 ];
+
+let startTimer = 0;
 
 export function readMuted() {
   try {
@@ -29,9 +34,12 @@ export function writeMuted(muted) {
 }
 
 export function applyMute(game, muted) {
-  game.sound.mute = muted;
   writeMuted(muted);
-  game.registry.set("muted", muted);
+  if (game?.sound) game.sound.mute = muted;
+  game?.registry?.set("muted", muted);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("nanogpt-mute", { detail: { muted: Boolean(muted) } }));
+  }
 }
 
 export function preloadAudio(scene) {
@@ -40,14 +48,34 @@ export function preloadAudio(scene) {
   });
 }
 
-export function unlockAudio(scene) {
-  const game = scene.game;
+/** Resume AudioContext on the current user gesture. Do not start clips here. */
+export function unlockAudioContext(game) {
+  if (!game?.sound) return;
   if (game.sound.locked) {
     game.sound.unlock();
   }
-  game.registry.set("audioUnlocked", true);
-  ensureBgm(scene);
-  flushVoice(scene);
+}
+
+/**
+ * Unlock Web Audio, then start BGM/VO on the next macrotask so the click
+ * frame only flips mute / paints UI.
+ */
+export function unlockAudio(scene) {
+  const game = scene.game;
+  unlockAudioContext(game);
+  if (!game.registry.get("audioUnlocked")) {
+    game.registry.set("audioUnlocked", true);
+  }
+  deferAudioStart(scene);
+}
+
+function deferAudioStart(scene) {
+  if (startTimer) return;
+  startTimer = window.setTimeout(() => {
+    startTimer = 0;
+    ensureBgm(scene);
+    flushVoice(scene);
+  }, 0);
 }
 
 export function ensureBgm(scene) {
@@ -90,9 +118,15 @@ export function speak(scene, key) {
     }
     if (bgm && bgm.isPlaying) bgm.setVolume(0.26);
     voice.destroy();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("nanogpt-voice", { detail: { playing: false, key } }));
+    }
   });
   voice.play();
   game.registry.set("voice", voice);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("nanogpt-voice", { detail: { playing: true, key } }));
+  }
 }
 
 export function playSfx(scene, key = "sfx-tap", volume = 0.3) {

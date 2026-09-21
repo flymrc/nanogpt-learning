@@ -1,31 +1,28 @@
 import Phaser from "phaser";
+import { LEVEL1_BEATS, SNIPPET_CHARS } from "../data/beats.js";
+import { DATASET, DEMO_IDS, VOCAB_SIZE, displayGlyph } from "../data/facts.js";
+import { playSfx } from "../audio/sound.js";
 import {
-  DATASET,
-  DEMO_IDS,
-  DEMO_SNIPPET,
-  VOCAB_SIZE,
-  displayGlyph,
-} from "../data/facts.js";
-import { cueVoice, playSfx } from "../audio/sound.js";
-import {
-  addChrome,
-  addFooterCta,
   addSectionTag,
-  bindAdvance,
   burstStars,
-  makeArrow,
+  highlightChip,
   makeCharTile,
   makeChip,
   makeFactChip,
-  paintBackdrop,
-  pulseChip,
   setTileActive,
 } from "../ui/components.js";
-import { addRobot, addScrollBuddy, addSpeechBubble, setSpeech } from "../ui/mascot.js";
-import { fitMeasure, flowPositions, makeShell, stackSlots, watchResize } from "../ui/layout.js";
-import { C, displayText } from "../ui/theme.js";
+import {
+  clearLayer,
+  makeBigStat,
+  makeIconCard,
+  makeLessonFrame,
+  popIn,
+  teach,
+} from "../ui/lesson.js";
+import { flowPositions, watchResize } from "../ui/layout.js";
+import { C } from "../ui/theme.js";
 
-const CHARS = [...DEMO_SNIPPET];
+const CHARS = SNIPPET_CHARS;
 
 export default class Level1Scene extends Phaser.Scene {
   constructor() {
@@ -33,400 +30,246 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
-    const shell = makeShell(this);
-    const v = shell.v;
-    this.view = v;
-    this.shell = shell;
-    paintBackdrop(this);
-    addChrome(this, { level: 1, total: 2, title: "字符变 ID", shell });
-
-    const plan = layoutLevel1(v, shell);
-    this.layout = plan;
-    this.tileSize = plan.tile;
-    this.chipH = plan.chipH;
-    this.mapPos = plan.mapPos;
-
-    const mascot = plan.slots.mascot;
-    const robotScale = plan.robotScale;
-    const robotX = v.left + (v.compact ? 32 : 52);
-    const robotY = mascot.cy;
-    addRobot(this, robotX, robotY, { scale: robotScale });
-    if (!v.compact) addScrollBuddy(this, robotX, robotY + 54, { scale: 0.28 });
-    const speechMax = Math.min(v.compact ? 168 : 220, v.right - robotX - 70);
-    this.speech = addSpeechBubble(this, robotX + (v.compact ? 118 : 150), robotY - 8, "点它变数字", {
-      maxWidth: speechMax,
-      fontSize: v.compact ? 18 : 24,
-    });
-    cueVoice(this, "vo-level1");
-
-    addSectionTag(this, "原文", C.pink, { left: v.left, top: plan.slots.source.top });
-    this.sourceTiles = CHARS.map((ch, i) =>
-      makeCharTile(this, plan.srcPos[i].x, plan.srcPos[i].y, displayGlyph(ch), {
-        width: plan.tile,
-        height: plan.tile,
-        seed: ch,
-      }),
-    );
-
-    this.downArrow = makeArrow(this, v.cx, plan.slots.arrow.cy, { angle: 90, color: C.coral, label: "" });
-
-    addSectionTag(this, "id", C.gold, { left: v.left, top: plan.slots.map.top });
-    this.mappedChips = new Array(CHARS.length).fill(null);
-
-    this.uniqueChip = makeFactChip(this, v.cx, plan.slots.dock.cy, {
-      value: "★ 0",
-      label: "本段唯一",
-      tip: "重复字母共用同一个 id",
-      accent: C.gold,
-      width: Math.min(200, v.innerW - 32),
-      height: plan.uniqueH,
-    });
-
-    this.nextBtn = addFooterCta(this, {
-      shell,
-      label: "下一步",
-      caption: "点一下",
-      onClick: () => this.advance(),
-    });
-
-    this.step = 0;
+    const frame = makeLessonFrame(this, { level: 1, total: 2, title: "字符变 ID" });
+    this.frame = frame;
+    this.view = frame.v;
+    this.beat = 0;
     this.busy = false;
-    this.factsShown = false;
-    this.uniqueSeen = new Set();
-    this.factChips = [];
-
-    bindAdvance(this, () => this.advance());
 
     watchResize(this, {
       restart: true,
-      persist: () => {
-        this.registry.set("level1.progress", {
-          step: this.step,
-          factsShown: this.factsShown,
-          unique: [...this.uniqueSeen],
-        });
-      },
+      persist: () => this.registry.set("level1.progress", { beat: this.beat }),
     });
 
     const saved = this.registry.get("level1.progress");
     if (saved) {
       this.registry.remove("level1.progress");
-      this.restoreProgress(saved);
-    }
-  }
-
-  restoreProgress(saved) {
-    this.uniqueSeen = new Set(saved.unique || []);
-    const limit = Math.min(CHARS.length, saved.step || 0);
-    for (let i = 0; i < limit; i += 1) {
-      const ch = CHARS[i];
-      const to = this.mapPos[i];
-      const chip = makeChip(this, to.x, to.y, {
-        glyph: displayGlyph(ch),
-        id: DEMO_IDS[i],
-        accent: this.uniqueSeen.has(ch) ? C.teal : C.blue,
-        width: this.tileSize,
-        height: this.chipH,
-      });
-      this.mappedChips[i] = chip;
-    }
-    this.step = limit;
-    this.refreshUnique();
-    if (saved.factsShown) {
-      this.showFacts({ instant: true });
+      this.beat = Math.min(LEVEL1_BEATS.length - 1, saved.beat || 0);
+      this.showBeat(this.beat, { instant: true });
+    } else {
+      this.showBeat(0);
     }
   }
 
   advance() {
     if (this.busy) return;
-    if (this.step < CHARS.length) {
-      this.mapOne(this.step);
+    if (this.beat >= LEVEL1_BEATS.length - 1) {
+      this.registry.remove("level1.progress");
+      this.scene.start("Level2");
       return;
     }
-    if (!this.factsShown) {
-      this.showFacts();
-      return;
-    }
-    this.registry.remove("level1.progress");
-    this.scene.start("Level2");
+    this.beat += 1;
+    this.showBeat(this.beat);
   }
 
-  mapOne(index) {
-    this.busy = true;
-    const ch = CHARS[index];
-    const id = DEMO_IDS[index];
-    const isNew = !this.uniqueSeen.has(ch);
-    this.uniqueSeen.add(ch);
-
-    const tile = this.sourceTiles[index];
-    setTileActive(tile, true);
-    this.sourceTiles.forEach((other, i) => {
-      if (i !== index) setTileActive(other, false);
+  showBeat(index, { instant = false } = {}) {
+    const beat = LEVEL1_BEATS[index];
+    teach(this, this.frame.purpose, this.frame.speech, beat, {
+      index,
+      total: LEVEL1_BEATS.length,
     });
+    this.frame.nextBtn.setLabel(index === LEVEL1_BEATS.length - 1 ? "走起" : "下一步");
+    this.frame.nextBtn.setCaption(index === LEVEL1_BEATS.length - 1 ? "下一关" : "点一下");
+    this.children.bringToTop(this.frame.nextBtn);
 
-    setSpeech(this.speech, speechFor(ch, id, isNew));
-    if (index === 0) cueVoice(this, "vo-map");
-
-    const flyer = makeCharTile(this, tile.x, tile.y, displayGlyph(ch), {
-      width: this.tileSize,
-      height: this.tileSize,
-      seed: ch,
-    });
-    flyer.setDepth(12);
-    const to = this.mapPos[index];
-
-    this.tweens.add({
-      targets: flyer,
-      x: to.x,
-      y: to.y,
-      scale: 0.2,
-      angle: 12,
-      duration: 380,
-      ease: "Cubic.In",
-      onComplete: () => {
-        flyer.destroy();
-        playSfx(this, "sfx-pop", 0.22);
-        burstStars(this, to.x, to.y);
-        const chip = makeChip(this, to.x, to.y, {
-          glyph: displayGlyph(ch),
-          id,
-          accent: isNew ? C.teal : C.blue,
-          width: this.tileSize,
-          height: this.chipH,
-        });
-        chip.setScale(0.55);
-        this.mappedChips[index] = chip;
-        this.tweens.add({ targets: chip, scale: 1, duration: 220, ease: "Back.Out" });
-
-        this.refreshUnique();
-
-        if (!isNew) {
-          const first = CHARS.indexOf(ch);
-          if (this.mappedChips[first]) {
-            pulseChip(this, this.mappedChips[first]);
-            this.flashReuse(this.mappedChips[first]);
-          }
-        }
-
-        this.step += 1;
-        this.busy = false;
-      },
-    });
+    clearLayer(this.frame.stage);
+    const render = RENDERERS[beat.id];
+    render?.(this, this.frame.stageBand, { instant });
   }
+}
 
-  refreshUnique() {
-    const n = this.uniqueSeen.size;
-    this.uniqueChip.setValue(`★ ${n}`);
-    this.tweens.add({
-      targets: this.uniqueChip,
-      scale: 1.1,
-      duration: 120,
-      yoyo: true,
-      ease: "Back.Out",
-    });
-  }
-
-  flashReuse(chip) {
-    const stamp = this.add
-      .text(chip.x, chip.y - this.chipH * 0.7, "复用", displayText(20, { color: C.coralCss }))
-      .setOrigin(0.5)
-      .setScale(0.4);
-    this.tweens.add({
-      targets: stamp,
-      scale: 1,
-      y: chip.y - this.chipH * 0.82,
-      duration: 180,
-      hold: 420,
-      yoyo: true,
-      onComplete: () => stamp.destroy(),
-    });
-  }
-
-  showFacts({ instant = false } = {}) {
-    this.busy = true;
-    this.factsShown = true;
-    setSpeech(this.speech, "全量数据！");
-    this.sourceTiles.forEach((t) => setTileActive(t, false));
-
-    this.tweens.add({
-      targets: [this.uniqueChip, this.downArrow],
-      alpha: 0,
-      duration: instant ? 0 : 180,
-    });
-
-    const facts = [
+const RENDERERS = {
+  why: (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: "文", label: "原文", accent: C.pink },
+      { glyph: "→", label: "encode", accent: C.coral },
+      { glyph: "31", label: "整数 id", accent: C.gold },
+    ]),
+  "no-bpe": (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: "BPE", label: "GPT-2 不用", accent: C.violet },
+      { glyph: "Aa", label: "一个字符", accent: C.teal },
+      { glyph: "id", label: "一个整数", accent: C.blue },
+    ]),
+  snippet: (scene, stage, opts) => drawSnippet(scene, stage, opts, { highlight: -1 }),
+  newline: (scene, stage, opts) => drawFocusChar(scene, stage, opts, CHARS.length - 1, 0, "换行"),
+  space: (scene, stage, opts) => drawFocusChar(scene, stage, opts, 6, 1, "空格"),
+  encode: (scene, stage, opts) => drawFocusChar(scene, stage, opts, 0, 31, "S"),
+  reuse: (scene, stage, opts) => drawReuse(scene, stage, opts),
+  sentence: (scene, stage, opts) => drawMappedSentence(scene, stage, opts),
+  length: (scene, stage, opts) =>
+    drawStats(scene, stage, opts, [
       {
         value: DATASET.chars.toLocaleString("en-US"),
-        label: "字符",
-        tip: "shakespeare_char 全文长度",
+        label: "全文字符",
         accent: C.coral,
       },
-      {
-        value: String(DATASET.vocab),
-        label: "词表",
-        tip: `vocab_size = 唯一字符数 = ${VOCAB_SIZE}`,
-        accent: C.gold,
-      },
-      {
-        value: DATASET.split,
-        label: "切分",
-        tip: `train ${DATASET.trainTokens.toLocaleString("en-US")} / val ${DATASET.valTokens.toLocaleString("en-US")}`,
-        accent: C.teal,
-      },
-      {
-        value: ".bin",
-        label: "产物",
-        tip: "train.bin · val.bin · meta.pkl",
-        accent: C.blue,
-      },
-    ];
+    ]),
+  vocab: (scene, stage, opts) =>
+    drawStats(scene, stage, opts, [
+      { value: String(VOCAB_SIZE), label: "去重排序后", accent: C.gold },
+      { value: "stoi", label: "字符 → id", accent: C.teal },
+    ]),
+  split: (scene, stage, opts) =>
+    drawStats(scene, stage, opts, [
+      { value: DATASET.split, label: "按字符下标切", accent: C.blue },
+      { value: DATASET.trainTokens.toLocaleString("en-US"), label: "train tokens", accent: C.teal },
+      { value: DATASET.valTokens.toLocaleString("en-US"), label: "val tokens", accent: C.gold },
+    ]),
+  files: (scene, stage, opts) =>
+    drawIconRow(scene, stage, opts, [
+      { glyph: ".bin", label: "train.bin", accent: C.coral },
+      { glyph: ".bin", label: "val.bin", accent: C.gold },
+      { glyph: "pkl", label: "meta.pkl", accent: C.teal },
+    ]),
+};
 
-    const v = this.view;
-    const dock = this.layout.slots.dock;
-    const fw = this.layout.factW;
-    const fh = this.layout.factH;
+function drawIconRow(scene, stage, { instant }, cards) {
+  const n = cards.length;
+  const w = Math.min(150, (stage.w - 20) / n - 8);
+  const h = Math.min(120, Math.max(88, stage.h * 0.42));
+  const y = stage.cy;
+  cards.forEach((card, i) => {
+    const x = stage.cx + (i - (n - 1) / 2) * (w + 14);
+    const node = makeIconCard(scene, x, y, { ...card, width: w, height: h });
+    scene.frame.stage.add(node);
+    popIn(scene, node, { instant, delay: i * 40 });
+  });
+}
 
-    facts.forEach((fact, i) => {
-      let x;
-      let y;
-      if (v.portrait) {
-        const col = i % 2;
-        const row = Math.floor(i / 2);
-        x = v.cx + (col === 0 ? -fw / 2 - 6 : fw / 2 + 6);
-        y = dock.top + fh / 2 + row * (fh + 10);
-      } else {
-        x = v.cx + (i - 1.5) * (fw + 12);
-        y = dock.cy;
-      }
-      const chip = makeFactChip(this, x, y, { ...fact, width: fw, height: fh });
-      chip.setAlpha(0);
-      chip.y += instant ? 0 : 24;
-      this.factChips.push(chip);
-      this.tweens.add({
-        targets: chip,
-        alpha: 1,
-        y,
-        delay: instant ? 0 : i * 80,
-        duration: instant ? 0 : 280,
-        ease: "Back.Out",
-      });
+function drawSnippet(scene, stage, { instant }, { highlight }) {
+  scene.frame.stage.add(addSectionTag(scene, "原文", C.pink, { left: stage.left, top: stage.top + 4 }));
+  const tile = Math.min(56, Math.max(28, Math.min(stage.w / 9, stage.h / 5)));
+  const pos = flowPositions(CHARS.length, {
+    y: stage.cy,
+    tileW: tile,
+    tileH: tile,
+    gapX: 6,
+    gapY: 8,
+    innerW: stage.w,
+    cx: stage.cx,
+  });
+  CHARS.forEach((ch, i) => {
+    const node = makeCharTile(scene, pos[i].x, pos[i].y, displayGlyph(ch), {
+      width: tile,
+      height: tile,
+      seed: ch,
     });
+    scene.frame.stage.add(node);
+    if (highlight === i) setTileActive(node, true);
+    popIn(scene, node, { instant, delay: i * 18 });
+  });
+}
 
-    this.time.delayedCall(instant ? 0 : 360, () => {
-      this.nextBtn.setLabel("走起");
-      this.nextBtn.setCaption("下一关");
-      this.children.bringToTop(this.nextBtn);
-      this.busy = false;
-    });
+function drawFocusChar(scene, stage, { instant }, index, id, label) {
+  const ch = CHARS[index];
+  const tile = Math.min(72, stage.h * 0.28);
+  const fromX = stage.cx - Math.min(110, stage.w * 0.28);
+  const toX = stage.cx + Math.min(110, stage.w * 0.28);
+  const y = stage.cy;
+  const src = makeCharTile(scene, fromX, y, displayGlyph(ch), {
+    width: tile,
+    height: tile,
+    seed: ch,
+  });
+  setTileActive(src, true);
+  const chip = makeChip(scene, toX, y, {
+    glyph: displayGlyph(ch),
+    id,
+    accent: C.teal,
+    width: tile,
+    height: tile * 1.25,
+  });
+  const arrow = makeIconCard(scene, stage.cx, y, {
+    glyph: "→",
+    label,
+    accent: C.coral,
+    width: Math.min(100, stage.w * 0.22),
+    height: Math.min(88, tile + 16),
+  });
+  scene.frame.stage.add([src, arrow, chip]);
+  popIn(scene, [src, arrow, chip], { instant });
+  if (!instant) {
+    playSfx(scene, "sfx-pop", 0.2);
+    burstStars(scene, toX, y);
   }
 }
 
-function layoutLevel1(v, shell) {
-  const landscapeShort = v.short && !v.portrait;
-  const measured = fitMeasure(shell.content.h, (s) => {
-    const tile = Math.round((landscapeShort ? 28 : v.short ? 34 : v.compact ? 40 : 62) * s);
-    const chipH = Math.max(tile + 6, Math.round((landscapeShort ? 40 : v.short ? 48 : v.compact ? 56 : 80) * s));
-    const gap = Math.max(4, Math.round((v.compact ? 6 : 8) * s));
-    const tagH = Math.round(26 * s);
-    const srcProbe = flowPositions(CHARS.length, {
-      y: 0,
-      tileW: tile,
-      tileH: tile,
-      gapX: gap,
-      gapY: gap + 4,
-      innerW: v.innerW,
-      cx: v.cx,
+function drawReuse(scene, stage, { instant }) {
+  const eIndex = [1, 12];
+  const tile = Math.min(64, stage.h * 0.24);
+  const y = stage.cy;
+  eIndex.forEach((idx, i) => {
+    const x = stage.cx + (i === 0 ? -90 : 90);
+    const src = makeCharTile(scene, x, y - tile * 0.7, "e", { width: tile, height: tile, seed: "e" });
+    const chip = makeChip(scene, x, y + tile * 0.7, {
+      glyph: "e",
+      id: 43,
+      accent: C.blue,
+      width: tile,
+      height: tile * 1.2,
     });
-    const mapProbe = flowPositions(CHARS.length, {
-      y: 0,
-      tileW: tile,
-      tileH: chipH,
-      gapX: gap,
-      gapY: gap + 6,
-      innerW: v.innerW,
-      cx: v.cx,
-    });
-    const srcRows = srcProbe[0]?.rows ?? 1;
-    const mapRows = mapProbe[0]?.rows ?? 1;
-    const factW = v.portrait ? Math.min(168, (v.innerW - 12) / 2) : Math.min(200, (v.innerW - 36) / 4);
-    const factH = Math.round((v.short ? 62 : v.compact ? 70 : 82) * s);
-    const uniqueH = Math.round((v.compact ? 68 : 76) * s);
-    const dockH = v.portrait ? factH * 2 + 10 : Math.max(factH, uniqueH);
-    const mascotH = Math.round((landscapeShort ? 52 : v.short ? 64 : v.compact ? 74 : 90) * s);
-    const arrowH = Math.round((landscapeShort ? 36 : 48) * s);
-    const sourceH = tagH + 8 + srcRows * tile + Math.max(0, srcRows - 1) * (gap + 4);
-    const mapH = tagH + 8 + mapRows * chipH + Math.max(0, mapRows - 1) * (gap + 6);
-    const gapY = Math.round((landscapeShort ? 8 : 12) * s);
-    const items = [
-      { id: "mascot", h: mascotH },
-      { id: "source", h: sourceH },
-      { id: "arrow", h: arrowH },
-      { id: "map", h: mapH },
-      { id: "dock", h: dockH },
-    ];
-    const stacked = stackSlots(items, {
-      top: 0,
-      bottom: items.reduce((sum, it) => sum + it.h, 0) + gapY * (items.length - 1),
-      gap: gapY,
-      justify: "start",
-    });
-    return {
-      h: stacked.used,
-      items,
-      gapY,
-      tile,
-      chipH,
-      gap,
-      tagH,
-      factW,
-      factH,
-      uniqueH,
-      srcRows,
-      mapRows,
-      robotScale: (landscapeShort ? 0.22 : v.short ? 0.26 : v.compact ? 0.3 : 0.38) * Math.min(1, s + 0.15),
-    };
+    scene.frame.stage.add([src, chip]);
+    popIn(scene, [src, chip], { instant, delay: i * 80 });
+    if (i === 1) highlightChip(scene, chip, true);
   });
-
-  const stacked = stackSlots(measured.items, {
-    top: shell.content.top,
-    bottom: shell.content.bottom,
-    gap: measured.gapY,
-    justify: v.portrait ? "distribute" : "center",
+  const stamp = makeIconCard(scene, stage.cx, y, {
+    glyph: "复用",
+    label: "同一个 id",
+    accent: C.coral,
+    width: Math.min(120, stage.w * 0.28),
+    height: Math.min(96, tile + 28),
   });
-
-  const srcY = stacked.slots.source.top + measured.tagH + 8 + measured.tile / 2;
-  const mapY = stacked.slots.map.top + measured.tagH + 8 + measured.chipH / 2;
-  const srcPos = flowPositions(CHARS.length, {
-    y: srcY,
-    tileW: measured.tile,
-    tileH: measured.tile,
-    gapX: measured.gap,
-    gapY: measured.gap + 4,
-    innerW: v.innerW,
-    cx: v.cx,
-  });
-  const mapPos = flowPositions(CHARS.length, {
-    y: mapY,
-    tileW: measured.tile,
-    tileH: measured.chipH,
-    gapX: measured.gap,
-    gapY: measured.gap + 6,
-    innerW: v.innerW,
-    cx: v.cx,
-  });
-
-  return {
-    ...measured,
-    slots: stacked.slots,
-    srcPos,
-    mapPos,
-  };
+  scene.frame.stage.add(stamp);
+  popIn(scene, stamp, { instant, delay: 80 });
 }
 
-function speechFor(ch, id, isNew) {
-  if (ch === " ") return "空格也算";
-  if (ch === "\n") return "换行是 0";
-  if (!isNew) return "复用这个";
-  const glyph = displayGlyph(ch);
-  return `${glyph} → ${id}`;
+function drawMappedSentence(scene, stage, { instant }) {
+  scene.frame.stage.add(addSectionTag(scene, "id", C.gold, { left: stage.left, top: stage.top + 4 }));
+  const tile = Math.min(46, Math.max(26, stage.w / 10));
+  const chipH = tile * 1.28;
+  const pos = flowPositions(CHARS.length, {
+    y: stage.cy,
+    tileW: tile,
+    tileH: chipH,
+    gapX: 5,
+    gapY: 8,
+    innerW: stage.w,
+    cx: stage.cx,
+  });
+  CHARS.forEach((ch, i) => {
+    const chip = makeChip(scene, pos[i].x, pos[i].y, {
+      glyph: displayGlyph(ch),
+      id: DEMO_IDS[i],
+      accent: i === 1 || i === 12 ? C.blue : C.teal,
+      width: tile,
+      height: chipH,
+    });
+    scene.frame.stage.add(chip);
+    popIn(scene, chip, { instant, delay: i * 16 });
+  });
+}
+
+function drawStats(scene, stage, { instant }, facts) {
+  const n = facts.length;
+  const w = Math.min(220, n === 1 ? stage.w * 0.72 : (stage.w - 16) / n - 10);
+  const h = Math.min(130, Math.max(90, stage.h * 0.42));
+  facts.forEach((fact, i) => {
+    const x = stage.cx + (i - (n - 1) / 2) * (w + 12);
+    const node = makeBigStat(scene, x, stage.cy, { ...fact, width: w, height: h });
+    scene.frame.stage.add(node);
+    popIn(scene, node, { instant, delay: i * 40 });
+  });
+  if (facts.length === 1 && facts[0].value.includes("1,115")) {
+    const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
+      value: "shakespeare_char",
+      label: "prepare.py 打印的长度",
+      tip: "length of dataset in characters: 1,115,394",
+      accent: C.pink,
+      width: Math.min(280, stage.w - 12),
+      height: 52,
+    });
+    scene.frame.stage.add(tip);
+    popIn(scene, tip, { instant, delay: 80 });
+  }
 }
