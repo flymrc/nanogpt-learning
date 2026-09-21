@@ -119,6 +119,7 @@ body {
   min-height: 0;
   width: 100%;
   overflow: hidden;
+  cursor: pointer;
 }
 
 #tutor-canvas {
@@ -129,6 +130,7 @@ body {
   /* Inline width/height come from JS (CSS px). Do not 100%-stretch
      a mismatched backing store — that is what caused the 重影. */
   image-rendering: auto;
+  pointer-events: auto;
 }
 
 .tutor-fallback {

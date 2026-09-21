@@ -15,11 +15,18 @@ let resizeObserver = null;
 let unsubTutor = null;
 let started = false;
 let lastBufferKey = "";
+let bootPromise = null;
+let bootGen = 0;
+const lookTarget = { x: 0, y: 0 };
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
   if (!Number.isFinite(raw) || raw <= 0) return 1;
   return Math.min(2, raw);
+}
+
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n));
 }
 
 function stageBox() {
@@ -55,8 +62,27 @@ function applyCanvasPixels(app, canvas, box) {
   }
 }
 
+/** One host canvas only — drop ghost canvases left by a leaked Pixi app. */
+function ensureTutorCanvas() {
+  const stage = document.getElementById("tutor-stage");
+  if (!stage) return null;
+  let canvas = document.getElementById("tutor-canvas");
+  for (const node of [...stage.querySelectorAll("canvas")]) {
+    if (!canvas) canvas = node;
+    if (node !== canvas) node.remove();
+  }
+  if (canvas && !canvas.id) canvas.id = "tutor-canvas";
+  if (canvas && canvas.parentElement !== stage) stage.appendChild(canvas);
+  if (!canvas) {
+    canvas = document.createElement("canvas");
+    canvas.id = "tutor-canvas";
+    stage.appendChild(canvas);
+  }
+  canvas.hidden = false;
+  return canvas;
+}
+
 export function mountTutorHost() {
-  syncTutorLayout();
   if (!started) {
     started = true;
     window.addEventListener("resize", () => {
@@ -66,8 +92,16 @@ export function mountTutorHost() {
     window.addEventListener("nanogpt-voice", (event) => {
       setTalking(Boolean(event.detail?.playing));
     });
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
     unsubTutor = onTutor((beat) => applyBeat(beat));
   }
+  syncTutorLayout();
+}
+
+/** Resize / layout only — never starts a second boot while one is in flight. */
+export function syncTutorHost() {
+  syncTutorLayout();
 }
 
 function syncTutorLayout() {
@@ -85,30 +119,48 @@ function syncTutorLayout() {
   }
 
   fillBubble(currentTutor());
-  if (!pixiApp) {
-    bootLive2d().catch((err) => {
-      console.warn("Live2D unavailable, using static tutor", err);
-      showStaticFallback();
-    });
-  } else {
+  if (pixiApp) {
     resizePixi();
+  } else {
+    ensureLive2d();
   }
 }
 
+function ensureLive2d() {
+  if (pixiApp || bootPromise || !isWidePcTutor()) return;
+  const gen = bootGen;
+  bootPromise = bootLive2d()
+    .catch((err) => {
+      console.warn("Live2D unavailable, using static tutor", err);
+      if (isWidePcTutor()) showStaticFallback();
+    })
+    .finally(() => {
+      bootPromise = null;
+      // A teardown aborted this attempt (orientation / gate flip). Retry once eligible.
+      if (!pixiApp && isWidePcTutor() && bootGen !== gen) {
+        ensureLive2d();
+      }
+    });
+}
+
 async function bootLive2d() {
-  const canvas = document.getElementById("tutor-canvas");
-  const stage = document.getElementById("tutor-stage");
-  const dock = document.getElementById("tutor-dock");
-  if (!canvas || !stage || !dock || pixiApp) return;
+  const gen = bootGen;
+  if (pixiApp) return;
 
   await loadFirstScript(CUBISM_CORE);
   await loadScript(PIXI_SRC);
   await loadScript(LIVE2D_SRC);
+  if (stale(gen)) return;
 
   const PIXI = window.PIXI;
   if (!PIXI?.Application || !PIXI.live2d?.Live2DModel) {
     throw new Error("pixi-live2d-display did not attach");
   }
+
+  const canvas = ensureTutorCanvas();
+  const stage = document.getElementById("tutor-stage");
+  const dock = document.getElementById("tutor-dock");
+  if (!canvas || !stage || !dock || stale(gen) || pixiApp) return;
 
   const box = stageBox();
   if (PIXI.settings) {
@@ -116,7 +168,7 @@ async function bootLive2d() {
     PIXI.settings.ROUND_PIXELS = false;
   }
 
-  pixiApp = new PIXI.Application({
+  const app = new PIXI.Application({
     view: canvas,
     width: box.w,
     height: box.h,
@@ -131,40 +183,82 @@ async function bootLive2d() {
     clearBeforeRender: true,
     powerPreference: "high-performance",
   });
+  if (stale(gen)) {
+    destroyPixiApp(app);
+    return;
+  }
+  pixiApp = app;
   lastBufferKey = `${box.w}x${box.h}@${box.dpr}`;
   applyCanvasPixels(pixiApp, canvas, box);
 
-  model = await PIXI.live2d.Live2DModel.from(modelUrl(), {
-    autoInteract: false,
-    autoUpdate: true,
-  });
+  let loaded = null;
   try {
-    model.internalModel?.renderer?.setIsPremultipliedAlpha?.(true);
-  } catch {
-    /* optional Cubism hook */
+    loaded = await PIXI.live2d.Live2DModel.from(modelUrl(), {
+      autoInteract: false,
+      autoUpdate: true,
+    });
+  } catch (err) {
+    if (bootGen === gen) {
+      destroyPixiApp(pixiApp);
+      pixiApp = null;
+    }
+    throw err;
   }
+
+  if (stale(gen) || pixiApp !== app) {
+    loaded?.destroy?.();
+    if (pixiApp === app) {
+      destroyPixiApp(app);
+      pixiApp = null;
+    }
+    return;
+  }
+
+  clearStageModels(pixiApp);
+  model = loaded;
   pixiApp.stage.addChild(model);
+  model.interactive = true;
   model.anchor.set(0.5, 0.12);
   placeModel();
   model.on("hit", () => playMood("react"));
+  model.on("pointertap", (event) => {
+    const global = event?.data?.global;
+    if (global) model.tap(global.x, global.y);
+    else playMood("react");
+  });
 
+  resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(() => resizePixi());
   resizeObserver.observe(stage);
   applyBeat(currentTutor());
-  window.__nanoGPTTutorHiDPI = () => {
-    const box = stageBox();
-    return {
-      box,
-      canvas: {
-        width: canvas.width,
-        height: canvas.height,
-        styleWidth: canvas.style.width,
-        styleHeight: canvas.style.height,
-        ratio: canvas.width / Math.max(1, canvas.clientWidth),
-      },
-      dockBorder: getComputedStyle(dock).borderLeftWidth,
-    };
-  };
+  installDebugProbe();
+}
+
+function stale(gen) {
+  return gen !== bootGen || !isWidePcTutor();
+}
+
+function destroyPixiApp(app) {
+  if (!app) return;
+  try {
+    clearStageModels(app);
+    app.destroy(false, { children: true, texture: false, baseTexture: false });
+  } catch {
+    /* already torn down */
+  }
+}
+
+function clearStageModels(app) {
+  const stage = app?.stage;
+  if (!stage) return;
+  for (const child of [...stage.children]) {
+    stage.removeChild(child);
+    try {
+      child.destroy?.({ children: true });
+    } catch {
+      /* ignore */
+    }
+  }
 }
 
 function modelUrl() {
@@ -175,7 +269,7 @@ function modelUrl() {
 
 function resizePixi() {
   if (!pixiApp) return;
-  const canvas = document.getElementById("tutor-canvas");
+  const canvas = ensureTutorCanvas();
   if (!canvas) return;
   const box = stageBox();
   const key = `${box.w}x${box.h}@${box.dpr}`;
@@ -200,7 +294,10 @@ function placeModel() {
 }
 
 function teardownLive2d() {
+  bootGen += 1;
   talking = false;
+  lookTarget.x = 0;
+  lookTarget.y = 0;
   if (mouthRaf) {
     cancelAnimationFrame(mouthRaf);
     mouthRaf = 0;
@@ -208,14 +305,19 @@ function teardownLive2d() {
   resizeObserver?.disconnect();
   resizeObserver = null;
   if (model) {
-    model.destroy();
+    try {
+      model.destroy();
+    } catch {
+      /* ignore */
+    }
     model = null;
   }
   if (pixiApp) {
-    pixiApp.destroy(false, { children: true, texture: false, baseTexture: false });
+    destroyPixiApp(pixiApp);
     pixiApp = null;
   }
   lastBufferKey = "";
+  ensureTutorCanvas();
 }
 
 function applyBeat(beat) {
@@ -297,6 +399,81 @@ function showStaticFallback() {
   img.alt = "卡通助教";
   img.src = `${import.meta.env.BASE_URL}assets/robot.svg`;
   dock.appendChild(img);
+}
+
+/**
+ * Eyes / head follow the pointer over the whole wide page.
+ * Uses FocusController ([-1, 1], +Y up) so Idle motions stay additive.
+ */
+function onPointerMove(event) {
+  if (!model || !pixiApp || !isWidePcTutor()) return;
+  const canvas = pixiApp.view;
+  if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 8 || rect.height < 8) return;
+
+  const faceX = rect.left + rect.width * 0.5;
+  const faceY = rect.top + rect.height * 0.3;
+  const reachX = Math.max(rect.width * 0.55, window.innerWidth * 0.38);
+  const reachY = Math.max(rect.height * 0.5, window.innerHeight * 0.42);
+  lookTarget.x = clamp((event.clientX - faceX) / reachX, -1, 1);
+  lookTarget.y = clamp((faceY - event.clientY) / reachY, -1, 1);
+
+  const focus = model.internalModel?.focusController;
+  if (focus && typeof focus.focus === "function") {
+    focus.focus(lookTarget.x, lookTarget.y);
+    return;
+  }
+  applyLookFallback();
+}
+
+function onPointerDown(event) {
+  if (!model || !isWidePcTutor()) return;
+  const dock = document.getElementById("tutor-dock");
+  if (!dock || dock.hidden || !dock.contains(event.target)) return;
+  playMood("react");
+}
+
+function applyLookFallback() {
+  const core = model?.internalModel?.coreModel;
+  if (!core?.addParameterValueById) return;
+  try {
+    core.addParameterValueById("ParamAngleX", lookTarget.x * 16);
+    core.addParameterValueById("ParamAngleY", lookTarget.y * 10);
+    core.addParameterValueById("ParamEyeBallX", lookTarget.x);
+    core.addParameterValueById("ParamEyeBallY", lookTarget.y);
+    core.addParameterValueById("ParamBodyAngleX", lookTarget.x * 6);
+  } catch {
+    /* optional */
+  }
+}
+
+function installDebugProbe() {
+  window.__nanoGPTTutorHiDPI = () => {
+    const canvas = document.getElementById("tutor-canvas");
+    const stage = document.getElementById("tutor-stage");
+    const dock = document.getElementById("tutor-dock");
+    const canvases = stage ? [...stage.querySelectorAll("canvas")] : [];
+    const kids = pixiApp?.stage?.children || [];
+    const box = stageBox();
+    return {
+      box,
+      canvasCount: canvases.length,
+      stageChildren: kids.length,
+      modelCount: kids.filter((child) => child?.internalModel).length,
+      look: { ...lookTarget },
+      canvas: canvas
+        ? {
+            width: canvas.width,
+            height: canvas.height,
+            styleWidth: canvas.style.width,
+            styleHeight: canvas.style.height,
+            ratio: canvas.width / Math.max(1, canvas.clientWidth),
+          }
+        : null,
+      dockBorder: dock ? getComputedStyle(dock).borderLeftWidth : "",
+    };
+  };
 }
 
 function loadScript(src) {
