@@ -47,6 +47,17 @@
           </svg>
           <span class="mute-toggle__slash" aria-hidden="true"></span>
         </button>
+        <button
+          type="button"
+          id="notes-toggle"
+          class="notes-toggle"
+          aria-label="看不懂？"
+          aria-expanded="false"
+          aria-controls="notes-overlay"
+          title="看不懂？"
+        >
+          看不懂？
+        </button>
         <div id="game"></div>
       </div>
       <aside id="tutor-dock" hidden>
@@ -60,6 +71,32 @@
           <canvas id="tutor-canvas"></canvas>
         </div>
       </aside>
+    </div>
+    <div id="notes-overlay" hidden>
+      <div class="notes-card" role="dialog" aria-modal="true" aria-labelledby="notes-title">
+        <header class="notes-head">
+          <h2 id="notes-title">这些词是什么意思</h2>
+          <button type="button" id="notes-close" class="notes-close" aria-label="关闭">关闭</button>
+        </header>
+        <ul id="notes-list" class="notes-list"></ul>
+        <div class="notes-detail-box">
+          <p id="notes-detail-term" class="notes-detail-term">BPE</p>
+          <p id="notes-detail" class="notes-detail">点一个词看说明</p>
+        </div>
+      </div>
+    </div>
+    <div id="game-cursor" hidden aria-hidden="true">
+      <svg class="game-cursor__pointer" viewBox="0 0 48 60" width="48" height="60">
+        <path
+          class="game-cursor__body"
+          d="M5 3 L5 42 L16.5 32.2 L24 56 L34.2 52.2 L25.6 29.4 L42 29.4 Z"
+          stroke="#3b2a2e"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+        <path class="game-cursor__core" d="M11 10 L11 29 L18.4 23.6 Z" />
+        <circle class="game-cursor__spark" cx="36" cy="14" r="5" />
+      </svg>
     </div>
     <div id="boot-splash" role="status" aria-live="polite">
       <div class="boot-spinner" aria-hidden="true"></div>

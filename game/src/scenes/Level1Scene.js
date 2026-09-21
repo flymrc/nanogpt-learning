@@ -125,7 +125,9 @@ function drawSnippet(scene, stage, { instant }, tag) {
 }
 
 function drawMappedSentence(scene, stage, { instant }) {
-  scene.frame.stage.add(addSectionTag(scene, "号码牌", C.gold, { left: stage.left, top: stage.top + 4 }));
+  scene.frame.stage.add(
+    addSectionTag(scene, "号码牌", C.gold, { left: stage.left, top: stage.top + 4, note: "plates" }),
+  );
   const tile = Math.min(46, Math.max(26, stage.w / 10));
   const chipH = tile * 1.28;
   const pos = flowPositions(CHARS.length, {
@@ -151,6 +153,17 @@ function drawMappedSentence(scene, stage, { instant }) {
   if (stage.h > 300) {
     scene.frame.stage.add(makeFocusPair(scene, stage, { instant }));
   }
+  const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
+    value: "按字符编号",
+    label: "GPT-2 用 BPE，本课不用",
+    note: "bpe",
+    tip: "GPT-2 会用 BPE。这一课按字符领号码牌。",
+    accent: C.violet,
+    width: Math.min(320, stage.w - 12),
+    height: 54,
+  });
+  scene.frame.stage.add(tip);
+  popIn(scene, tip, { instant, delay: 80 });
 }
 
 function makeFocusPair(scene, stage, { instant }) {
@@ -211,7 +224,8 @@ function drawScrolls(scene, stage, { instant }) {
   ]);
   const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
     value: "验收不是答题纸",
-    label: "源码里叫 train.bin / val.bin",
+    label: "点我看练习卷 / 验收卷",
+    note: "scrolls",
     tip: `练习 ${DATASET.trainTokens.toLocaleString("zh-CN")} · 验收 ${DATASET.valTokens.toLocaleString("zh-CN")}。验收用来抽查，不把答案写在卷上。`,
     accent: C.pink,
     width: Math.min(320, stage.w - 12),

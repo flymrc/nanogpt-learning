@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
+import { openNote } from "./notes.js";
 import { pointerToCss, textureScale } from "./dpr.js";
 import { TAP_MIN, clamp, getView, makeShell, scaled } from "./layout.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
@@ -277,7 +278,7 @@ export function highlightChip(scene, chip, on = true) {
   });
 }
 
-export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, width = 200, height = 96 }) {
+export function makeFactChip(scene, x, y, { value, label, tip, note, accent = C.gold, width = 200, height = 96 }) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, 22, C.surface);
@@ -290,7 +291,12 @@ export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, 
   const labelText = scene.add
     .text(10, height * 0.24, label, uiText(Math.max(13, Math.round(height * 0.18)), { color: C.muted }))
     .setOrigin(0.5);
-  box.add([g, stripe, valueText, labelText]);
+  const hint = note
+    ? scene.add
+        .text(width / 2 - 16, -height / 2 + 12, "?", uiText(13, { color: C.muted }))
+        .setOrigin(0.5)
+    : null;
+  box.add(hint ? [g, stripe, valueText, labelText, hint] : [g, stripe, valueText, labelText]);
   box.setSize(width, height);
   box.setData("valueText", valueText);
   box.setValue = (next) => valueText.setText(next);
@@ -298,6 +304,10 @@ export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, 
   box.input.cursor = "pointer";
   box.on("pointerdown", (pointer, _lx, _ly, event) => {
     event?.stopPropagation?.();
+    if (note) {
+      openNote(note);
+      return;
+    }
     showTooltip(scene, box.x, box.y - height / 2 - 18, tip || value);
   });
   return box;
@@ -459,21 +469,30 @@ export function spawnConfetti(scene) {
   }
 }
 
-export function makeTag(scene, x, y, text, accent = C.blue) {
+export function makeTag(scene, x, y, text, accent = C.blue, opts = {}) {
   const tag = scene.add.container(x, y);
   const label = scene.add.text(0, 0, text, displayText(14)).setOrigin(0.5);
-  const w = label.width + 20;
+  const w = label.width + (opts.note ? 28 : 20);
   const h = 26;
   const g = scene.add.graphics();
   drawSticker(g, -w / 2, -h / 2, w, h, 10, accent, { lineWidth: 4, shadow: false });
   tag.add([g, label]);
+  if (opts.note) {
+    tag.add(scene.add.text(w / 2 - 9, 0, "?", uiText(12, { color: C.text })).setOrigin(0.5));
+    tag.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
+    tag.input.cursor = "pointer";
+    tag.on("pointerdown", (pointer, _lx, _ly, event) => {
+      event?.stopPropagation?.();
+      openNote(opts.note);
+    });
+  }
   tag.setSize(w, h);
   return tag;
 }
 
 /** Label sits above a row, never on top of the first tile. */
-export function addSectionTag(scene, text, accent, { left, top }) {
-  const tag = makeTag(scene, 0, 0, text, accent);
+export function addSectionTag(scene, text, accent, { left, top, note } = {}) {
+  const tag = makeTag(scene, 0, 0, text, accent, { note });
   tag.setPosition(left + tag.width / 2, top + tag.height / 2);
   return tag;
 }
@@ -492,6 +511,7 @@ export function addMuteToggle(scene) {
 
 export function bindAdvance(scene, advance) {
   const tryAdvance = () => {
+    if (!document.getElementById("notes-overlay")?.hidden) return;
     unlockAudio(scene);
     if (scene.busy) return;
     playSfx(scene, "sfx-tap", 0.2);
@@ -502,7 +522,7 @@ export function bindAdvance(scene, advance) {
     if (currentlyOver?.length) return;
     const view = getView(scene);
     const pt = pointerToCss(scene, pointer);
-    if (pt.x > view.w - 96 && pt.y < view.padTop + 100) return;
+    if (pt.x > view.w - 260 && pt.y < view.padTop + 100) return;
     tryAdvance();
   });
 
