@@ -33,7 +33,7 @@ export default class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 520, ease: "Back.Out" });
 
     this.add
-      .text(v.cx, titles.bottom - titleSize * 0.35, "先把台词拉成纸带", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
+      .text(v.cx, titles.bottom - titleSize * 0.35, "像课本一样，一步步讲清", displayText(Math.max(16, titleSize * 0.42), { color: C.tealCss }))
       .setOrigin(0.5);
 
     this.playPreview(v, plan);

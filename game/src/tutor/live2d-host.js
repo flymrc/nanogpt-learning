@@ -1,3 +1,4 @@
+import { renderTutorBook } from "../ui/textbook.js";
 import { currentTutor, isWidePcTutor, onTutor } from "./bus.js";
 
 const CUBISM_CORE = [
@@ -377,24 +378,7 @@ function startMouth() {
 }
 
 function fillBubble(beat) {
-  const purpose = document.getElementById("tutor-purpose");
-  const caption = document.getElementById("tutor-caption");
-  const step = document.getElementById("tutor-step");
-  if (!purpose || !caption) return;
-  if (!beat) {
-    purpose.textContent = "点下一步，我跟着讲";
-    caption.textContent = "这一步在干什么";
-    if (step) step.textContent = "";
-    return;
-  }
-  purpose.textContent = beat.purpose || "";
-  caption.textContent = beat.caption || "";
-  if (step) {
-    step.textContent =
-      typeof beat.index === "number" && typeof beat.total === "number"
-        ? `${beat.index + 1} / ${beat.total}`
-        : "";
-  }
+  renderTutorBook(beat);
 }
 
 function showStaticFallback() {

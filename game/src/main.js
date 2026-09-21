@@ -149,9 +149,9 @@ async function boot() {
     return active.sys.settings.key;
   };
 
-  window.__nanoGPTJump = (key, beat = 0) => {
-    if (key === "Level1") game.registry.set("level1.progress", { beat });
-    if (key === "Level2") game.registry.set("level2.progress", { beat });
+  window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
+    if (key === "Level1") game.registry.set("level1.progress", { beat, phase });
+    if (key === "Level2") game.registry.set("level2.progress", { beat, phase });
     const active = game.scene.getScenes(true)[0];
     active?.scene.start(key);
     return key;
