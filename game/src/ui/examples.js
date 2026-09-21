@@ -24,8 +24,9 @@ import {
   setTileActive,
 } from "./components.js";
 import { makeBigStat, makeIconCard, popIn } from "./lesson.js";
-import { flowPositions, lessonRhythm, tokenMetrics } from "./layout.js";
-import { C, uiText } from "./theme.js";
+import { isWidePcTutor } from "../tutor/bus.js";
+import { flowPositions, lessonRhythm } from "./layout.js";
+import { C, uiText, wrapToWidth } from "./theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
 const STREAM = DEMO_STREAM;
@@ -55,13 +56,10 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
     popIn(scene, node, { instant, delay: i * 12 });
   });
   const last = pos[pos.length - 1];
+  const noteRaw = "空格写成 ␣，换行写成 ↵。Citizen 是 8 格，不是 1 个词。";
+  const noteText = wrapToWidth(scene, noteRaw, 13, stage.w - 8, uiText);
   const note = scene.add
-    .text(
-      stage.cx,
-      last.y + tile / 2 + rhythm + 6,
-      "空格写成 ␣，换行写成 ↵。Citizen 是 8 格，不是 1 个词。",
-      uiText(14, { color: C.muted }),
-    )
+    .text(stage.cx, last.y + tile / 2 + rhythm + 6, noteText, uiText(13, { color: C.muted, align: "center" }))
     .setOrigin(0.5, 0);
   scene.frame.stage.add(note);
 }
@@ -222,9 +220,9 @@ export function drawShiftExample(scene, stage, opts) {
 }
 
 export function drawBlankExample(scene, stage, opts) {
-  drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: "填空线索", yTag: "每格一空" });
+  const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: "填空线索", yTag: "每格一空" });
   if (stage.h > 200) {
-    const board = makePairBoard(scene, stage.cx, stage.top + Math.min(stage.h - 40, 168), {
+    const board = makePairBoard(scene, stage.cx, (rows?.bottom || stage.top) + 40, {
       width: Math.min(340, stage.w - 16),
       height: 58,
     });
@@ -322,31 +320,40 @@ function drawIconRow(scene, stage, { instant }, cards) {
   return { bottom: y + h / 2, height: h };
 }
 
-function layoutTokens(stage) {
-  const tight = stage.h < 280;
-  const metrics = tokenMetrics(STREAM.length, stage.w, {
-    maxW: Math.min(tight ? 32 : 42, stage.w / 18),
-    maxH: Math.min(tight ? 42 : 56, stage.h / (tight ? 8 : 6.2)),
-    minW: 16,
-    gap: tight ? 3 : 4,
-  });
-  const total = STREAM.length * metrics.tileW + (STREAM.length - 1) * metrics.gapX;
-  const startX = stage.cx - total / 2 + metrics.tileW / 2;
-  const gapY = tight ? 18 : 30;
-  const streamY = stage.top + (tight ? 22 : 30) + metrics.tileH / 2;
-  const xY = streamY + metrics.tileH + gapY;
-  const yY = xY + metrics.tileH + gapY;
+function layoutTokens(stage, { showX = false, showY = false } = {}) {
+  const phone = !isWidePcTutor();
+  const count = STREAM.length;
+  const gapX = phone ? 2 : 4;
+  const maxW = phone ? 20 : Math.min(42, stage.w / 18);
+  const tileW = Math.min(maxW, (stage.w - Math.max(0, count - 1) * gapX) / count);
+  const tileH = phone ? Math.max(26, tileW * 1.35) : Math.max(32, tileW * 1.32);
+  const metrics = { tileW, tileH, gapX, font: Math.max(11, Math.round(tileW * 0.4)) };
+  const total = count * tileW + (count - 1) * gapX;
+  const startX = stage.left + (stage.w - total) / 2 + tileW / 2;
+  const tagSlot = phone ? 30 : 28;
+  const rhythm = phone ? 10 : 16;
+  const rowPitch = tagSlot + tileH + rhythm;
+  const streamY = stage.top + tagSlot + tileH / 2;
+  const xY = streamY + rowPitch;
+  const yY = xY + rowPitch;
+  const shiftHintY = streamY + tileH / 2 + rhythm / 2;
   const streamPos = STREAM.map((_, i) => ({
-    x: startX + i * (metrics.tileW + metrics.gapX),
+    x: startX + i * (tileW + gapX),
     y: streamY,
   }));
   return {
+    phone,
     metrics,
+    tagSlot,
+    rhythm,
+    shiftHintY,
     streamPos,
     xPos: streamPos.slice(0, DEMO_BLOCK).map((p) => ({ x: p.x, y: xY })),
     yPos: streamPos.slice(1, DEMO_BLOCK + 1).map((p) => ({ x: p.x, y: yY })),
     xY,
     yY,
+    showX,
+    showY,
   };
 }
 
@@ -356,22 +363,24 @@ function drawWindowRows(
   { instant } = {},
   { showX, showY, highlight = -1, allOn = false, notFromStart = false, xTag = "现在看到的牌", yTag = "下一字", alignArrows = false },
 ) {
-  const layout = layoutTokens(stage);
-  scene.frame.stage.add(addSectionTag(scene, "纸带", C.violet, { left: stage.left, top: stage.top + 2 }));
+  const layout = layoutTokens(stage, { showX, showY });
+  const { metrics, phone } = layout;
+  const streamLabel = phone && notFromStart ? "纸带 · 前面还很长" : "纸带";
+  scene.frame.stage.add(addSectionTag(scene, streamLabel, C.violet, { left: stage.left, top: stage.top }));
 
-  if (notFromStart) {
+  if (notFromStart && !phone) {
     const first = layout.streamPos[0];
-    const dotsX = first.x - layout.metrics.tileW - 8;
+    const dotsX = first.x - metrics.tileW - 8;
     for (let i = 0; i < 3; i += 1) {
-      const node = makeCharTile(scene, dotsX - i * (layout.metrics.tileW * 0.55), first.y, "…", {
-        width: Math.max(16, layout.metrics.tileW * 0.7),
-        height: layout.metrics.tileH,
+      const node = makeCharTile(scene, dotsX - i * (metrics.tileW * 0.55), first.y, "…", {
+        width: Math.max(16, metrics.tileW * 0.7),
+        height: metrics.tileH,
         seed: "dot",
       });
       node.setAlpha(0.28);
       scene.frame.stage.add(node);
     }
-    const tag = makeTag(scene, dotsX - 8, first.y - layout.metrics.tileH * 0.7, "前面还很长", C.violet);
+    const tag = makeTag(scene, dotsX - 8, first.y - metrics.tileH * 0.7, "前面还很长", C.violet);
     tag.setAlpha(0.7);
     scene.frame.stage.add(tag);
   }
@@ -381,8 +390,8 @@ function drawWindowRows(
       glyph: displayGlyph(STREAM_GLYPHS[i]),
       id,
       accent: C.violet,
-      width: layout.metrics.tileW,
-      height: layout.metrics.tileH,
+      width: metrics.tileW,
+      height: metrics.tileH,
     });
     const inX = i < DEMO_BLOCK;
     const inY = i >= 1 && i <= DEMO_BLOCK;
@@ -393,24 +402,34 @@ function drawWindowRows(
 
   const first = layout.streamPos[0];
   const last = layout.streamPos[DEMO_BLOCK - 1];
-  const winW = last.x - first.x + layout.metrics.tileW + 8;
-  const winH = layout.metrics.tileH + 16;
-  const shift = showY ? layout.streamPos[1].x - layout.streamPos[0].x : 0;
-  const win = makeWindowFrame(scene, (first.x + last.x) / 2 + shift, first.y, winW, winH, showY ? C.gold : C.blue);
-  scene.frame.stage.add(win);
-  popIn(scene, win, { instant });
+  const winW = last.x - first.x + metrics.tileW + 6;
+  const winH = metrics.tileH + 12;
+  if (!phone) {
+    const shift = showY ? layout.streamPos[1].x - layout.streamPos[0].x : 0;
+    const win = makeWindowFrame(scene, (first.x + last.x) / 2 + shift, first.y, winW, winH, showY ? C.gold : C.blue);
+    scene.frame.stage.add(win);
+    popIn(scene, win, { instant });
+    if (showY) {
+      const plus = makeTag(scene, win.x + winW / 2 + 22, first.y, "挪一格", C.gold);
+      scene.frame.stage.add(plus);
+      popIn(scene, plus, { instant });
+    }
+  }
 
   if (showX) {
     scene.frame.stage.add(
-      addSectionTag(scene, xTag, C.blue, { left: stage.left, top: layout.xY - layout.metrics.tileH / 2 - 20 }),
+      addSectionTag(scene, xTag, C.blue, {
+        left: stage.left,
+        top: layout.xY - metrics.tileH / 2 - layout.tagSlot + 2,
+      }),
     );
     DEMO_IDS.forEach((id, i) => {
       const chip = makeChip(scene, layout.xPos[i].x, layout.xPos[i].y, {
         glyph: displayGlyph(CHARS[i]),
         id,
         accent: C.blue,
-        width: layout.metrics.tileW,
-        height: layout.metrics.tileH,
+        width: metrics.tileW,
+        height: metrics.tileH,
       });
       scene.frame.stage.add(chip);
       if (highlight === i || allOn) highlightChip(scene, chip, true);
@@ -422,25 +441,22 @@ function drawWindowRows(
     scene.frame.stage.add(
       addSectionTag(scene, yTag, C.gold, {
         left: stage.left,
-        top: layout.yY - layout.metrics.tileH / 2 - 20,
+        top: layout.yY - metrics.tileH / 2 - layout.tagSlot + 2,
         note: yTag.includes("挪") || yTag.includes("评分") ? "shift" : undefined,
       }),
     );
-    const plus = makeTag(scene, win.x + winW / 2 + 22, first.y, "挪一格", C.gold);
-    scene.frame.stage.add(plus);
-    popIn(scene, plus, { instant });
     DEMO_Y_IDS.forEach((id, i) => {
       const chip = makeChip(scene, layout.yPos[i].x, layout.yPos[i].y, {
         glyph: displayGlyph(STREAM_GLYPHS[i + 1]),
         id,
         accent: C.gold,
-        width: layout.metrics.tileW,
-        height: layout.metrics.tileH,
+        width: metrics.tileW,
+        height: metrics.tileH,
       });
       scene.frame.stage.add(chip);
       if (highlight === i || allOn) highlightChip(scene, chip, true);
       popIn(scene, chip, { instant, delay: i * 8 });
-      if (alignArrows && i < 3 && layout.xPos[i]) {
+      if (alignArrows && !phone && i < 3 && layout.xPos[i]) {
         const mark = scene.add
           .text((layout.xPos[i].x + layout.yPos[i].x) / 2, (layout.xPos[i].y + layout.yPos[i].y) / 2, "↓", uiText(14, { color: C.coralCss }))
           .setOrigin(0.5);
@@ -448,5 +464,34 @@ function drawWindowRows(
       }
     });
   }
+  const lastY = showY ? layout.yY : showX ? layout.xY : layout.streamPos[0].y;
+  scene.frame.tapeRows = [
+    {
+      name: "row-stream",
+      left: stage.left,
+      top: layout.streamPos[0].y - metrics.tileH / 2,
+      w: stage.w,
+      h: metrics.tileH,
+    },
+    showX
+      ? {
+          name: "row-x",
+          left: stage.left,
+          top: layout.xY - metrics.tileH / 2,
+          w: stage.w,
+          h: metrics.tileH,
+        }
+      : null,
+    showY
+      ? {
+          name: "row-y",
+          left: stage.left,
+          top: layout.yY - metrics.tileH / 2,
+          w: stage.w,
+          h: metrics.tileH,
+        }
+      : null,
+  ].filter(Boolean);
+  return { bottom: lastY + metrics.tileH / 2 };
 }
 
