@@ -512,6 +512,7 @@ export function addMuteToggle(scene) {
 export function bindAdvance(scene, advance) {
   const tryAdvance = () => {
     if (!document.getElementById("notes-overlay")?.hidden) return;
+    if (!document.getElementById("lesson-book-overlay")?.hidden) return;
     unlockAudio(scene);
     if (scene.busy) return;
     playSfx(scene, "sfx-tap", 0.2);
@@ -522,7 +523,7 @@ export function bindAdvance(scene, advance) {
     if (currentlyOver?.length) return;
     const view = getView(scene);
     const pt = pointerToCss(scene, pointer);
-    if (pt.x > view.w - 260 && pt.y < view.padTop + 100) return;
+    if (pt.x > view.w - 360 && pt.y < view.padTop + 100) return;
     tryAdvance();
   });
 

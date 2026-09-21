@@ -7,6 +7,7 @@ import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted } from "./audio/sound.js";
 import { mountMuteHud } from "./audio/mute-hud.js";
 import { mountNotesHud } from "./ui/notes.js";
+import { mountTutorBook } from "./ui/textbook.js";
 import { mountGameCursor } from "./ui/cursor.js";
 import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
@@ -95,6 +96,7 @@ async function boot() {
   applyOuterViewport();
   mountMuteHud(() => window.__nanoGPTGame);
   mountNotesHud();
+  mountTutorBook();
   mountTutorHost();
 
   const game = new Phaser.Game(config);

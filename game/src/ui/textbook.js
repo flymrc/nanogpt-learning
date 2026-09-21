@@ -3,10 +3,61 @@ import { emitTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { C, uiText } from "./theme.js";
 
+let bookMounted = false;
+
 export function mountTutorBook() {
-  const root = document.getElementById("tutor-book");
-  if (!root) return;
+  const overlay = document.getElementById("lesson-book-overlay");
+  const btn = document.getElementById("book-toggle");
+  const close = document.getElementById("lesson-book-close");
+  if (bookMounted || !overlay || !btn) {
+    renderTutorBook(window.__nanoGPTTutor || null);
+    return;
+  }
+  bookMounted = true;
+  btn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleLessonBook();
+  });
+  close?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeLessonBook();
+  });
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeLessonBook();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !overlay.hidden) {
+      event.stopPropagation();
+      closeLessonBook();
+    }
+  });
+  window.__nanoGPTBookOpen = () => !overlay.hidden;
   renderTutorBook(window.__nanoGPTTutor || null);
+}
+
+export function toggleLessonBook() {
+  const overlay = document.getElementById("lesson-book-overlay");
+  if (!overlay) return;
+  if (overlay.hidden) openLessonBook();
+  else closeLessonBook();
+}
+
+export function openLessonBook() {
+  const overlay = document.getElementById("lesson-book-overlay");
+  const btn = document.getElementById("book-toggle");
+  if (!overlay) return;
+  overlay.hidden = false;
+  btn?.setAttribute("aria-expanded", "true");
+}
+
+export function closeLessonBook() {
+  const overlay = document.getElementById("lesson-book-overlay");
+  const btn = document.getElementById("book-toggle");
+  if (!overlay) return;
+  overlay.hidden = true;
+  btn?.setAttribute("aria-expanded", "false");
 }
 
 export function renderTutorBook(beat) {
@@ -15,10 +66,10 @@ export function renderTutorBook(beat) {
   const caption = document.getElementById("tutor-caption");
   const kicker = document.querySelector(".tutor-kicker");
   const step = document.getElementById("tutor-step");
-  if (kicker) kicker.textContent = "详细笔记";
+  if (kicker) kicker.textContent = "这一步要干什么";
   if (!beat) {
     if (purpose) purpose.textContent = "点下一步，我跟着讲";
-    if (caption) caption.textContent = "宽屏看完整课本页";
+    if (caption) caption.textContent = "宽屏才出现助教";
     if (root) root.innerHTML = "";
     if (step) step.textContent = "";
     return;
@@ -165,9 +216,13 @@ function phaseAccent(id) {
 
 export function exampleBand(stage, cardBottom) {
   const top = Math.max(cardBottom, stage.top + 90);
+  const inset = 16;
   return {
     ...stage,
     top,
+    left: stage.left + inset,
+    right: stage.right - inset,
+    w: Math.max(80, stage.w - inset * 2),
     h: Math.max(80, stage.bottom - top),
     cy: (top + stage.bottom) / 2,
   };
