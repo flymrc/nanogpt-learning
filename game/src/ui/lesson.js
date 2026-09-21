@@ -68,8 +68,11 @@ export function addPurposeBanner(scene, rect) {
   box.set = (text, index, total) => {
     purpose.setText(text);
     const maxW = rect.w - 88;
-    if (purpose.width > maxW) {
-      purpose.setFontSize(Math.max(15, Math.round(rect.h * 0.22)));
+    let size = Math.max(18, Math.round(rect.h * 0.28));
+    purpose.setFontSize(size);
+    while (purpose.width > maxW && size > 13) {
+      size -= 1;
+      purpose.setFontSize(size);
     }
     step.setText(`${index + 1} / ${total}`);
     purpose.setAlpha(0);

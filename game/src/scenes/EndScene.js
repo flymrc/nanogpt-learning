@@ -1,6 +1,5 @@
 import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
-import { REAL_BATCH, REAL_BLOCK } from "../data/facts.js";
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
@@ -52,26 +51,26 @@ export default class EndScene extends Phaser.Scene {
     const cards = [
       {
         icon: "deco-badge",
-        fallback: "Aa",
-        title: "字符变 ID",
-        caption: "词表就是 65",
-        tip: "prepare.py：字符 → id，写出 train.bin / val.bin / meta.pkl",
+        fallback: "带",
+        title: "台词拉成纸带",
+        caption: "一字一号，共 65 牌",
+        tip: "号码只是座位号。本局只有这套莎翁字符，不是宇宙词表。",
         accent: C.teal,
       },
       {
         icon: "deco-window",
-        fallback: "▭",
-        title: "窗口右移",
-        caption: "y 是下一位",
-        tip: `x = data[i:i+T]，y = data[i+1:i+1+T]。正式 T=${REAL_BLOCK}，batch=${REAL_BATCH}`,
+        fallback: "卷",
+        title: "练习卷和验收卷",
+        caption: "验收不是答题纸",
+        tip: "九成练习、一成抽查。源码里叫 train.bin / val.bin。",
         accent: C.blue,
       },
       {
         icon: "deco-star",
-        fallback: "★",
-        title: "预测下一位",
-        caption: "65 类对齐",
-        tip: "F.cross_entropy 对齐 y[t]。本游戏没有训练模型。",
+        fallback: "空",
+        title: "剪一段来填空",
+        caption: "错题分取平均",
+        tip: "y 只放在评分桌。评分看真答案被押了多少。本游戏没有训练，也不编造分数。",
         accent: C.gold,
       },
     ];
