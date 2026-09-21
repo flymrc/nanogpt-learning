@@ -6,7 +6,7 @@ import Level2Scene from "./scenes/Level2Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted } from "./audio/sound.js";
 import { mountMuteHud } from "./audio/mute-hud.js";
-import { mountTutorHost } from "./tutor/live2d-host.js";
+import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
 
@@ -103,7 +103,7 @@ async function boot() {
 
   const syncSize = () => {
     applyOuterViewport();
-    mountTutorHost();
+    syncTutorHost();
     game.registry.set("safeInsets", readSafeInsets());
     applyGameSize(game);
   };
