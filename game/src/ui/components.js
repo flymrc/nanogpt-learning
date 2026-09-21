@@ -1,44 +1,56 @@
 import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
-import { C, H, W, displayText, monoText, stickerColor, uiText } from "./theme.js";
+import { TAP_MIN, getView, scaled } from "./layout.js";
+import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
+  const v = getView(scene);
   const g = scene.add.graphics();
   g.fillGradientStyle(C.skyTop, C.skyTop, C.skyBot, C.skyBot, 1);
-  g.fillRect(0, 0, W, H);
+  g.fillRect(0, 0, v.w, v.h);
 
   const dots = [0x3b2a2e, 0xff7a85, 0xffc43d, 0x3dcec0, 0x5eb3ff, 0xc084fc];
-  for (let i = 0; i < 42; i += 1) {
-    const x = 28 + ((i * 97) % (W - 56));
-    const y = 24 + ((i * 61) % (H - 48));
+  const n = v.portrait ? 56 : 42;
+  for (let i = 0; i < n; i += 1) {
+    const x = 28 + ((i * 97) % Math.max(40, v.w - 56));
+    const y = 24 + ((i * 61) % Math.max(40, v.h - 48));
     g.fillStyle(dots[i % dots.length], 0.07 + (i % 5) * 0.012);
     g.fillCircle(x, y, 2 + (i % 3));
   }
 }
 
 export function addHeader(scene, { level, total, title }) {
-  const badge = scene.add.container(78, 46);
+  const v = getView(scene);
+  const y = v.padTop + (v.short ? 28 : 36);
+  const badge = scene.add.container(v.left + 38, y);
   const g = scene.add.graphics();
-  drawSticker(g, -38, -28, 76, 56, 18, C.coral);
+  drawSticker(g, -34, -24, 68, 48, 16, C.coral);
   badge.add(g);
-  badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(24)).setOrigin(0.5));
+  badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(20)).setOrigin(0.5));
 
-  scene.add.text(132, 46, title, displayText(34)).setOrigin(0, 0.5);
+  const titleSize = v.compact ? 22 : 34;
+  const titleText = scene.add.text(v.left + 80, y, title, displayText(titleSize)).setOrigin(0, 0.5);
 
-  const dots = scene.add.container(W - 140, 46);
+  const muteReserve = TAP_MIN + 24;
+  let dotsX = v.left + 80 + titleText.width + 56;
+  if (dotsX > v.w - muteReserve - 8) {
+    dotsX = v.left + 80 + 36;
+  }
+  const dots = scene.add.container(dotsX, y);
   for (let i = 0; i < total; i += 1) {
     const on = i + 1 === level;
     const key = on && scene.textures.exists("deco-star") ? "deco-star" : null;
     if (key) {
-      dots.add(scene.add.image(i * -36, 0, key).setScale(on ? 0.55 : 0.38).setAlpha(on ? 1 : 0.35));
+      dots.add(scene.add.image(i * 28, 0, key).setScale(on ? 0.48 : 0.32).setAlpha(on ? 1 : 0.35));
     } else {
-      dots.add(scene.add.star(i * -36, 0, 5, on ? 8 : 6, on ? 16 : 12, on ? C.gold : 0xf3d9a2));
+      dots.add(scene.add.star(i * 28, 0, 5, on ? 8 : 6, on ? 16 : 12, on ? C.gold : 0xf3d9a2));
     }
   }
 }
 
 export function addBeat(scene, { title, caption }) {
-  const wrap = scene.add.container(W / 2, 108);
+  const v = getView(scene);
+  const wrap = scene.add.container(v.cx, v.padTop + 92);
   const titleText = scene.add.text(0, -16, title, displayText(28)).setOrigin(0.5);
   const cap = scene.add.text(0, 18, caption, uiText(18, { color: C.muted })).setOrigin(0.5);
   wrap.add([titleText, cap]);
@@ -58,8 +70,8 @@ export function setBeat(beat, { title, caption }) {
 }
 
 export function createButton(scene, x, y, label, onClick, opts = {}) {
-  const w = opts.width ?? 240;
-  const h = opts.height ?? 68;
+  const w = Math.max(opts.minWidth ?? 160, opts.width ?? 240);
+  const h = Math.max(TAP_MIN, opts.height ?? 68);
   const fill = opts.fill ?? C.coral;
   const container = scene.add.container(x, y);
 
@@ -71,7 +83,7 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   draw(false);
 
   const text = scene.add
-    .text(0, -2, label, displayText(opts.fontSize ?? 28, { color: opts.textColor ?? C.text }))
+    .text(0, -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
     .setOrigin(0.5);
 
   container.add([bg, text]);
@@ -105,12 +117,13 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
 }
 
 export function addAdvanceHint(scene, text = "点一下") {
+  const v = getView(scene);
   const hint = scene.add
-    .text(W / 2, H - 26, text, uiText(16, { color: C.muted }))
+    .text(v.cx, v.bottom - 8, text, uiText(15, { color: C.muted }))
     .setOrigin(0.5);
   scene.tweens.add({
     targets: hint,
-    y: H - 32,
+    y: v.bottom - 16,
     duration: 700,
     yoyo: true,
     repeat: -1,
@@ -124,7 +137,9 @@ export function makeCharTile(scene, x, y, glyph, { width = 64, height = 64, seed
   const g = scene.add.graphics();
   const fill = stickerColor(seed);
   drawSticker(g, -width / 2, -height / 2, width, height, 16, fill);
-  const t = scene.add.text(0, -2, glyph, monoText(26, { fontStyle: "700" })).setOrigin(0.5);
+  const t = scene.add
+    .text(0, -2, glyph, monoText(Math.max(12, Math.round(width * 0.42)), { fontStyle: "700" }))
+    .setOrigin(0.5);
   box.add([g, t]);
   box.setSize(width, height);
   box.setData("graphics", g);
@@ -156,9 +171,16 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
   paintBadge(g, width, height, accent, false);
-  const clip = scene.add.rectangle(0, -height / 2 + 7, 16, 10, accent).setStrokeStyle(4, C.stroke);
-  const ch = scene.add.text(0, -10, glyph, monoText(22, { fontStyle: "700" })).setOrigin(0.5);
-  const idText = scene.add.text(0, 22, String(id), monoText(16, { fontStyle: "700" })).setOrigin(0.5);
+  const clipW = Math.max(10, width * 0.26);
+  const clip = scene.add
+    .rectangle(0, -height / 2 + Math.max(5, height * 0.08), clipW, Math.max(7, height * 0.12), accent)
+    .setStrokeStyle(Math.max(2, width * 0.06), C.stroke);
+  const ch = scene.add
+    .text(0, -height * 0.12, glyph, monoText(Math.max(11, Math.round(width * 0.4)), { fontStyle: "700" }))
+    .setOrigin(0.5);
+  const idText = scene.add
+    .text(0, height * 0.26, String(id), monoText(Math.max(9, Math.round(width * 0.28)), { fontStyle: "700" }))
+    .setOrigin(0.5);
   box.add([g, clip, ch, idText]);
   box.setSize(width, height);
   box.setData("graphics", g);
@@ -200,8 +222,12 @@ export function makeFactChip(scene, x, y, { value, label, tip, accent = C.gold, 
   const stripe = scene.add.graphics();
   stripe.fillStyle(accent, 1);
   stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 14, height - 16, 8);
-  const valueText = scene.add.text(10, -14, value, displayText(28)).setOrigin(0.5);
-  const labelText = scene.add.text(10, 22, label, uiText(16, { color: C.muted })).setOrigin(0.5);
+  const valueText = scene.add
+    .text(10, -height * 0.16, value, displayText(Math.max(16, Math.round(height * 0.3))))
+    .setOrigin(0.5);
+  const labelText = scene.add
+    .text(10, height * 0.24, label, uiText(Math.max(12, Math.round(height * 0.18)), { color: C.muted }))
+    .setOrigin(0.5);
   box.add([g, stripe, valueText, labelText]);
   box.setSize(width, height);
   box.setData("valueText", valueText);
@@ -249,22 +275,26 @@ export function showTooltip(scene, x, y, text) {
 export function makeWindowFrame(scene, x, y, width, height, color = C.blue) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
+  const sw = width < 420 ? 5 : 8;
+  const inner = width < 420 ? 4 : 6;
+  const radius = width < 420 ? 14 : 22;
   const paint = (fill) => {
     g.clear();
     g.fillStyle(C.stroke, 0.12);
-    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 8, width, height, 22);
-    g.lineStyle(8, C.stroke, 1);
-    g.strokeRoundedRect(-width / 2, -height / 2, width, height, 22);
-    g.lineStyle(6, fill, 1);
-    g.strokeRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    g.fillRoundedRect(-width / 2 + 4, -height / 2 + 6, width, height, radius);
+    g.lineStyle(sw, C.stroke, 1);
+    g.strokeRoundedRect(-width / 2, -height / 2, width, height, radius);
+    g.lineStyle(inner, fill, 1);
+    g.strokeRoundedRect(-width / 2 + inner, -height / 2 + inner, width - inner * 2, height - inner * 2, radius - 6);
     g.fillStyle(fill, 0.14);
-    g.fillRoundedRect(-width / 2 + 6, -height / 2 + 6, width - 12, height - 12, 16);
+    g.fillRoundedRect(-width / 2 + inner, -height / 2 + inner, width - inner * 2, height - inner * 2, radius - 6);
     const dots = [C.coral, C.gold, C.teal];
+    const dotR = width < 420 ? 5 : 8;
     dots.forEach((c, i) => {
       g.fillStyle(c, 1);
-      g.lineStyle(4, C.stroke, 1);
-      g.fillCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
-      g.strokeCircle(-width / 2 + 22 + i * 18, -height / 2, 8);
+      g.lineStyle(3, C.stroke, 1);
+      g.fillCircle(-width / 2 + 16 + i * 14, -height / 2, dotR);
+      g.strokeCircle(-width / 2 + 16 + i * 14, -height / 2, dotR);
     });
   };
   paint(color);
@@ -300,13 +330,16 @@ export function makeArrow(scene, x, y, { angle = 90, color = C.coral, label = ""
 }
 
 export function makePairBoard(scene, x, y) {
+  const v = getView(scene);
+  const width = Math.min(420, v.innerW - 16);
+  const height = Math.max(88, Math.min(116, width * 0.28));
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  drawSticker(g, -210, -58, 420, 116, 24, C.surface);
-  const from = scene.add.text(-120, -8, "", monoText(40, { fontStyle: "700" })).setOrigin(0.5);
-  const arrow = scene.add.text(0, -8, "→", displayText(42, { color: C.coralCss })).setOrigin(0.5);
-  const to = scene.add.text(120, -8, "", monoText(40, { fontStyle: "700" })).setOrigin(0.5);
-  const sub = scene.add.text(0, 34, "", uiText(16, { color: C.muted })).setOrigin(0.5);
+  drawSticker(g, -width / 2, -height / 2, width, height, 24, C.surface);
+  const from = scene.add.text(-width * 0.28, -8, "", monoText(Math.max(22, width * 0.1), { fontStyle: "700" })).setOrigin(0.5);
+  const arrow = scene.add.text(0, -8, "→", displayText(Math.max(24, width * 0.1), { color: C.coralCss })).setOrigin(0.5);
+  const to = scene.add.text(width * 0.28, -8, "", monoText(Math.max(22, width * 0.1), { fontStyle: "700" })).setOrigin(0.5);
+  const sub = scene.add.text(0, height * 0.28, "", uiText(15, { color: C.muted })).setOrigin(0.5);
   box.add([g, from, arrow, to, sub]);
   box.setAlpha(0);
   box.show = (left, right, note) => {
@@ -341,10 +374,11 @@ export function burstStars(scene, x, y) {
 }
 
 export function spawnConfetti(scene) {
+  const v = getView(scene);
   const colors = [C.coral, C.gold, C.teal, C.blue, C.violet, C.pink];
   for (let i = 0; i < 26; i += 1) {
     const bit = scene.add.rectangle(
-      50 + Math.random() * (W - 100),
+      50 + Math.random() * Math.max(40, v.w - 100),
       -30 - Math.random() * 120,
       12,
       18,
@@ -354,7 +388,7 @@ export function spawnConfetti(scene) {
     bit.setAngle(Math.random() * 360);
     scene.tweens.add({
       targets: bit,
-      y: H + 40,
+      y: v.h + 40,
       angle: bit.angle + 240,
       duration: 2400 + Math.random() * 1400,
       delay: Math.random() * 600,
@@ -385,8 +419,9 @@ export function makePanel(scene, x, y, width, height) {
 export function addMuteToggle(scene) {
   applyMute(scene.game, readMuted());
 
-  const size = 64;
-  const box = scene.add.container(W - 52, 48);
+  const v = getView(scene);
+  const size = Math.max(TAP_MIN, Math.min(64, Math.round(56 * v.uiScale)));
+  const box = scene.add.container(v.w - v.padRight - size / 2 - 2, v.padTop + size / 2 + 2);
   const bg = scene.add.graphics();
   const icon = scene.add.graphics();
 
@@ -479,7 +514,8 @@ export function bindAdvance(scene, advance) {
 
   scene.input.on("pointerdown", (pointer, currentlyOver) => {
     if (currentlyOver?.length) return;
-    if (pointer.x > W - 96 && pointer.y < 92) return;
+    const view = getView(scene);
+    if (pointer.x > view.w - 96 && pointer.y < view.padTop + 88) return;
     tryAdvance();
   });
 
@@ -487,9 +523,9 @@ export function bindAdvance(scene, advance) {
   scene.input.keyboard?.on("keydown-ENTER", tryAdvance);
 }
 
-export function rowPositions(count, y, tile, gap) {
+export function rowPositions(count, y, tile, gap, viewW = 1280) {
   const total = count * tile + (count - 1) * gap;
-  const start = (W - total) / 2 + tile / 2;
+  const start = (viewW - total) / 2 + tile / 2;
   return Array.from({ length: count }, (_, i) => ({
     x: start + i * (tile + gap),
     y,
@@ -510,9 +546,11 @@ export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
 }
 
 function paintBadge(g, width, height, accent, on) {
-  drawSticker(g, -width / 2, -height / 2, width, height, 16, on ? 0xfff4c2 : C.surface, {
-    lineWidth: on ? 6 : 5,
+  const radius = Math.max(8, Math.min(16, width * 0.26));
+  const stripeH = Math.max(12, height * 0.28);
+  drawSticker(g, -width / 2, -height / 2, width, height, radius, on ? 0xfff4c2 : C.surface, {
+    lineWidth: on ? 6 : Math.max(3, width * 0.08),
   });
   g.fillStyle(accent, 1);
-  g.fillRoundedRect(-width / 2 + 6, height / 2 - 28, width - 12, 22, 8);
+  g.fillRoundedRect(-width / 2 + 4, height / 2 - stripeH - 3, width - 8, stripeH, Math.max(4, radius * 0.5));
 }
