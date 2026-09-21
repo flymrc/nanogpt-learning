@@ -1,8 +1,8 @@
 import Phaser from "phaser";
-import { CHARSET, displayGlyph } from "../data/facts.js";
+import { cueVoice, unlockAudio } from "../audio/sound.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { createButton, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
-import { C, H, W, displayText, stickerColor } from "../ui/theme.js";
+import { addMuteToggle, createButton, makeCharTile, makeChip, paintBackdrop } from "../ui/components.js";
+import { C, W, displayText, stickerColor } from "../ui/theme.js";
 
 export default class TitleScene extends Phaser.Scene {
   constructor() {
@@ -11,63 +11,42 @@ export default class TitleScene extends Phaser.Scene {
 
   create() {
     paintBackdrop(this);
-    this.spawnStickerLetters();
 
-    addRobot(this, 190, 300, { scale: 1.05 });
-    addSpeechBubble(this, 400, 168, "一起闯关吧！");
+    addRobot(this, 86, 540, { scale: 0.46 });
+    addSpeechBubble(this, 250, 468, "一起闯关吧！");
 
-    const title = this.add.text(W / 2 + 80, 236, "nanoGPT 闯关", displayText(72)).setOrigin(0.5);
+    const title = this.add.text(W / 2, 168, "nanoGPT 闯关", displayText(72)).setOrigin(0.5);
     title.setScale(0.84);
     title.setAlpha(0);
     this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 520, ease: "Back.Out" });
 
-    this.add.text(W / 2 + 80, 300, "字符变数字", displayText(28, { color: C.tealCss })).setOrigin(0.5);
+    this.add.text(W / 2, 232, "字符变数字", displayText(28, { color: C.tealCss })).setOrigin(0.5);
 
     this.playPreview();
 
-    this.advance = () => this.scene.start("Level1");
-    createButton(this, W / 2 + 80, 572, "开始", () => this.advance(), { width: 280, height: 74 });
+    this.advance = () => {
+      unlockAudio(this);
+      this.scene.start("Level1");
+    };
+    createButton(this, W / 2, 572, "开始", () => this.advance(), { width: 280, height: 74 });
+    addMuteToggle(this);
+    cueVoice(this, "vo-title");
 
-    this.input.keyboard?.once("keydown-SPACE", () => this.scene.start("Level1"));
-    this.input.keyboard?.once("keydown-ENTER", () => this.scene.start("Level1"));
-  }
-
-  spawnStickerLetters() {
-    const printable = [...CHARSET].filter((ch) => ch !== "\n");
-    for (let i = 0; i < 10; i += 1) {
-      const ch = printable[(i * 9) % printable.length];
-      const tile = makeCharTile(
-        this,
-        70 + Math.random() * (W - 140),
-        40 + Math.random() * (H - 90),
-        displayGlyph(ch),
-        { width: 48, height: 48, seed: ch },
-      );
-      tile.setAlpha(0.4);
-      tile.setDepth(-1);
-      this.tweens.add({
-        targets: tile,
-        y: tile.y + (i % 2 === 0 ? 22 : -22),
-        angle: i % 2 === 0 ? 8 : -8,
-        duration: 2600 + i * 120,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.InOut",
-      });
-    }
+    this.input.keyboard?.once("keydown-SPACE", () => this.advance());
+    this.input.keyboard?.once("keydown-ENTER", () => this.advance());
   }
 
   playPreview() {
     const sample = ["S", "e", "c"];
     const ids = [31, 43, 41];
-    const y = 400;
-    const fromX = W / 2 - 20;
-    const toX = W / 2 + 250;
+    const y = 380;
+    const fromX = W / 2 - 196;
+    const toX = W / 2 + 70;
 
     const tiles = sample.map((ch, i) =>
       makeCharTile(this, fromX + i * 66, y, ch, { width: 54, height: 54, seed: ch }),
     );
-    this.add.text(fromX + 212, y, "→", displayText(36, { color: C.coralCss })).setOrigin(0.5);
+    this.add.text(W / 2, y, "→", displayText(36, { color: C.coralCss })).setOrigin(0.5);
 
     sample.forEach((ch, i) => {
       this.time.delayedCall(280 + i * 280, () => {
