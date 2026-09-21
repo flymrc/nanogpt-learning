@@ -12,7 +12,9 @@ import {
 } from "../ui/components.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { textureScale } from "../ui/dpr.js";
+import { isWidePcTutor } from "../tutor/bus.js";
 import { TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
 export default class EndScene extends Phaser.Scene {
@@ -21,12 +23,14 @@ export default class EndScene extends Phaser.Scene {
   }
 
   create() {
-    const shell = makeShell(this, { twoRow: false, headerH: 56 });
+    const phone = !isWidePcTutor();
+    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
     const v = shell.v;
     this.shell = shell;
     paintBackdrop(this);
     spawnConfetti(this);
     watchResize(this, { restart: true });
+    if (phone) syncMobileChrome({ title: "通关！" });
     addMuteToggle(this, shell);
     cueVoice(this, "vo-clear");
     emitTutor(END_BEAT);

@@ -71,3 +71,27 @@ export function stickerColor(seed) {
   const n = typeof seed === "number" ? seed : String(seed).charCodeAt(0) || 0;
   return STICKERS[Math.abs(n) % STICKERS.length];
 }
+
+/** Phaser wordWrap ignores CJK (no spaces). Split on glyphs to a pixel width. */
+export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
+  const probe = scene.add.text(-4000, -4000, "", styleFn(size)).setVisible(false);
+  const lines = [];
+  String(raw || "")
+    .split("\n")
+    .forEach((para, index) => {
+      let current = "";
+      for (const ch of para) {
+        probe.setText(current + ch);
+        if (current && probe.width > maxWidth) {
+          lines.push(current);
+          current = ch;
+        } else {
+          current += ch;
+        }
+      }
+      lines.push(current);
+      if (index < String(raw || "").split("\n").length - 1) lines.push("");
+    });
+  probe.destroy();
+  return lines.join("\n");
+}

@@ -523,7 +523,7 @@ export function bindAdvance(scene, advance) {
     if (currentlyOver?.length) return;
     const view = getView(scene);
     const pt = pointerToCss(scene, pointer);
-    if (pt.x > view.w - 360 && pt.y < view.padTop + 100) return;
+    if (document.documentElement.classList.contains("is-pc") && pt.x > view.w - 360 && pt.y < view.padTop + 100) return;
     tryAdvance();
   });
 

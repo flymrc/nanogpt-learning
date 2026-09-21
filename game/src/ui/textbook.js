@@ -1,9 +1,9 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
-import { emitTutor } from "../tutor/bus.js";
+import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
 import { layerBottom, placeLessonCta } from "./lesson.js";
-import { C, uiText } from "./theme.js";
+import { C, uiText, wrapToWidth } from "./theme.js";
 
 let bookMounted = false;
 
@@ -123,9 +123,10 @@ export function teachLesson(scene, frame, beat, { index, total, phase = 0, insta
 
 export function drawPhaseTabs(scene, stage, phase, onPick) {
   const n = LESSON_PHASES.length;
-  const gap = 8;
-  const h = 32;
-  const w = Math.min(78, (stage.w - gap * (n - 1) - 8) / n);
+  const phone = !isWidePcTutor();
+  const gap = phone ? 4 : 8;
+  const h = phone ? 30 : 32;
+  const w = Math.min(phone ? 72 : 78, (stage.w - gap * (n - 1)) / n);
   const y = stage.top + h / 2;
   const start = stage.cx - ((n - 1) * (w + gap)) / 2;
   LESSON_PHASES.forEach((item, i) => {
@@ -136,7 +137,7 @@ export function drawPhaseTabs(scene, stage, phase, onPick) {
       lineWidth: 4,
       shadow: false,
     });
-    const label = scene.add.text(0, 0, item.label, uiText(12)).setOrigin(0.5);
+    const label = scene.add.text(0, 0, item.label, uiText(phone ? 11 : 12)).setOrigin(0.5);
     tab.add([g, label]);
     tab.setSize(w, h);
     tab.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
@@ -153,40 +154,46 @@ export function drawPhaseTabs(scene, stage, phase, onPick) {
 export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
+  const phone = !isWidePcTutor();
   const cardTop = (top ?? stage.top) + rhythm;
-  const width = Math.min(stage.w - 8, 640);
-  const wrap = width - 36;
+  const width = Math.min(stage.w - (phone ? 0 : 8), 640);
+  const wrap = width - (phone ? 44 : 48);
   const body = phaseText(beat, phase);
-  const maxH = meta.id === "example" ? stage.h * 0.34 : stage.h * 0.38;
-  const title = scene.add.text(0, 0, meta.kicker, uiText(13, { color: C.goldCss })).setOrigin(0.5, 0);
-  let size = meta.id === "example" ? 14 : 15;
-  const text = scene.add
-    .text(0, 22, body, uiText(size, { wordWrap: { width: wrap }, align: "left", lineSpacing: 4 }))
-    .setOrigin(0.5, 0);
+  const maxH = phone
+    ? Math.min(stage.h * 0.42, 220)
+    : meta.id === "example"
+      ? stage.h * 0.34
+      : stage.h * 0.38;
+  let size = phone ? 14 : meta.id === "example" ? 14 : 15;
+  let wrapped = wrapToWidth(scene, body, size, wrap, uiText);
+  const title = scene.add.text(0, 0, meta.kicker, uiText(phone ? 12 : 13, { color: C.goldCss })).setOrigin(0, 0);
+  const text = scene.add.text(0, 0, wrapped, uiText(size, { align: "left", lineSpacing: 4 })).setOrigin(0, 0);
   while (text.height > maxH - 48 && size > 12) {
     size -= 1;
+    wrapped = wrapToWidth(scene, body, size, wrap, uiText);
     text.setFontSize(size);
+    text.setText(wrapped);
   }
   let extraH = 0;
   let footnote = null;
   if (meta.id === "remember" && beat.footnote) {
-    footnote = scene.add
-      .text(0, 22 + text.height + 8, beat.footnote, uiText(12, { color: C.muted, wordWrap: { width: wrap } }))
-      .setOrigin(0.5, 0);
+    const foot = wrapToWidth(scene, beat.footnote, 12, wrap, uiText);
+    footnote = scene.add.text(0, 0, foot, uiText(12, { color: C.muted })).setOrigin(0, 0);
     extraH = footnote.height + 8;
   }
-  const height = Math.min(maxH, Math.max(86, 36 + text.height + extraH + 16));
+  const height = Math.min(maxH, Math.max(phone ? 78 : 86, 36 + text.height + extraH + 16));
   const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
-  drawSticker(g, -width / 2, -height / 2, width, height, 18, C.surface);
+  drawSticker(g, -width / 2, -height / 2, width, height, phone ? 14 : 18, C.surface);
   const stripe = scene.add.graphics();
   stripe.fillStyle(phaseAccent(meta.id), 1);
-  stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 10, height - 16, 6);
-  title.setPosition(8, -height / 2 + 10);
-  text.setPosition(8, -height / 2 + 28);
+  stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 8, height - 16, 5);
+  const textX = -width / 2 + 22;
+  title.setPosition(textX, -height / 2 + 10);
+  text.setPosition(textX, -height / 2 + 28);
   box.add([g, stripe, title, text]);
   if (footnote) {
-    footnote.setPosition(8, -height / 2 + 28 + text.height + 8);
+    footnote.setPosition(textX, -height / 2 + 28 + text.height + 8);
     box.add(footnote);
   }
   box.setSize(width, height);
@@ -217,7 +224,7 @@ function phaseAccent(id) {
 export function exampleBand(stage, cardBottom, v) {
   const rhythm = lessonRhythm(v);
   const top = cardBottom + rhythm;
-  const inset = 16;
+  const inset = isWidePcTutor() ? 16 : 8;
   return {
     ...stage,
     top,
