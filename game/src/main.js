@@ -6,6 +6,8 @@ import Level2Scene from "./scenes/Level2Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted } from "./audio/sound.js";
 import { mountMuteHud } from "./audio/mute-hud.js";
+import { mountNotesHud } from "./ui/notes.js";
+import { mountGameCursor } from "./ui/cursor.js";
 import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
@@ -92,6 +94,7 @@ async function boot() {
 
   applyOuterViewport();
   mountMuteHud(() => window.__nanoGPTGame);
+  mountNotesHud();
   mountTutorHost();
 
   const game = new Phaser.Game(config);
@@ -100,6 +103,7 @@ async function boot() {
   game.registry.set("assetsReady", false);
   applyMute(game, readMuted());
   window.__nanoGPTGame = game;
+  mountGameCursor(() => window.__nanoGPTGame);
 
   const syncSize = () => {
     applyOuterViewport();
@@ -143,6 +147,14 @@ async function boot() {
       active.scene.start("Title");
     }
     return active.sys.settings.key;
+  };
+
+  window.__nanoGPTJump = (key, beat = 0) => {
+    if (key === "Level1") game.registry.set("level1.progress", { beat });
+    if (key === "Level2") game.registry.set("level2.progress", { beat });
+    const active = game.scene.getScenes(true)[0];
+    active?.scene.start(key);
+    return key;
   };
 }
 

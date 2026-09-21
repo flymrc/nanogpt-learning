@@ -227,7 +227,11 @@ function drawWindowRows(
 
   if (showY) {
     scene.frame.stage.add(
-      addSectionTag(scene, yTag, C.gold, { left: stage.left, top: layout.yY - layout.metrics.tileH / 2 - 22 }),
+      addSectionTag(scene, yTag, C.gold, {
+        left: stage.left,
+        top: layout.yY - layout.metrics.tileH / 2 - 22,
+        note: yTag.includes("挪") ? "shift" : undefined,
+      }),
     );
     const plus = makeTag(scene, win.x + winW / 2 + 22, first.y, "挪一格", C.gold);
     scene.frame.stage.add(plus);
@@ -278,7 +282,8 @@ function drawMean(scene, stage, { instant }) {
   ]);
   const tip = makeFactChip(scene, stage.cx, stage.bottom - 36, {
     value: "不编造分数",
-    label: "源码里这个平均罚分叫交叉熵",
+    label: "点我看罚分 / 猜错分",
+    note: "penalty",
     tip: "本游戏没有训练，也不写出假的 loss 数字。",
     accent: C.pink,
     width: Math.min(320, stage.w - 12),
