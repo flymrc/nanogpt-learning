@@ -58,15 +58,16 @@ body {
 
 #tutor-dock {
   display: none;
-  position: relative;
-  flex: 0 0 360px;
-  width: 360px;
-  height: 100%;
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: auto;
+  height: auto;
   box-sizing: border-box;
-  /* Same cream as the game page — no wall / gutter between them. */
-  background: #f3ebe0;
+  background: transparent;
   border: none;
-  overflow: hidden;
+  overflow: visible;
+  pointer-events: none;
 }
 
 html.is-pc #app-layout.is-wide #tutor-dock:not([hidden]) {
@@ -126,8 +127,9 @@ html.is-mobile #tutor-dock {
   width: 100%;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
-  cursor: pointer;
+  overflow: visible;
+  background: transparent;
+  pointer-events: none;
 }
 
 #tutor-canvas {
@@ -138,7 +140,8 @@ html.is-mobile #tutor-dock {
   /* Inline width/height come from JS (CSS px). Do not 100%-stretch
      a mismatched backing store — that is what caused the 重影. */
   image-rendering: auto;
-  pointer-events: auto;
+  background: transparent;
+  pointer-events: none;
 }
 
 .tutor-fallback {
@@ -209,7 +212,15 @@ html.is-pc #mobile-chrome {
 }
 
 html.is-pc #pc-chrome:not([hidden]) {
-  display: block;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  z-index: 30;
+  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
+  right: calc(var(--tutor-figure, 0px) + max(10px, env(safe-area-inset-right, 0px) + 8px));
+  pointer-events: none;
 }
 
 html.is-mobile #pc-chrome {
@@ -236,13 +247,14 @@ html.is-mobile #pc-chrome {
 }
 
 #pc-chrome .mute-toggle {
-  position: absolute;
-  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-  right: max(10px, calc(env(safe-area-inset-right, 0px) + 8px));
-  z-index: 30;
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: auto;
   width: 52px;
   height: 52px;
   padding: 0;
+  pointer-events: auto;
 }
 
 .mute-toggle:hover {
@@ -287,20 +299,14 @@ html.is-mobile #pc-chrome {
 
 #pc-chrome .notes-toggle,
 #pc-chrome .book-toggle {
-  position: absolute;
-  top: max(10px, calc(env(safe-area-inset-top, 0px) + 8px));
-  z-index: 30;
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: auto;
   height: 52px;
   padding: 0 14px;
   font-size: 16px;
-}
-
-#pc-chrome .notes-toggle {
-  right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 60px);
-}
-
-#pc-chrome .book-toggle {
-  right: calc(max(10px, env(safe-area-inset-right, 0px) + 8px) + 168px);
+  pointer-events: auto;
 }
 
 #mobile-actions .mute-toggle,

@@ -8,7 +8,7 @@ The prior `E2E_OK` that only walked first+last beats **missed** a real encode-be
 ## Layout modes (hard switch)
 
 - **Mobile:** `width < 1024` or portrait or mobile UA. Shell: `#mobile-chrome` (in-flow) + `#game-shell`. No Live2D. No desktop absolute HUD. No `挪一格` / window-frame overlays on the tape.
-- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. Left lesson | right `#tutor-dock` (Live2D only, forehead/hair free). `#mobile-chrome` hidden.
+- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. The lesson uses the full parchment. `#tutor-dock` is a full-scene transparent overlay (Live2D only): no sidebar fill, no width clip. She may hang into the lesson. Forehead and hair stay clear of notes and mute. `#mobile-chrome` hidden.
 
 Do not share absolute coordinates, 360px dock widths, or 1080px drawers across modes.
 
@@ -29,7 +29,7 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 | Viewport | What must be true |
 | --- | --- |
 | **390×844 mobile** | Walk **all 13 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 13 beats** at least once (example tab is enough if slow). Live2D-only right column, **forehead free**. |
+| **1440×900 PC** | Smoke **all 13 beats** at least once (example tab is enough if slow). Live2D overlays the same parchment, **forehead free**, no gray sidebar seam. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 

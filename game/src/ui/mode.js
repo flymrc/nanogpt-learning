@@ -1,4 +1,5 @@
 import { isWidePcTutor } from "../tutor/bus.js";
+import { tutorFigurePx } from "./tutor-lane.js";
 
 export function isPcLayout() {
   return isWidePcTutor();
@@ -11,6 +12,7 @@ export function applyLayoutMode() {
   root.classList.toggle("is-pc", pc);
   root.classList.toggle("is-mobile", !pc);
   root.dataset.layout = pc ? "pc" : "mobile";
+  root.style.setProperty("--tutor-figure", pc ? `${tutorFigurePx()}px` : "0px");
 
   const layout = document.getElementById("app-layout");
   layout?.classList.toggle("is-wide", pc);

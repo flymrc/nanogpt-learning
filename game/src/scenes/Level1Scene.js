@@ -18,7 +18,7 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
-    const frame = makeLessonFrame(this, { level: 1, total: 2, title: "先拉成纸带" });
+    const frame = makeLessonFrame(this, { level: 1, total: 2, title: "纸带和号码牌" });
     this.frame = frame;
     this.view = frame.v;
     this.beat = 0;
@@ -75,8 +75,8 @@ export default class Level1Scene extends Phaser.Scene {
     if (this.phase === 0 && beat.vo) cueVoice(this, beat.vo);
     const lastBeat = index === LEVEL1_BEATS.length - 1;
     const lastPhase = this.phase >= PHASE_COUNT - 1;
-    this.frame.nextBtn.setLabel(lastBeat && lastPhase ? "走起" : lastPhase ? "下一拍" : "下一步细节");
-    this.frame.nextBtn.setCaption(lastBeat && lastPhase ? "下一关" : lastPhase ? "下一想法" : `${this.phase + 1}/${PHASE_COUNT}`);
+    this.frame.nextBtn.setLabel(lastBeat && lastPhase ? "去下一关" : lastPhase ? "下一课" : "下一页");
+    this.frame.nextBtn.setCaption(lastBeat && lastPhase ? "第 2 关" : lastPhase ? "换一课" : `${this.phase + 1}/${PHASE_COUNT}`);
     this.children.bringToTop(this.frame.nextBtn);
 
     clearLayer(this.frame.stage);

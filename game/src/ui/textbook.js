@@ -72,13 +72,15 @@ export function renderTutorBook(beat) {
   }
   const phase = Number.isFinite(beat.phase) ? beat.phase : 0;
   root.innerHTML = "";
-  const blocks = [
-    ["这一步要干什么", beat.goal || beat.purpose, "goal"],
-    ["为什么需要这一步", beat.why, "why"],
-    ["具体例子走一遍", beat.example, "example"],
-    ["常见误会", (beat.myths || []).map((line) => `· ${line}`).join("\n"), "myth"],
-    ["一句话记住", beat.remember, "remember"],
-  ];
+  const blocks = LESSON_PHASES.map((meta) => {
+    let body = "";
+    if (meta.id === "goal") body = beat.goal || beat.purpose || "";
+    else if (meta.id === "why") body = beat.why || "";
+    else if (meta.id === "example") body = beat.example || "";
+    else if (meta.id === "myth") body = (beat.myths || []).map((line) => `· ${line}`).join("\n");
+    else if (meta.id === "remember") body = beat.remember || "";
+    return [meta.kicker, body, meta.id];
+  });
   blocks.forEach(([title, body, id]) => {
     if (!body) return;
     const sec = document.createElement("section");
@@ -102,7 +104,7 @@ export function renderTutorBook(beat) {
 export function teachLesson(scene, frame, beat, { index, total, phase = 0, instant = false }) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   frame.purpose.set(beat.purpose, index, total, {
-    kicker: "这一步要干什么",
+    kicker: "这一课",
     detail: `${phase + 1} / ${PHASE_COUNT}`,
   });
   if (frame.speech) {
