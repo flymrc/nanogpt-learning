@@ -207,8 +207,15 @@ export default class Level2Scene extends Phaser.Scene {
       duration: instant ? 0 : 460,
       ease: "Cubic.InOut",
       onComplete: () => {
-        const tagX = Math.min(this.view.right - 24, this.window.x + this.winW / 2 + 28);
-        const plus = makeTag(this, tagX, this.winY, "+1", C.gold);
+        const winRight = this.window.x + this.winW / 2;
+        const roomRight = this.view.right - winRight > 36;
+        const plus = makeTag(
+          this,
+          roomRight ? winRight + 22 : this.window.x,
+          roomRight ? this.winY : this.winY - this.winH / 2 - 16,
+          "+1",
+          C.gold,
+        );
         plus.setScale(instant ? 1 : 0.4);
         this.tweens.add({ targets: plus, scale: 1.05, duration: instant ? 0 : 220, ease: "Back.Out" });
       },
