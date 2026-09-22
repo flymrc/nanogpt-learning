@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="is-mobile" data-layout="mobile">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#f3ebe0" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>nanoGPT 闯关</title>
+    <link rel="icon" href="./assets/robot.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@500;700&family=Noto+Sans+SC:wght@500;700;900&family=ZCOOL+QingKe+HuangYou&display=swap"
+      rel="stylesheet"
+    />
+    <script type="module" crossorigin src="./assets/index-CM-M3sdT.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BpXUmM1B.css">
+  </head>
+  <body>
+    <div id="safe-probe" aria-hidden="true"></div>
+    <div id="app-layout" class="is-phone">
+      <header id="mobile-chrome" hidden>
+        <span id="mobile-badge" class="mobile-chrome__badge">1/2</span>
+        <p id="mobile-title" class="mobile-chrome__title">nanoGPT 闯关</p>
+        <div id="mobile-actions" class="mobile-chrome__actions"></div>
+      </header>
+      <div id="pc-stage">
+      <div id="pc-chrome">
+          <button
+            type="button"
+            id="mute-toggle"
+            class="mute-toggle"
+            aria-label="静音"
+            aria-pressed="false"
+            title="静音"
+          >
+            <svg class="mute-toggle__speaker" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M3.5 9.2h3.1L11 5.4v13.2L6.6 14.8H3.5V9.2z"
+                fill="currentColor"
+              />
+              <path
+                class="mute-toggle__waves"
+                d="M14.2 8.4a4.2 4.2 0 0 1 0 7.2M16.8 6.2a7.2 7.2 0 0 1 0 11.6"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              />
+            </svg>
+            <span class="mute-toggle__slash" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            id="notes-toggle"
+            class="notes-toggle"
+            aria-label="看不懂？"
+            aria-expanded="false"
+            aria-controls="notes-overlay"
+            title="看不懂？"
+          >
+            看不懂？
+          </button>
+          <button
+            type="button"
+            id="book-toggle"
+            class="book-toggle"
+            aria-label="详细笔记"
+            aria-expanded="false"
+            aria-controls="lesson-book-overlay"
+            title="详细笔记"
+          >
+            详细笔记
+          </button>
+          <button
+            type="button"
+            id="pseudo-toggle"
+            class="pseudo-toggle"
+            aria-label="伪代码"
+            aria-expanded="false"
+            aria-controls="pseudo-overlay"
+            title="伪代码"
+          >
+            伪代码
+          </button>
+          <button type="button" id="lang-toggle" class="hud-toggle" aria-label="日本語">日本語</button>
+          <button type="button" id="catalog-toggle" class="hud-toggle" aria-label="目录">目录</button>
+          <button type="button" id="back-toggle" class="hud-toggle" aria-label="返回">返回</button>
+        </div>
+        <p id="voice-note" class="voice-note">配音跟着这一课</p>
+      <div id="game-shell">
+        <div id="game"></div>
+        <div id="lesson-book-overlay" hidden>
+          <div class="lesson-book-card" role="dialog" aria-modal="true" aria-labelledby="lesson-book-title">
+            <header class="lesson-book-head">
+              <h2 id="lesson-book-title">详细笔记</h2>
+              <button type="button" id="lesson-book-close" class="notes-close" aria-label="关闭">关闭</button>
+            </header>
+            <div id="tutor-book" class="tutor-book"></div>
+          </div>
+        </div>
+      </div>
+      </div>
+      <aside id="tutor-dock" hidden>
+        <div id="tutor-stage">
+          <canvas id="tutor-canvas"></canvas>
+        </div>
+      </aside>
+    </div>
+    <div id="pseudo-overlay" hidden>
+      <div class="pseudo-card" role="dialog" aria-modal="true" aria-labelledby="pseudo-title">
+        <header class="pseudo-head">
+          <h2 id="pseudo-title">伪代码</h2>
+          <button type="button" id="pseudo-close" class="notes-close" aria-label="关闭">关闭</button>
+        </header>
+        <section class="pseudo-block">
+          <h3 id="pseudo-h-does">干什么</h3>
+          <p id="pseudo-does"></p>
+        </section>
+        <section class="pseudo-block">
+          <h3 id="pseudo-h-meta">对应纸带</h3>
+          <p id="pseudo-metaphor"></p>
+        </section>
+        <section class="pseudo-block">
+          <h3 id="pseudo-h-code">伪代码</h3>
+          <pre id="pseudo-code"></pre>
+        </section>
+        <section class="pseudo-block">
+          <h3 id="pseudo-h-myth">常见误会</h3>
+          <p id="pseudo-myth"></p>
+        </section>
+      </div>
+    </div>
+    <div id="notes-overlay" hidden>
+      <div class="notes-card" role="dialog" aria-modal="true" aria-labelledby="notes-title">
+        <header class="notes-head">
+          <h2 id="notes-title">这些词是什么意思</h2>
+          <button type="button" id="notes-close" class="notes-close" aria-label="关闭">关闭</button>
+        </header>
+        <ul id="notes-list" class="notes-list"></ul>
+        <div class="notes-detail-box">
+          <p id="notes-detail-term" class="notes-detail-term">BPE</p>
+          <p id="notes-detail" class="notes-detail">点一个词，看一句说明</p>
+        </div>
+      </div>
+    </div>
+    <div id="game-cursor" hidden aria-hidden="true">
+      <svg class="game-cursor__pointer" viewBox="0 0 48 60" width="48" height="60">
+        <path
+          class="game-cursor__body"
+          d="M5 3 L5 42 L16.5 32.2 L24 56 L34.2 52.2 L25.6 29.4 L42 29.4 Z"
+          stroke="#3b2a2e"
+          stroke-width="4"
+          stroke-linejoin="round"
+        />
+        <path class="game-cursor__core" d="M11 10 L11 29 L18.4 23.6 Z" />
+        <circle class="game-cursor__spark" cx="36" cy="14" r="5" />
+      </svg>
+    </div>
+    <div id="guide-overlay" class="sheet-overlay" hidden>
+      <div class="sheet-card guide-card" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+        <header class="sheet-head">
+          <h2 id="guide-title">先看一分钟</h2>
+          <button type="button" id="guide-close" class="notes-close">开始学</button>
+        </header>
+        <ol id="guide-cards" class="guide-steps"></ol>
+      </div>
+    </div>
+    <div id="catalog-overlay" class="sheet-overlay" hidden>
+      <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="catalog-title">
+        <header class="sheet-head">
+          <h2 id="catalog-title">目录</h2>
+          <button type="button" id="catalog-close" class="notes-close">关闭</button>
+        </header>
+        <p id="catalog-lead" class="sheet-lead"></p>
+        <div id="catalog-list" class="catalog-list"></div>
+        <button type="button" id="guide-toggle" class="sheet-link">再看导读</button>
+      </div>
+    </div>
+    <div id="chapter-sheet" class="sheet-overlay" hidden>
+      <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="chapter-sheet-title">
+        <h2 id="chapter-sheet-title"></h2>
+        <p id="chapter-sheet-body" class="sheet-lead"></p>
+        <button type="button" id="chapter-sheet-close" class="sheet-link">回到目录</button>
+      </div>
+    </div>
+    <div id="boot-splash" role="status" aria-live="polite">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <p class="boot-label">加载中…</p>
+    </div>
+  </body>
+</html>
