@@ -14,7 +14,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+SC:wght@500;700;900&family=ZCOOL+QingKe+HuangYou&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Sans+JP:wght@500;700&family=Noto+Sans+SC:wght@500;700;900&family=ZCOOL+QingKe+HuangYou&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/style.css" />
@@ -86,7 +86,11 @@
           >
             伪代码
           </button>
+          <button type="button" id="lang-toggle" class="hud-toggle" aria-label="日本語">日本語</button>
+          <button type="button" id="catalog-toggle" class="hud-toggle" aria-label="目录">目录</button>
+          <button type="button" id="back-toggle" class="hud-toggle" aria-label="返回">返回</button>
         </div>
+        <p id="voice-note" class="voice-note">配音跟着这一课</p>
       <div id="game-shell">
         <div id="game"></div>
         <div id="lesson-book-overlay" hidden>
@@ -113,19 +117,19 @@
           <button type="button" id="pseudo-close" class="notes-close" aria-label="关闭">关闭</button>
         </header>
         <section class="pseudo-block">
-          <h3>干什么</h3>
+          <h3 id="pseudo-h-does">干什么</h3>
           <p id="pseudo-does"></p>
         </section>
         <section class="pseudo-block">
-          <h3>对应纸带</h3>
+          <h3 id="pseudo-h-meta">对应纸带</h3>
           <p id="pseudo-metaphor"></p>
         </section>
         <section class="pseudo-block">
-          <h3>伪代码</h3>
+          <h3 id="pseudo-h-code">伪代码</h3>
           <pre id="pseudo-code"></pre>
         </section>
         <section class="pseudo-block">
-          <h3>常见误会</h3>
+          <h3 id="pseudo-h-myth">常见误会</h3>
           <p id="pseudo-myth"></p>
         </section>
       </div>
@@ -155,6 +159,33 @@
         <path class="game-cursor__core" d="M11 10 L11 29 L18.4 23.6 Z" />
         <circle class="game-cursor__spark" cx="36" cy="14" r="5" />
       </svg>
+    </div>
+    <div id="guide-overlay" class="sheet-overlay" hidden>
+      <div class="sheet-card guide-card" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+        <header class="sheet-head">
+          <h2 id="guide-title">先看一分钟</h2>
+          <button type="button" id="guide-close" class="notes-close">开始学</button>
+        </header>
+        <ol id="guide-cards" class="guide-steps"></ol>
+      </div>
+    </div>
+    <div id="catalog-overlay" class="sheet-overlay" hidden>
+      <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="catalog-title">
+        <header class="sheet-head">
+          <h2 id="catalog-title">目录</h2>
+          <button type="button" id="catalog-close" class="notes-close">关闭</button>
+        </header>
+        <p id="catalog-lead" class="sheet-lead"></p>
+        <div id="catalog-list" class="catalog-list"></div>
+        <button type="button" id="guide-toggle" class="sheet-link">再看导读</button>
+      </div>
+    </div>
+    <div id="chapter-sheet" class="sheet-overlay" hidden>
+      <div class="sheet-card" role="dialog" aria-modal="true" aria-labelledby="chapter-sheet-title">
+        <h2 id="chapter-sheet-title"></h2>
+        <p id="chapter-sheet-body" class="sheet-lead"></p>
+        <button type="button" id="chapter-sheet-close" class="sheet-link">回到目录</button>
+      </div>
     </div>
     <div id="boot-splash" role="status" aria-live="polite">
       <div class="boot-spinner" aria-hidden="true"></div>

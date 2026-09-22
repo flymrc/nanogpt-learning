@@ -1,3 +1,6 @@
+import { JA_NOTES } from "../i18n/copy.js";
+import { getLang } from "../i18n/locale.js";
+
 /** Lesson jargon only. Skip Live2D / engine terms. */
 export const NOTES = [
   {
@@ -59,6 +62,11 @@ export const NOTES = [
 let mounted = false;
 let openId = "";
 
+function noteEntries() {
+  if (getLang() !== "ja") return NOTES;
+  return NOTES.map((item) => ({ ...item, ...(JA_NOTES[item.id] || {}) }));
+}
+
 export function mountNotesHud() {
   const btn = document.getElementById("notes-toggle");
   const overlay = document.getElementById("notes-overlay");
@@ -86,6 +94,10 @@ export function mountNotesHud() {
 
   window.__nanoGPTOpenNote = openNote;
   window.__nanoGPTNotesOpen = () => !overlay.hidden;
+  window.addEventListener("nanogpt-lang", () => {
+    renderList();
+    if (openId) selectNote(openId);
+  });
 }
 
 export function toggleNotes(id) {
@@ -116,7 +128,7 @@ function renderList() {
   const list = document.getElementById("notes-list");
   if (!list) return;
   list.innerHTML = "";
-  NOTES.forEach((item) => {
+  noteEntries().forEach((item) => {
     const li = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
@@ -133,7 +145,8 @@ function renderList() {
 }
 
 function selectNote(id) {
-  const item = NOTES.find((note) => note.id === id) || NOTES[0];
+  const entries = noteEntries();
+  const item = entries.find((note) => note.id === id) || entries[0];
   openId = item.id;
   const detail = document.getElementById("notes-detail");
   const title = document.getElementById("notes-detail-term");

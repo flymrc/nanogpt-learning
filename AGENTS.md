@@ -47,6 +47,9 @@ Also required:
   - a 号码牌 is under 32×40, its number font is under 12px, or the number intersects the glyph or the bottom stripe.
 - Also assert the title scene. The 95-step mobile walk (19×5) and the 19 PC beats stay required; the title check is extra, not a substitute.
 - Open and close **详细笔记** and **看不懂？**
+- **导读** shows once on a fresh profile (`nanogpt-seen-guide` unset), stays hidden after dismiss + reload, and reopens from **目录**.
+- **目录** lists 5 chapters (准备 / 罚分 / 注意力 / 开训 / 采样). Playable chapters start at beat 0. 开训 and 采样 explain that they are unwritten and return to the catalog. **返回** steps to the previous phase, then the previous beat, then the previous chapter.
+- **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core beat lines and 伪代码 open are narrated (existing Chinese clips when `zh` and a clip exists; Web Speech otherwise, including all Japanese).
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
 - Mobile chips/tags must stay inside the game shell (no horizontal overflow).

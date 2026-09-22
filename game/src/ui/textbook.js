@@ -1,4 +1,5 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
+import { t } from "../i18n/locale.js";
 import { syncPseudo } from "./pseudo.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
@@ -105,7 +106,7 @@ export function renderTutorBook(beat) {
 export function teachLesson(scene, frame, beat, { index, total, phase = 0, instant = false }) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   frame.purpose.set(beat.purpose, index, total, {
-    kicker: "这一课",
+    kicker: t("thisLesson"),
     detail: `${phase + 1} / ${PHASE_COUNT}`,
   });
   if (frame.speech) {

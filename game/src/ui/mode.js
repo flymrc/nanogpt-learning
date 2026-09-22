@@ -23,12 +23,18 @@ export function applyLayoutMode() {
   if (pcChrome) pcChrome.hidden = !pc;
 
   const home = pc ? pcChrome : mobileActions;
+  const order = pc
+    ? ["pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle", "lang-toggle", "catalog-toggle", "back-toggle"]
+    : ["back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
   if (home) {
-    ["pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"].forEach((id) => {
+    order.forEach((id) => {
       const btn = document.getElementById(id);
       if (btn && btn.parentElement !== home) home.appendChild(btn);
     });
   }
+  const note = document.getElementById("voice-note");
+  const noteHome = pc ? document.getElementById("pc-stage") : mobileChrome;
+  if (note && noteHome && note.parentElement !== noteHome) noteHome.appendChild(note);
 
   const dock = document.getElementById("tutor-dock");
   if (dock && !pc) dock.hidden = true;

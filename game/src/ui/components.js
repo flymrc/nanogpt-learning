@@ -13,6 +13,7 @@ import {
   makeShell,
   scaled,
 } from "./layout.js";
+import { overlayBlocksInput } from "./catalog.js";
 import { tutorClickGuardLeft } from "./tutor-lane.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
@@ -559,9 +560,7 @@ export function addMuteToggle(scene) {
 
 export function bindAdvance(scene, advance) {
   const tryAdvance = () => {
-    if (!document.getElementById("notes-overlay")?.hidden) return;
-    if (!document.getElementById("lesson-book-overlay")?.hidden) return;
-    if (!document.getElementById("pseudo-overlay")?.hidden) return;
+    if (overlayBlocksInput()) return;
     unlockAudio(scene);
     if (scene.busy) return;
     playSfx(scene, "sfx-tap", 0.2);

@@ -1,4 +1,5 @@
-import { applyMute, ensureBgm, flushVoice, readMuted, unlockAudioContext } from "./sound.js";
+import { applyMute, ensureBgm, flushNarration, flushVoice, readMuted, unlockAudioContext } from "./sound.js";
+import { t } from "../i18n/locale.js";
 
 const DEBOUNCE_MS = 140;
 
@@ -36,6 +37,7 @@ export function mountMuteHud(getGame) {
       if (!scene) return;
       ensureBgm(scene);
       flushVoice(scene);
+      flushNarration(scene);
     }, 0);
   };
 
@@ -60,6 +62,6 @@ export function syncMuteHud(muted) {
   if (!btn) return;
   btn.classList.toggle("is-muted", muted);
   btn.setAttribute("aria-pressed", muted ? "true" : "false");
-  btn.setAttribute("aria-label", muted ? "取消静音" : "静音");
-  btn.title = muted ? "取消静音" : "静音";
+  btn.setAttribute("aria-label", muted ? t("unmute") : t("mute"));
+  btn.title = muted ? t("unmute") : t("mute");
 }

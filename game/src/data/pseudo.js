@@ -1,3 +1,5 @@
+import { JA_PSEUDO, JA_PSEUDO_FALLBACK } from "../i18n/copy.js";
+import { getLang } from "../i18n/locale.js";
 import { HEAD_SIZE, MODEL, VOCAB_SIZE } from "./facts.js";
 
 /**
@@ -203,7 +205,9 @@ const FALLBACK = {
 };
 
 export function pseudoFor(beat) {
-  return PSEUDO[beat?.id] || FALLBACK;
+  const base = PSEUDO[beat?.id] || FALLBACK;
+  if (getLang() !== "ja") return base;
+  return JA_PSEUDO[beat?.id] || JA_PSEUDO_FALLBACK;
 }
 
 for (const [id, tip] of Object.entries(PSEUDO)) {

@@ -5,7 +5,11 @@ import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
 import Level3Scene from "./scenes/Level3Scene.js";
 import EndScene from "./scenes/EndScene.js";
-import { applyMute, readMuted } from "./audio/sound.js";
+import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
+import { setLang, toggleLang } from "./i18n/locale.js";
+import { applyChromeCopy, bindVoiceNote } from "./ui/chrome.js";
+import { mountCatalog } from "./ui/catalog.js";
+import { mountGuide } from "./ui/guide.js";
 import { mountMuteHud } from "./audio/mute-hud.js";
 import { mountNotesHud } from "./ui/notes.js";
 import { mountPseudoHud } from "./ui/pseudo.js";
@@ -99,6 +103,10 @@ async function boot() {
 
   applyOuterViewport();
   applyLayoutMode();
+  applyChromeCopy();
+  bindVoiceNote();
+  mountGuide();
+  mountCatalog();
   const bootCss = cssViewportSize();
   const bootDpr = displayRatio();
   const bootGame = gamePixelSize(bootCss, bootDpr);
@@ -135,6 +143,30 @@ async function boot() {
     const dpr = displayRatio();
     game.scene.getScenes(true).forEach((scene) => syncRetinaCamera(scene, css.w, css.h, dpr));
   });
+  const onLang = () => {
+    applyLayoutMode();
+    applyChromeCopy();
+    syncSize();
+    const scene = game.scene.getScenes(true)[0];
+    if (!scene || scene.sys.settings.key === "Boot") return;
+    game.registry.set("forceSpeak", true);
+    const key = scene.sys.settings.key;
+    if (key === "Level1" || key === "Level2" || key === "Level3") {
+      const id = key === "Level1" ? "level1" : key === "Level2" ? "level2" : "level3";
+      game.registry.set(`${id}.progress`, { beat: scene.beat || 0, phase: scene.phase || 0 });
+    }
+    scene.scene.restart();
+  };
+  window.addEventListener("nanogpt-lang", onLang);
+  document.getElementById("lang-toggle")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const scene = game.scene.getScenes(true)[0];
+    if (scene) unlockAudio(scene);
+    toggleLang();
+  });
+  window.__nanoGPTSetLang = (next) => setLang(next);
+
   window.addEventListener("resize", syncSize);
   window.visualViewport?.addEventListener("resize", syncSize);
   window.visualViewport?.addEventListener("scroll", syncSize);

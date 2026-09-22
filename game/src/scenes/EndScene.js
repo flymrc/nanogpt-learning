@@ -1,7 +1,9 @@
 import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
 import { syncPseudo } from "../ui/pseudo.js";
-import { cueVoice } from "../audio/sound.js";
+import { narrateBeat } from "../audio/narrate.js";
+import { localizeBeat, t } from "../i18n/locale.js";
+import { retreatToPreviousChapter } from "../ui/catalog.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
   addMuteToggle,
@@ -31,11 +33,12 @@ export default class EndScene extends Phaser.Scene {
     paintBackdrop(this);
     spawnConfetti(this);
     watchResize(this, { restart: true });
-    if (phone) syncMobileChrome({ title: "通关！" });
+    if (phone) syncMobileChrome({ title: t("endTitle") });
     addMuteToggle(this, shell);
-    cueVoice(this, "vo-clear");
-    emitTutor(END_BEAT);
-    syncPseudo(END_BEAT);
+    const endBeat = localizeBeat(END_BEAT);
+    narrateBeat(this, END_BEAT);
+    emitTutor(endBeat);
+    syncPseudo(endBeat);
 
     const plan = layoutEnd(v, shell);
     const hero = plan.slots.hero;
@@ -47,36 +50,36 @@ export default class EndScene extends Phaser.Scene {
       this,
       v.portrait ? v.cx + 8 : robotX + 150,
       v.portrait ? robotY + plan.robotH * 0.42 : hero.top + 28,
-      "通关啦",
+      t("endSpeech"),
       { pointer: v.portrait ? "none" : "left", fontSize: v.compact ? 20 : 26, maxWidth: 200 },
     );
 
     const titleY = v.portrait ? hero.bottom - plan.titleSize * 0.55 : hero.cy + 10;
-    this.add.text(v.cx, titleY, "通关！", displayText(plan.titleSize)).setOrigin(0.5);
+    this.add.text(v.cx, titleY, t("endTitle"), displayText(plan.titleSize)).setOrigin(0.5);
 
     const cards = [
       {
         icon: "deco-badge",
         fallback: "带",
-        title: "台词拉成纸带",
-        caption: "一字一格，再领号码",
-        tip: "先把台词拉成纸带。每个字符一张号码牌。号码只是座位号。这一课只有 65 张。",
+        title: t("cardTape"),
+        caption: t("cardTapeCap"),
+        tip: t("cardTapeTip"),
         accent: C.teal,
       },
       {
         icon: "deco-window",
         fallback: "移",
-        title: "右移一格来猜",
-        caption: "罚分只看平均",
-        tip: "看见这张，猜右边那张。y 只放在评分桌上。猜错罚分不在这里编造数字。",
+        title: t("cardShift"),
+        caption: t("cardShiftCap"),
+        tip: t("cardShiftTip"),
         accent: C.blue,
       },
       {
         icon: "deco-star",
         fallback: "空",
-        title: "只看左边",
-        caption: "提问、遮罩、加总",
-        tip: "每一格回头看自己和左边。右边盖住。按重量把内容加回来。这一章没有开训。",
+        title: t("cardLook"),
+        caption: t("cardLookCap"),
+        tip: t("cardLookTip"),
         accent: C.gold,
       },
     ];
@@ -140,24 +143,17 @@ export default class EndScene extends Phaser.Scene {
     const btnW = Math.min(168, (shell.footer.w - 16) / 2);
     const btnH = clamp(shell.footer.h - 24, TAP_MIN, 68);
     const btnY = shell.footer.cy;
-    createButton(this, shell.footer.cx - btnW / 2 - 8, btnY, "再玩", () => {
+    createButton(this, shell.footer.cx - btnW / 2 - 8, btnY, t("endReplay"), () => {
       this.scene.start("Title");
-    }, { width: btnW, height: btnH });
+    }, { width: btnW, height: btnH, fontSize: 20 });
 
-    const stub = createButton(
-      this,
-      shell.footer.cx + btnW / 2 + 8,
-      btnY,
-      "下一关",
-      () => this.toast(),
-      { width: btnW, height: btnH, fill: C.surface2 },
-    );
-    stub.setAlpha(0.95);
+    createButton(this, shell.footer.cx + btnW / 2 + 8, btnY, t("endBack"), () => {
+      this.retreat();
+    }, { width: btnW, height: btnH, fill: C.surface, fontSize: 20 });
   }
 
-  toast() {
-    const v = this.shell ? this.shell.v : makeShell(this).v;
-    showTooltip(this, v.cx, this.shell.footer.top - 24, "开训还没写");
+  retreat() {
+    retreatToPreviousChapter(this);
   }
 }
 

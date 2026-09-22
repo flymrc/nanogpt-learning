@@ -2,13 +2,14 @@ import { makeCharTile, addSectionTag, makeFactChip, markCaption } from "./compon
 import { makeIconCard, popIn } from "./lesson.js";
 import { isWidePcTutor } from "../tutor/bus.js";
 import { CAPTION_CLEAR, CHIP_GAP_X, CHIP_GAP_Y, STICKER_SHADOW_Y, lessonRhythm } from "./layout.js";
+import { L } from "../i18n/locale.js";
 import { C, uiText } from "./theme.js";
 
 const GLYPHS = ["S", "e", "c", "o"];
 
 export function drawLookExample(scene, stage, { instant } = {}) {
   const rhythm = lessonRhythm(scene.frame.v);
-  scene.frame.stage.add(addSectionTag(scene, "轮到 c", C.gold, { left: stage.left, top: stage.top, note: "attn" }));
+  scene.frame.stage.add(addSectionTag(scene, L("轮到 c", "c の番"), C.gold, { left: stage.left, top: stage.top, note: "attn" }));
   const tile = Math.min(52, Math.max(32, stage.w / 8));
   const y = stage.top + 28 + rhythm + tile / 2;
   const gap = tile + Math.max(10, CHIP_GAP_X);
@@ -19,21 +20,21 @@ export function drawLookExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 20 });
   });
-  placeCaption(scene, stage, y + tile / 2, "S、e、c 能看。右边的 o 盖住。");
+  placeCaption(scene, stage, y + tile / 2, L("S、e、c 能看。右边的 o 盖住。", "S・e・c は見える。右の o は隠す。"));
 }
 
 export function drawQkvExample(scene, stage, { instant } = {}) {
   const cards = [
-    { glyph: "问", label: "提问", accent: C.coral },
-    { glyph: "签", label: "标签", accent: C.gold },
-    { glyph: "内", label: "内容", accent: C.teal },
+    { glyph: L("问", "問"), label: L("提问", "問い"), accent: C.coral },
+    { glyph: L("签", "札"), label: L("标签", "札"), accent: C.gold },
+    { glyph: L("内", "中"), label: L("内容", "中身"), accent: C.teal },
   ];
   const row = drawCards(scene, stage, cards, { instant });
   placeFact(scene, stage, row.bottom + STICKER_SHADOW_Y + CAPTION_CLEAR + 24, {
-    value: "一次切开",
-    label: "三份来自同一格",
+    value: L("一次切开", "一度に切る"),
+    label: L("三份来自同一格", "三つは同じマス"),
     note: "qkv",
-    tip: "提问去比标签。搬回来的才是内容。",
+    tip: L("提问去比标签。搬回来的才是内容。", "問いで札を比べる。運び戻すのは中身。"),
     accent: C.violet,
   });
 }
@@ -41,7 +42,7 @@ export function drawQkvExample(scene, stage, { instant } = {}) {
 export function drawMaskExample(scene, stage, { instant } = {}) {
   const phone = !isWidePcTutor();
   const rhythm = lessonRhythm(scene.frame.v);
-  scene.frame.stage.add(addSectionTag(scene, "谁在看谁", C.violet, { left: stage.left, top: stage.top, note: "mask" }));
+  scene.frame.stage.add(addSectionTag(scene, L("谁在看谁", "誰が誰を見る"), C.violet, { left: stage.left, top: stage.top, note: "mask" }));
   const cols = GLYPHS;
   const rows = ["S", "e", "c"];
   const labelCol = phone ? 18 : 22;
@@ -84,7 +85,7 @@ export function drawMaskExample(scene, stage, { instant } = {}) {
 
 export function drawWeightExample(scene, stage, { instant } = {}) {
   const rhythm = lessonRhythm(scene.frame.v);
-  scene.frame.stage.add(addSectionTag(scene, "一份重量", C.gold, { left: stage.left, top: stage.top, note: "softmax" }));
+  scene.frame.stage.add(addSectionTag(scene, L("一份重量", "一そろいの重み"), C.gold, { left: stage.left, top: stage.top, note: "softmax" }));
   const tile = Math.min(48, Math.max(32, stage.w / 8));
   const y = stage.top + 28 + rhythm + tile / 2;
   const gap = tile + Math.max(10, CHIP_GAP_X);
@@ -95,24 +96,24 @@ export function drawWeightExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(node);
     popIn(scene, node, { instant, delay: i * 16 });
   });
-  placeCaption(scene, stage, y + tile / 2, "S、e、c 加起来是一整份。o 是 0。");
+  placeCaption(scene, stage, y + tile / 2, L("S、e、c 加起来是一整份。o 是 0。", "S・e・c で一そろい。o は 0。"));
 }
 
 export function drawMixExample(scene, stage, { instant } = {}) {
   const cards = [
-    { glyph: "S", label: "内容", accent: C.teal },
-    { glyph: "e", label: "内容", accent: C.blue },
-    { glyph: "c", label: "内容", accent: C.gold },
-    { glyph: "和", label: "加总", accent: C.coral },
+    { glyph: "S", label: L("内容", "中身"), accent: C.teal },
+    { glyph: "e", label: L("内容", "中身"), accent: C.blue },
+    { glyph: "c", label: L("内容", "中身"), accent: C.gold },
+    { glyph: L("和", "和"), label: L("加总", "合計"), accent: C.coral },
   ];
   const row = drawCards(scene, stage, cards, { instant });
-  placeCaption(scene, stage, row.bottom, "o 的重量是 0，不进这个和。");
+  placeCaption(scene, stage, row.bottom, L("o 的重量是 0，不进这个和。", "o の重みは 0。この和に入らない。"));
 }
 
 export function drawWriteExample(scene, stage, { instant } = {}) {
   const phone = !isWidePcTutor();
   const rhythm = lessonRhythm(scene.frame.v);
-  scene.frame.stage.add(addSectionTag(scene, "六个头", C.pink, { left: stage.left, top: stage.top, note: "attn" }));
+  scene.frame.stage.add(addSectionTag(scene, L("六个头", "六つの頭"), C.pink, { left: stage.left, top: stage.top, note: "attn" }));
   const n = 6;
   const plusW = 18;
   const gap = Math.max(CHIP_GAP_X, 8);
@@ -143,7 +144,7 @@ export function drawWriteExample(scene, stage, { instant } = {}) {
   scene.frame.stage.add(plus);
   scene.frame.stage.add(back);
   popIn(scene, back, { instant, delay: 80 });
-  placeCaption(scene, stage, y + tile / 2, "拼好以后，加回原来的 c。");
+  placeCaption(scene, stage, y + tile / 2, L("拼好以后，加回原来的 c。", "つないだあと、元の c へ足す。"));
 }
 
 function drawCards(scene, stage, cards, { instant }) {

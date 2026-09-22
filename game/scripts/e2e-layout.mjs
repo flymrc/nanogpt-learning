@@ -97,9 +97,120 @@ async function openPseudoShot(page, key, beat, phase, file) {
   return tip;
 }
 
+async function dismissGuide(page, label) {
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 20000 });
+  const open = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === false);
+  if (!open) return false;
+  await page.screenshot({ path: `${OUT}/${label}-guide.png` });
+  await page.click("#guide-close");
+  await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === true);
+  return true;
+}
+
+async function assertGuideOnce(page) {
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 20000 });
+  await page.waitForTimeout(400);
+  const hidden = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === true);
+  if (!hidden) throw new Error("guide showed again after dismiss");
+  await page.click("#catalog-toggle");
+  await page.waitForSelector("#catalog-overlay:not([hidden])");
+  await page.click("#guide-toggle");
+  await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === false);
+  await page.click("#guide-close");
+  await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === true);
+}
+
+async function assertNav(page, label) {
+  await page.click("#catalog-toggle");
+  await page.waitForSelector("#catalog-overlay:not([hidden])");
+  const count = await page.locator("#catalog-list [data-chapter]").count();
+  if (count !== 5) throw new Error(`chapter count ${count}`);
+  await page.screenshot({ path: `${OUT}/${label}-catalog.png` });
+  await page.click("[data-chapter='Level2']");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level2");
+  await page.click("#back-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1");
+  await page.screenshot({ path: `${OUT}/${label}-back.png` });
+  await page.evaluate(() => window.__nanoGPTJump("Level2", 1, 2));
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
+  });
+  await page.click("#back-toggle");
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level2" && state.beat === 1 && state.phase === 1;
+  });
+  await page.click("#catalog-toggle");
+  await page.click("[data-chapter='sample']");
+  await page.waitForSelector("#chapter-sheet:not([hidden])");
+  const sheet = await page.evaluate(() => document.getElementById("chapter-sheet-body")?.textContent || "");
+  if (sheet.length < 8) throw new Error("sample sheet empty");
+  await page.click("#chapter-sheet-close");
+  await page.waitForSelector("#catalog-overlay:not([hidden])");
+  await page.click("#catalog-close");
+  await page.evaluate(() => window.__nanoGPTPickChapter("Level1"));
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && window.__nanoGPTState?.().beat === 0);
+}
+
+async function assertLang(page, label) {
+  await page.click("#lang-toggle");
+  await page.waitForFunction(() => document.documentElement.lang === "ja" && localStorage.getItem("nanogpt-lang") === "ja");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.__nanoGPTHome());
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Title" && typeof window.__nanoGPTAssertLayout === "function");
+  await page.waitForTimeout(500);
+  const titleLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!titleLayout?.ok) throw new Error(`ja title ${JSON.stringify(titleLayout?.overlaps || titleLayout)}`);
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && typeof window.__nanoGPTAssertLayout === "function");
+  await page.waitForTimeout(500);
+  const beatLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  const voice = await page.evaluate(() => window.__nanoGPTNarration?.() || {});
+  const note = await page.evaluate(() => document.getElementById("voice-note")?.textContent || "");
+  if (!String(voice.lang || "").startsWith("ja") || !voice.text) throw new Error(`ja voice ${JSON.stringify(voice)}`);
+  if (!note.includes("音声")) throw new Error(`voice note ${note}`);
+  if (!beatLayout?.ok) {
+    throw new Error(`ja beat ${JSON.stringify({ overlaps: beatLayout?.overlaps, overflows: beatLayout?.overflows, locals: beatLayout?.locals })}`);
+  }
+  await page.screenshot({ path: `${OUT}/${label}-ja-voice.png` });
+  await page.click("#pseudo-toggle");
+  await page.waitForTimeout(200);
+  const pseudo = await page.evaluate(() => document.getElementById("pseudo-does")?.textContent || "");
+  await page.click("#pseudo-close");
+  if (!pseudo.includes("マス")) throw new Error(`ja pseudo ${pseudo}`);
+  if (label === "mobile") {
+    const spine = await page.evaluate(() => window.__nanoGPTSpine);
+    const jobs = [
+      ...Array.from({ length: spine.l1 }, (_, beat) => ["Level1", beat]),
+      ...Array.from({ length: spine.l2 }, (_, beat) => ["Level2", beat]),
+      ...Array.from({ length: spine.l3 }, (_, beat) => ["Level3", beat]),
+    ];
+    for (const [key, beat] of jobs) {
+      for (const phase of [0, 2]) {
+        await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
+        await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+        await page.waitForTimeout(350);
+        const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+        if (!result?.ok) {
+          throw new Error(
+            `ja ${key} b${beat} p${phase} ${JSON.stringify({ overlaps: result?.overlaps, locals: result?.locals, overflows: result?.overflows })}`,
+          );
+        }
+      }
+    }
+  }
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(() => document.documentElement.lang === "ja", { timeout: 20000 });
+  const still = await page.evaluate(() => localStorage.getItem("nanogpt-lang"));
+  if (still !== "ja") throw new Error(`lang not persistent ${still}`);
+}
+
 async function runViewport(label, pageOpts, { allPhases }) {
   const page = await browser.newPage(pageOpts);
   await ready(page);
+  const guideShown = await dismissGuide(page, label);
   const spine = await page.evaluate(() => window.__nanoGPTSpine);
   if (!spine?.l1 || !spine?.l2 || !spine?.l3 || !spine?.phases) {
     throw new Error("missing __nanoGPTSpine");
@@ -167,12 +278,16 @@ async function runViewport(label, pageOpts, { allPhases }) {
   });
 
   const muteSlash = await assertMuteSlash(page);
+  await assertGuideOnce(page);
+  await assertNav(page, label);
+  await assertLang(page, label);
   await page.close();
   return {
     reports,
     bookOpen,
     notesOpen,
     muteSlash,
+    guideShown,
     walked: jobs.length,
     spine,
     pseudoEncode,
@@ -269,7 +384,8 @@ const pseudoOk =
   tipOk(pc.pseudoMask, "负无穷");
 const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
 const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !chromeOk) {
+const flowOk = mobile.guideShown && pc.guideShown;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !chromeOk || !flowOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -279,6 +395,7 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     pseudoOk,
     attnOk,
     chromeOk,
+    flowOk,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);

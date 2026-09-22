@@ -30,7 +30,7 @@ export function lessonRhythm(v) {
 /** DOM 伪代码 / 详细笔记 / 看不懂？ / mute sit in the lesson column. */
 export function hudReservePx(v) {
   if (!v || !isWidePcTutor()) return 148;
-  return 440;
+  return 720;
 }
 
 export function readSafeInsets() {

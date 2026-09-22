@@ -34,6 +34,7 @@ import {
   fitChipGrid,
   lessonRhythm,
 } from "./layout.js";
+import { L } from "../i18n/locale.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
 const CHARS = [...DEMO_SNIPPET];
@@ -41,11 +42,11 @@ const STREAM = DEMO_STREAM;
 const STREAM_GLYPHS = STREAM_CHARS;
 
 export function drawTapeExample(scene, stage, { instant } = {}) {
-  const tag = addSectionTag(scene, "纸带 · 16 格", C.pink, { left: stage.left, top: stage.top });
+  const tag = addSectionTag(scene, L("纸带 · 16 格", "テープ · 16マス"), C.pink, { left: stage.left, top: stage.top });
   scene.frame.stage.add(tag);
   const ceiling = exampleCeiling(scene, stage);
   const gridTop = stage.top + tag.height + CAPTION_CLEAR;
-  const noteRaw = "空格写成 ␣，换行写成 ↵。一个字占一格。";
+  const noteRaw = L("空格写成 ␣，换行写成 ↵。一个字占一格。", "空白は ␣、改行は ↵。一文字が一マス。");
   const noteText = wrapToWidth(scene, noteRaw, 13, stage.w - 8, uiText);
   const noteReserve = 40;
   const grid = fitChipGrid(CHARS.length, {
@@ -83,7 +84,7 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
 
 export function drawEncodeExample(scene, stage, { instant } = {}) {
   const phone = !isWidePcTutor();
-  const tag = addSectionTag(scene, "一字一号", C.gold, {
+  const tag = addSectionTag(scene, L("一字一号", "一文字一番号"), C.gold, {
     left: stage.left,
     top: stage.top,
     note: "plates",
@@ -98,7 +99,7 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     setTileActive(src, true);
     const arrow = makeIconCard(scene, stage.cx, y, {
       glyph: "→",
-      label: "发牌",
+      label: L("发牌", "配る"),
       accent: C.coral,
       width: 72,
       height: 52,
@@ -143,10 +144,10 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
   scene.frame.tapeRows = [{ name: "tape", left: stage.left, top: gridTop, w: stage.w, h: grid.height }];
   if (phone) return;
   placeFactBelow(scene, stage, gridTop + grid.height, {
-    value: "一字一号",
-    label: "不是把词切开",
+    value: L("一字一号", "一文字一番号"),
+    label: L("不是把词切开", "単語では切らない"),
     note: "bpe",
-    tip: "另一种切法叫 BPE，会把词切碎。这一课一个字符一张牌。",
+    tip: L("另一种切法叫 BPE，会把词切碎。这一课一个字符一张牌。", "別の切り方 BPE は語を砕く。この課は一文字に一枚。"),
     accent: C.violet,
     width: Math.min(320, stage.w - 12),
     height: 48,
@@ -155,16 +156,16 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
 
 export function drawSeatExample(scene, stage, { instant } = {}) {
   const cards = [
-    { glyph: "e", label: "前面的 e", accent: C.teal },
-    { glyph: "43", label: "同一张牌", accent: C.gold },
-    { glyph: "e", label: "后面的 e", accent: C.teal },
+    { glyph: "e", label: L("前面的 e", "前の e"), accent: C.teal },
+    { glyph: "43", label: L("同一张牌", "同じ札"), accent: C.gold },
+    { glyph: "e", label: L("后面的 e", "後の e"), accent: C.teal },
   ];
   const row = drawIconRow(scene, stage, { instant }, cards);
   placeFactBelow(scene, stage, row.bottom, {
-    value: "43 是座位",
-    label: "不是性格",
+    value: L("43 是座位", "43 は座席"),
+    label: L("不是性格", "性格ではない"),
     note: "plates",
-    tip: "两个 e 都是 43。号码大，也不更重要。",
+    tip: L("两个 e 都是 43。号码大，也不更重要。", "二つの e はどちらも 43。番号が大きくても大事ではない。"),
     accent: C.gold,
     width: Math.min(300, stage.w - 12),
     height: 48,
@@ -176,7 +177,7 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
   const statH = Math.min(110, Math.max(78, Math.min(stage.h * 0.32, 110)));
   const node = makeBigStat(scene, stage.cx, stage.top + statH / 2 + 4, {
     value: String(VOCAB_SIZE),
-    label: "换行、空格、标点、字母",
+    label: L("换行、空格、标点、字母", "改行、空白、記号、字母"),
     width: Math.min(280, stage.w * 0.72),
     height: statH,
     accent: C.gold,
@@ -206,9 +207,9 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(cell);
   });
   placeFactBelow(scene, stage, gridTop + grid.height, {
-    value: "只有 65 张",
-    label: "只数这套剧本",
-    tip: "剧本里出现过的字符，去重以后是 65 个。",
+    value: L("只有 65 张", "65 枚だけ"),
+    label: L("只数这套剧本", "この脚本だけ"),
+    tip: L("剧本里出现过的字符，去重以后是 65 个。", "脚本に出た文字は、重複を除くと 65。"),
     accent: C.pink,
     width: Math.min(200, stage.w * 0.4),
     height: 48,
@@ -217,14 +218,14 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
 
 export function drawScrollExample(scene, stage, { instant } = {}) {
   const row = drawIconRow(scene, stage, { instant }, [
-    { glyph: "练", label: "练习卷", accent: C.coral },
-    { glyph: "验", label: "验收卷", accent: C.gold },
+    { glyph: L("练", "練"), label: L("练习卷", "練習"), accent: C.coral },
+    { glyph: L("验", "確"), label: L("验收卷", "確認"), accent: C.gold },
   ]);
   placeFactBelow(scene, stage, row.bottom, {
-    value: "不是答题纸",
-    label: "九成学，一成抽查",
+    value: L("不是答题纸", "答案用紙ではない"),
+    label: L("九成学，一成抽查", "九割学び、一割確認"),
     note: "scrolls",
-    tip: "同一条纸带按大约 9 比 1 切开。验收卷用来抽查。",
+    tip: L("同一条纸带按大约 9 比 1 切开。验收卷用来抽查。", "同じ紙テープをおよそ 9 対 1 で切る。確認用は抜き打ち。"),
     accent: C.pink,
     width: Math.min(320, stage.w - 12),
     height: 48,
@@ -236,21 +237,22 @@ export function drawClipExample(scene, stage, opts) {
 }
 
 export function drawSeenExample(scene, stage, opts) {
-  drawWindowRows(scene, stage, opts, { showX: true, showY: false, xTag: "x 现在看见的" });
+  drawWindowRows(scene, stage, opts, { showX: true, showY: false, xTag: L("x 现在看见的", "x 今見ている") });
 }
 
 export function drawShiftExample(scene, stage, opts) {
   drawWindowRows(scene, stage, opts, {
     showX: true,
     showY: true,
-    xTag: "x 现在看见的",
-    yTag: "y 右移一格",
+    xTag: L("x 现在看见的", "x 今見ている"),
+    yTag: L("y 右移一格", "y を右へ"),
+    linkShift: true,
     alignArrows: true,
   });
 }
 
 export function drawBlankExample(scene, stage, opts) {
-  const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: "线索 x", yTag: "答案 y" });
+  const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: L("线索 x", "手がかり x"), yTag: L("答案 y", "答え y") });
   const boardH = 58;
   const boardY = (rows?.bottom || stage.top) + 40;
   if (boardY + boardH / 2 <= stage.bottom) {
@@ -259,7 +261,7 @@ export function drawBlankExample(scene, stage, opts) {
       height: boardH,
     });
     scene.frame.stage.add(board);
-    board.show("S", "e", "第 1 空：看见 S，填右边的 e");
+    board.show("S", "e", L("第 1 空：看见 S，填右边的 e", "1問目：S を見て、右の e"));
   }
 }
 
@@ -267,8 +269,8 @@ export function drawChoiceExample(scene, stage, { instant } = {}) {
   const w = Math.min(200, (stage.w - 16) / 2);
   const h = Math.min(100, stage.h * 0.34);
   [
-    { value: String(VOCAB_SIZE), label: "每题的候选", accent: C.coral },
-    { value: "1", label: "真答案只有 e", accent: C.gold },
+    { value: String(VOCAB_SIZE), label: L("每题的候选", "各問の候補"), accent: C.coral },
+    { value: "1", label: L("真答案只有 e", "正解は e だけ"), accent: C.gold },
   ].forEach((fact, i) => {
     const x = stage.cx + (i - 0.5) * (w + 12);
     const node = makeBigStat(scene, x, stage.top + h / 2 + 8, { ...fact, width: w, height: h });
@@ -278,13 +280,13 @@ export function drawChoiceExample(scene, stage, { instant } = {}) {
 }
 
 export function drawDeskExample(scene, stage, opts) {
-  drawWindowRows(scene, stage, opts, { showX: true, showY: true, xTag: "线索 x", yTag: "评分桌 y" });
+  drawWindowRows(scene, stage, opts, { showX: true, showY: true, xTag: L("线索 x", "手がかり x"), yTag: L("评分桌 y", "採点机 y"), linkShift: true });
 }
 
 export function drawScoreExample(scene, stage, { instant } = {}) {
   const rhythm = lessonRhythm(scene.frame.v);
   scene.frame.stage.add(
-    addSectionTag(scene, "只点亮真答案", C.coral, { left: stage.left, top: stage.top, note: "penalty" }),
+    addSectionTag(scene, L("只点亮真答案", "正解だけ点灯"), C.coral, { left: stage.left, top: stage.top, note: "penalty" }),
   );
   const letters = [...CHARSET];
   const gridTop = stage.top + 26 + rhythm;
@@ -313,10 +315,10 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
     scene.frame.stage.add(cell);
   });
   const tip = placeFactBelow(scene, stage, gridTop + grid.height, {
-    value: "真答案是 e",
-    label: "押得矮，罚分就大",
+    value: L("真答案是 e", "正解は e"),
+    label: L("押得矮，罚分就大", "低いと罰点が大きい"),
     note: "penalty",
-    tip: "只看真答案那一格。这一课不写假的罚分。",
+    tip: L("只看真答案那一格。这一课不写假的罚分。", "正解のマスだけを見る。偽の罰点は書かない。"),
     accent: C.coral,
     width: Math.min(340, stage.w - 12),
     height: 46,
@@ -326,15 +328,15 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
 
 export function drawMeanExample(scene, stage, { instant } = {}) {
   const row = drawIconRow(scene, stage, { instant }, [
-    { glyph: "16", label: "每格一题", accent: C.blue },
-    { glyph: "+", label: "加在一起", accent: C.violet },
-    { glyph: "均", label: "再取平均", accent: C.gold },
+    { glyph: "16", label: L("每格一题", "各1問"), accent: C.blue },
+    { glyph: "+", label: L("加在一起", "合計"), accent: C.violet },
+    { glyph: L("均", "均"), label: L("再取平均", "平均"), accent: C.gold },
   ]);
   placeFactBelow(scene, stage, row.bottom, {
-    value: "不编分数",
-    label: "通关还没训练",
+    value: L("不编分数", "点数は作らない"),
+    label: L("通关还没训练", "クリアは未学習"),
     note: "penalty",
-    tip: "这一课没有训练，也不写出假的罚分。",
+    tip: L("这一课没有训练，也不写出假的罚分。", "この課に学習は無く、偽の罰点も書かない。"),
     accent: C.pink,
     width: Math.min(320, stage.w - 12),
     height: 48,
@@ -374,7 +376,7 @@ function drawIconRow(scene, stage, { instant }, cards) {
 }
 
 function drawPlaceholders(scene, stage, top) {
-  const tag = addSectionTag(scene, "前面还有", C.violet, { left: stage.left, top });
+  const tag = addSectionTag(scene, L("前面还有", "前はまだ"), C.violet, { left: stage.left, top });
   scene.frame.stage.add(tag);
   const dot = 28;
   const gap = Math.max(CHIP_GAP_X, 8);
@@ -397,7 +399,7 @@ function drawWindowRows(
   scene,
   stage,
   { instant } = {},
-  { showX, showY, highlight = -1, allOn = false, notFromStart = false, xTag = "现在看到的牌", yTag = "下一字" },
+  { showX, showY, highlight = -1, allOn = false, notFromStart = false, linkShift = false, xTag = L("现在看到的牌", "今の札"), yTag = L("下一字", "次の字") },
 ) {
   const phone = !isWidePcTutor();
   const ceiling = exampleCeiling(scene, stage);
@@ -410,7 +412,7 @@ function drawWindowRows(
     {
       id: "stream",
       name: "row-stream",
-      label: notFromStart ? "纸带 · 前面还有" : "纸带",
+      label: notFromStart ? L("纸带 · 前面还有", "テープ · 前はまだ") : L("纸带", "テープ"),
       accent: C.violet,
       count: STREAM.length,
     },
@@ -423,7 +425,7 @@ function drawWindowRows(
       label: yTag,
       accent: C.gold,
       count: DEMO_Y_IDS.length,
-      note: yTag.includes("挪") || yTag.includes("右移") || yTag.includes("评分") ? "shift" : undefined,
+      note: linkShift ? "shift" : undefined,
     });
   }
 

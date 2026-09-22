@@ -1,4 +1,4 @@
-import { cueVoice } from "../audio/sound.js";
+import { t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
@@ -7,7 +7,7 @@ import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
 import { C, displayText, uiText, wrapToWidth } from "./theme.js";
 
-export function makeLessonFrame(scene, { level, total, title, startLabel = "下一步" }) {
+export function makeLessonFrame(scene, { level, total, title, startLabel } = {}) {
   const phone = !isWidePcTutor();
   const shell = makeShell(scene, phone ? { header: false, footerH: 84 } : {});
   const v = shell.v;
@@ -40,8 +40,8 @@ export function makeLessonFrame(scene, { level, total, title, startLabel = "下�
 
   const nextBtn = addFooterCta(scene, {
     shell,
-    label: startLabel,
-    caption: "点一下",
+    label: startLabel || t("nextPage"),
+    caption: t("tap"),
     onClick: () => scene.advance?.(),
   });
 
@@ -150,7 +150,7 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
   box.add([g, stripe, kicker, purpose, step]);
   box.setSize(rect.w, rect.h);
   box.set = (text, index, total, extra = {}) => {
-    kicker.setText(extra.kicker || "这一课");
+    kicker.setText(extra.kicker || t("thisLesson"));
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
     const maxW = phone ? rect.w - 40 : rect.w - 88 - hang;
@@ -172,7 +172,6 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
 export function teach(scene, purposeUi, speech, beat, { index, total }) {
   purposeUi.set(beat.purpose, index, total);
   if (speech) setSpeech(speech, beat.caption);
-  if (beat.vo) cueVoice(scene, beat.vo);
   emitTutor({
     ...beat,
     index,

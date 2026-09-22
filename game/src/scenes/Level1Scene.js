@@ -1,6 +1,9 @@
 import Phaser from "phaser";
-import { CHAPTER_COUNT, LEVEL1_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
-import { cueVoice } from "../audio/sound.js";
+import { LEVEL1_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
+import { CHAPTERS } from "../i18n/copy.js";
+import { t } from "../i18n/locale.js";
+import { retreatToPreviousChapter } from "../ui/catalog.js";
+import { ctaFor, presentBeat } from "../ui/lesson-nav.js";
 import {
   drawEncodeExample,
   drawScrollExample,
@@ -18,7 +21,7 @@ export default class Level1Scene extends Phaser.Scene {
   }
 
   create() {
-    const frame = makeLessonFrame(this, { level: 1, total: CHAPTER_COUNT, title: "纸带和号码牌" });
+    const frame = makeLessonFrame(this, { level: 1, total: CHAPTERS.length, title: t("level1Title") });
     this.frame = frame;
     this.view = frame.v;
     this.beat = 0;
@@ -45,7 +48,7 @@ export default class Level1Scene extends Phaser.Scene {
     if (this.busy) return;
     if (this.phase < PHASE_COUNT - 1) {
       this.phase += 1;
-      this.showBeat(this.beat, { phase: this.phase });
+      this.showBeat(this.beat, { phase: this.phase, speak: false });
       return;
     }
     if (this.beat >= LEVEL1_BEATS.length - 1) {
@@ -58,25 +61,48 @@ export default class Level1Scene extends Phaser.Scene {
     this.showBeat(this.beat);
   }
 
-  setPhase(phase) {
-    this.phase = Math.max(0, Math.min(PHASE_COUNT - 1, phase));
-    this.showBeat(this.beat, { phase: this.phase, instant: true });
+  retreat() {
+    if (this.busy) return;
+    if (this.phase > 0) {
+      this.phase -= 1;
+      this.showBeat(this.beat, { phase: this.phase, instant: true, speak: false });
+      return;
+    }
+    if (this.beat > 0) {
+      this.beat -= 1;
+      this.phase = PHASE_COUNT - 1;
+      this.showBeat(this.beat, { phase: this.phase, instant: true, speak: false });
+      return;
+    }
+    retreatToPreviousChapter(this);
   }
 
-  showBeat(index, { instant = false, phase } = {}) {
+  setPhase(phase) {
+    this.phase = Math.max(0, Math.min(PHASE_COUNT - 1, phase));
+    this.showBeat(this.beat, { phase: this.phase, instant: true, speak: false });
+  }
+
+  showBeat(index, { instant = false, phase, speak } = {}) {
     this.phase = phase ?? this.phase ?? 0;
-    const beat = LEVEL1_BEATS[index];
+    const raw = LEVEL1_BEATS[index];
+    const beat = presentBeat(this, raw, { speak });
     teachLesson(this, this.frame, beat, {
       index,
       total: SPINE_TOTAL,
       phase: this.phase,
       instant,
     });
-    if (this.phase === 0 && beat.vo) cueVoice(this, beat.vo);
     const lastBeat = index === LEVEL1_BEATS.length - 1;
     const lastPhase = this.phase >= PHASE_COUNT - 1;
-    this.frame.nextBtn.setLabel(lastBeat && lastPhase ? "去下一关" : lastPhase ? "下一课" : "下一页");
-    this.frame.nextBtn.setCaption(lastBeat && lastPhase ? "第 2 关" : lastPhase ? "换一课" : `${this.phase + 1}/${PHASE_COUNT}`);
+    const cta = ctaFor({
+      lastBeat,
+      lastPhase,
+      phase: this.phase,
+      endLabel: t("toLevel2"),
+      endCaption: t("toLevel2Hint"),
+    });
+    this.frame.nextBtn.setLabel(cta.label);
+    this.frame.nextBtn.setCaption(cta.caption);
     this.children.bringToTop(this.frame.nextBtn);
 
     clearLayer(this.frame.stage);

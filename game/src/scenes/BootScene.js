@@ -3,6 +3,7 @@ import { applyMute, preloadAudio, readMuted } from "../audio/sound.js";
 import { displayRatio } from "../ui/dpr.js";
 import { getView, hideBootSplash, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { drawSticker } from "../ui/components.js";
+import { t } from "../i18n/locale.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
 export default class BootScene extends Phaser.Scene {
@@ -106,9 +107,9 @@ export default class BootScene extends Phaser.Scene {
     });
 
     const title = this.add
-      .text(cx, slots.title.cy, "nanoGPT 闯关", displayText(titleSize))
+      .text(cx, slots.title.cy, t("appTitle"), displayText(titleSize))
       .setOrigin(0.5);
-    const status = this.add.text(cx, slots.status.cy, "加载中", uiText(18, { color: C.muted })).setOrigin(0.5);
+    const status = this.add.text(cx, slots.status.cy, t("bootLoading"), uiText(18, { color: C.muted })).setOrigin(0.5);
     const percent = this.add.text(cx, slots.pct.cy, "0%", displayText(36)).setOrigin(0.5);
     root.add([title, status, percent]);
 
@@ -121,7 +122,7 @@ export default class BootScene extends Phaser.Scene {
     const barFill = this.add.graphics();
     root.add([barBg, barFill]);
 
-    const hint = this.add.text(cx, slots.hint.cy, "图片 · 音频", uiText(14, { color: C.muted })).setOrigin(0.5);
+    const hint = this.add.text(cx, slots.hint.cy, t("bootHint"), uiText(14, { color: C.muted })).setOrigin(0.5);
     root.add(hint);
 
     this.ui = { root, status, percent, barFill, barW, barH, barX, barY, spinner };
@@ -132,7 +133,7 @@ export default class BootScene extends Phaser.Scene {
     if (!this.ui) this.buildLoader();
     const pct = Math.round(Math.max(0, Math.min(1, value)) * 100);
     this.ui.percent.setText(`${pct}%`);
-    this.ui.status.setText(pct >= 100 ? "就绪" : "加载中");
+    this.ui.status.setText(pct >= 100 ? t("bootReady") : t("bootLoading"));
     const { barFill, barW, barH, barX, barY } = this.ui;
     barFill.clear();
     const fillW = Math.max(0, (barW - 10) * (pct / 100));
