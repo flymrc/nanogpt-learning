@@ -2,7 +2,17 @@ import Phaser from "phaser";
 import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
 import { openNote } from "./notes.js";
 import { pointerToCss, textureScale } from "./dpr.js";
-import { TAP_MIN, clamp, getView, hudReservePx, makeShell, scaled } from "./layout.js";
+import {
+  MIN_ID_FONT,
+  STICKER_SHADOW_X,
+  STICKER_SHADOW_Y,
+  TAP_MIN,
+  clamp,
+  getView,
+  hudReservePx,
+  makeShell,
+  scaled,
+} from "./layout.js";
 import { tutorClickGuardLeft } from "./tutor-lane.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
@@ -121,6 +131,9 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
     drawSticker(bg, -w / 2, -h / 2, w, h, 22, hover ? 0xff9aa2 : fill, { shadow: true });
   };
   draw(false);
+  container.setData("width", w);
+  container.setData("height", h);
+  container.setData("shadow", true);
 
   const text = scene.add
     .text(0, caption ? -12 : -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
@@ -183,16 +196,17 @@ export function makeCharTile(scene, x, y, glyph, { width = 64, height = 64, seed
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
   const fill = stickerColor(seed);
-  drawSticker(g, -width / 2, -height / 2, width, height, 16, fill);
-  const t = scene.add
-    .text(0, -2, glyph, monoText(Math.max(14, Math.round(width * 0.44)), { fontStyle: "700" }))
-    .setOrigin(0.5);
+  drawSticker(g, -width / 2, -height / 2, width, height, Math.min(16, width * 0.28), fill);
+  const font = Math.max(12, Math.min(Math.round(width * 0.42), Math.round(height * 0.42)));
+  const t = scene.add.text(0, -1, glyph, monoText(font, { fontStyle: "700" })).setOrigin(0.5);
   box.add([g, t]);
   box.setSize(width, height);
   box.setData("graphics", g);
   box.setData("label", t);
+  box.setData("kind", "tile");
   box.setData("width", width);
   box.setData("height", height);
+  box.setData("shadow", true);
   box.setData("fill", fill);
   return box;
 }
@@ -203,55 +217,86 @@ export function setTileActive(tile, on) {
   const height = tile.getData("height");
   const fill = tile.getData("fill");
   g.clear();
-  drawSticker(g, -width / 2, -height / 2, width, height, 16, on ? C.gold : fill, {
-    lineWidth: on ? 7 : 5,
-  });
-  tile.scene.tweens.add({
-    targets: tile,
-    scale: on ? 1.12 : 1,
-    duration: 140,
-    ease: "Back.Out",
+  drawSticker(g, -width / 2, -height / 2, width, height, Math.min(16, width * 0.28), on ? C.gold : fill, {
+    lineWidth: on ? 5 : 4,
   });
 }
 
 export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, height = 82 } = {}) {
   const box = scene.add.container(x, y);
   const g = scene.add.graphics();
-  const compact = height < 50 || width < 34;
-  paintBadge(g, width, height, accent, false, { compact });
-  const parts = [g];
-  if (!compact) {
-    const clipW = Math.max(10, width * 0.26);
-    const clip = scene.add
-      .rectangle(0, -height / 2 + Math.max(5, height * 0.08), clipW, Math.max(7, height * 0.12), accent)
-      .setStrokeStyle(Math.max(2, width * 0.06), C.stroke);
-    parts.push(clip);
+  const stripeH = Math.max(6, Math.min(12, Math.round(height * 0.16)));
+  paintBadge(g, width, height, accent, false, { stripeH });
+  let glyphSize = Math.min(22, Math.max(MIN_ID_FONT, Math.round(width * 0.42)));
+  let idSize = Math.min(16, Math.max(MIN_ID_FONT, Math.round(width * 0.32)));
+  if (height < 52) {
+    glyphSize = MIN_ID_FONT;
+    idSize = MIN_ID_FONT;
   }
-  const ch = scene.add
-    .text(
-      0,
-      compact ? -height * 0.18 : -height * 0.12,
-      glyph,
-      monoText(Math.max(compact ? 8 : 13, Math.round(width * (compact ? 0.4 : 0.44))), { fontStyle: "700" }),
-    )
-    .setOrigin(0.5);
-  const idText = scene.add
-    .text(
-      0,
-      compact ? height * 0.22 : height * 0.26,
-      String(id),
-      monoText(Math.max(compact ? 7 : 12, Math.round(width * (compact ? 0.26 : 0.3))), { fontStyle: "700" }),
-    )
-    .setOrigin(0.5);
-  parts.push(ch, idText);
+  const ch = scene.add.text(0, 0, glyph, monoText(glyphSize, { fontStyle: "700" })).setOrigin(0.5);
+  const idText = scene.add.text(0, 0, String(id), monoText(idSize, { fontStyle: "700" })).setOrigin(0.5);
+  const room = height - stripeH - 4;
+  let guard = 0;
+  while (ch.height + idText.height + 2 > room + 0.5 && guard < 16) {
+    if (glyphSize > idSize && glyphSize > MIN_ID_FONT) glyphSize -= 1;
+    else if (idSize > MIN_ID_FONT) idSize -= 1;
+    else break;
+    ch.setFontSize(glyphSize);
+    idText.setFontSize(idSize);
+    guard += 1;
+  }
+  const textOk = layoutChipText(ch, idText, height, stripeH) && idSize >= MIN_ID_FONT;
+  const parts = [g, ch, idText];
+  if (height >= 56) {
+    const clipH = Math.max(6, height * 0.1);
+    const clipY = -height / 2 + clipH / 2 + 3;
+    const glyphTop = ch.y - ch.height / 2;
+    if (glyphTop >= clipY + clipH / 2 + 2) {
+      const clipW = Math.max(10, width * 0.26);
+      parts.splice(
+        1,
+        0,
+        scene.add
+          .rectangle(0, clipY, clipW, clipH, accent)
+          .setStrokeStyle(Math.max(2, Math.min(4, width * 0.06)), C.stroke),
+      );
+    }
+  }
   box.add(parts);
   box.setSize(width, height);
   box.setData("graphics", g);
   box.setData("accent", accent);
+  box.setData("kind", "chip");
   box.setData("width", width);
   box.setData("height", height);
-  box.setData("compact", compact);
+  box.setData("shadow", true);
+  box.setData("stripeH", stripeH);
+  box.setData("idFont", idSize);
+  box.setData("textOk", textOk);
   return box;
+}
+
+function layoutChipText(ch, idText, height, stripeH) {
+  const regionTop = -height / 2 + 2;
+  const regionBot = height / 2 - stripeH - 2;
+  const gap = 2;
+  const block = ch.height + gap + idText.height;
+  const room = regionBot - regionTop;
+  const y0 = regionTop + Math.max(0, (room - block) / 2);
+  ch.setY(y0 + ch.height / 2);
+  idText.setY(y0 + ch.height + gap + idText.height / 2);
+  const glyphTop = ch.y - ch.height / 2;
+  const glyphBottom = ch.y + ch.height / 2;
+  const idTop = idText.y - idText.height / 2;
+  const idBottom = idText.y + idText.height / 2;
+  return glyphTop >= regionTop - 0.5 && idTop >= glyphBottom - 0.25 && idBottom <= regionBot + 0.5;
+}
+
+/** Mark a Phaser text as a caption so the layout probe can measure it. */
+export function markCaption(text) {
+  text.setData("kind", "caption");
+  text.setData("shadow", false);
+  return text;
 }
 
 export function pulseChip(scene, chip) {
@@ -270,13 +315,7 @@ export function highlightChip(scene, chip, on = true) {
   const width = chip.getData("width");
   const height = chip.getData("height");
   g.clear();
-  paintBadge(g, width, height, on ? C.gold : accent, on, { compact: chip.getData("compact") });
-  scene.tweens.add({
-    targets: chip,
-    scale: on ? 1.1 : 1,
-    duration: 140,
-    ease: "Back.Out",
-  });
+  paintBadge(g, width, height, on ? C.gold : accent, on, { stripeH: chip.getData("stripeH") });
 }
 
 export function makeFactChip(scene, x, y, { value, label, tip, note, accent = C.gold, width = 200, height = 96 }) {
@@ -299,6 +338,10 @@ export function makeFactChip(scene, x, y, { value, label, tip, note, accent = C.
     : null;
   box.add(hint ? [g, stripe, valueText, labelText, hint] : [g, stripe, valueText, labelText]);
   box.setSize(width, height);
+  box.setData("kind", "label");
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("shadow", true);
   box.setData("valueText", valueText);
   box.setValue = (next) => valueText.setText(next);
   box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
@@ -478,6 +521,10 @@ export function makeTag(scene, x, y, text, accent = C.blue, opts = {}) {
   const g = scene.add.graphics();
   drawSticker(g, -w / 2, -h / 2, w, h, 10, accent, { lineWidth: 4, shadow: false });
   tag.add([g, label]);
+  tag.setData("kind", "label");
+  tag.setData("width", w);
+  tag.setData("height", h);
+  tag.setData("shadow", false);
   if (opts.note) {
     tag.add(scene.add.text(w / 2 - 9, 0, "?", uiText(12, { color: C.text })).setOrigin(0.5));
     tag.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
@@ -555,7 +602,7 @@ export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
   const sw = opts.lineWidth ?? 6;
   if (opts.shadow !== false) {
     g.fillStyle(C.stroke, 0.2);
-    g.fillRoundedRect(x + 5, y + 8, w, h, r);
+    g.fillRoundedRect(x + STICKER_SHADOW_X, y + STICKER_SHADOW_Y, w, h, r);
   }
   g.fillStyle(fill, 1);
   g.lineStyle(sw, stroke, 1);
@@ -564,13 +611,13 @@ export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
 }
 
 function paintBadge(g, width, height, accent, on, opts = {}) {
-  const compact = opts.compact;
-  const radius = Math.max(compact ? 4 : 8, Math.min(16, width * 0.26));
-  const stripeH = Math.max(compact ? 8 : 12, height * (compact ? 0.22 : 0.28));
+  const radius = Math.max(6, Math.min(16, width * 0.24));
+  const stripeH = opts.stripeH ?? Math.max(6, Math.min(12, Math.round(height * 0.16)));
+  const lineWidth = on ? 4 : Math.max(2, Math.min(4, width * 0.08));
   drawSticker(g, -width / 2, -height / 2, width, height, radius, on ? 0xfff4c2 : C.surface, {
-    lineWidth: on ? 6 : Math.max(compact ? 2 : 3, width * 0.08),
-    shadow: !compact,
+    lineWidth,
+    shadow: true,
   });
   g.fillStyle(accent, 1);
-  g.fillRoundedRect(-width / 2 + 4, height / 2 - stripeH - 3, width - 8, stripeH, Math.max(4, radius * 0.5));
+  g.fillRoundedRect(-width / 2 + 4, height / 2 - stripeH - 3, width - 8, stripeH, Math.max(3, radius * 0.45));
 }
