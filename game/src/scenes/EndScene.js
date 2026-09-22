@@ -76,7 +76,15 @@ export default class EndScene extends Phaser.Scene {
         fallback: "空",
         title: "只看左边",
         caption: "提问、遮罩、加总",
-        tip: "每一格回头看自己和左边。右边盖住。按重量把内容加回来。这一章没有开训。",
+        tip: "每一格回头看自己和左边。右边盖住。按重量把内容加回来。",
+        accent: C.violet,
+      },
+      {
+        icon: "deco-scroll",
+        fallback: "训",
+        title: "按罚分改一笔",
+        caption: "验收更好才存档",
+        tip: "一批窗口：往前算，记罚分，往回传，AdamW 改一笔。遮罩不动。采样还没写。",
         accent: C.gold,
       },
     ];
@@ -87,7 +95,8 @@ export default class EndScene extends Phaser.Scene {
     const stack = plan.stackCards;
 
     cards.forEach((card, i) => {
-      const x = stack ? v.cx : v.cx + (i - 1) * Math.min(cardW + 16, v.innerW / 3 + 8);
+      const pitch = Math.min(cardW + 12, (v.innerW - 8) / cards.length);
+      const x = stack ? v.cx : v.cx + (i - (cards.length - 1) / 2) * pitch;
       const y = stack ? cardBand.top + cardH / 2 + i * (cardH + plan.cardGap) : cardBand.cy;
       const panel = this.add.container(x, y);
       const g = this.add.graphics();
@@ -101,7 +110,7 @@ export default class EndScene extends Phaser.Scene {
           this.add
             .image(iconX, iconY, card.icon)
             .setScale(
-              textureScale(card.icon === "deco-star" ? (stack ? 0.5 : 0.62) : stack ? 0.46 : 0.64),
+              textureScale(card.icon === "deco-star" ? (stack ? 0.42 : 0.5) : stack ? 0.4 : 0.52),
             ),
         );
       } else {
@@ -148,7 +157,7 @@ export default class EndScene extends Phaser.Scene {
       this,
       shell.footer.cx + btnW / 2 + 8,
       btnY,
-      "下一关",
+      "采样",
       () => this.toast(),
       { width: btnW, height: btnH, fill: C.surface2 },
     );
@@ -157,7 +166,7 @@ export default class EndScene extends Phaser.Scene {
 
   toast() {
     const v = this.shell ? this.shell.v : makeShell(this).v;
-    showTooltip(this, v.cx, this.shell.footer.top - 24, "开训还没写");
+    showTooltip(this, v.cx, this.shell.footer.top - 24, "采样还没写");
   }
 }
 
@@ -169,12 +178,13 @@ function layoutEnd(v, shell) {
     const robotScale = (v.compact ? 0.36 : 0.48) * Math.min(1, s + 0.08);
     const robotH = 200 * robotScale;
     const heroH = v.portrait ? robotH + 36 + titleSize : Math.max(robotH, titleSize + 24);
-    const cardW = stackCards ? Math.min(300, v.innerW - 8) : Math.min(280, (v.innerW - 24) / 3);
+    const cardCount = 4;
+    const cardW = stackCards ? Math.min(300, v.innerW - 8) : Math.min(220, (v.innerW - 36) / cardCount);
     const cardGap = Math.round(10 * s);
     const cardH = stackCards
-      ? clamp((shell.content.h - heroH - 24) / 3 - cardGap, 72, 112)
-      : clamp(140 * s, 88, 160);
-    const cardsH = stackCards ? cardH * 3 + cardGap * 2 : cardH;
+      ? clamp((shell.content.h - heroH - 24) / cardCount - cardGap, 68, 96)
+      : clamp(128 * s, 88, 150);
+    const cardsH = stackCards ? cardH * cardCount + cardGap * (cardCount - 1) : cardH;
     const gapY = Math.round(12 * s);
     const items = [
       { id: "hero", h: heroH },

@@ -1,4 +1,15 @@
-import { DATASET, DEMO_NEXT_CHAR, DEMO_SNIPPET, HEAD_SIZE, MODEL, VOCAB_SIZE } from "./facts.js";
+import {
+  DATASET,
+  DEMO_NEXT_CHAR,
+  DEMO_SNIPPET,
+  HEAD_SIZE,
+  MODEL,
+  REAL_BATCH,
+  REAL_BLOCK,
+  TOKENS_PER_ITER,
+  TRAIN,
+  VOCAB_SIZE,
+} from "./facts.js";
 
 /** 每一课五个小块。一块只讲一个意思，句子要短。 */
 export const LESSON_PHASES = [
@@ -262,18 +273,98 @@ const L3 = [
     note: "attn",
     goal: "注意力的结果加回原来的这一格。格子还在，不是换成别的纸带。",
     why: "如果直接覆盖，原来的号码信息会丢。加上去，这一格既记得自己，也记得左边。",
-    example: `六个头各做一遍提问、遮罩、重量、加总，拼成宽 ${MODEL.nEmbd}，加回 c 这一格。同一块后面还有另一层。这一章先停在这里。没有开训。`,
+    example: `六个头各做一遍提问、遮罩、重量、加总，拼成宽 ${MODEL.nEmbd}，加回 c 这一格。同一块后面还有另一层。这一章先停在这里。开训在下一章。`,
     myths: ["不是已经猜出下一个字。猜字还在更后面。", "不是六个模型。是六个头同时看同一条纸带。"],
     remember: "看完左边，加回自己这一格。",
     footnote: `x = x + 注意力(层归一化(x))。${MODEL.nLayer} 层，${MODEL.nHead} 头，dropout ${MODEL.dropout}。MLP 这一章不展开。`,
   },
 ];
 
+const L4 = [
+  {
+    id: "random",
+    purpose: "一开始只是乱猜",
+    caption: "先把练习卷上的罚分往下压",
+    mood: "point",
+    note: "train",
+    goal: "模型刚出生时，里面的数是随手填的。开训是让它在练习卷上，把猜下一个字的罚分慢慢压低。",
+    why: "纸带、右移、只看左边，都还没改这些数。不改，它就一直乱猜。验收卷放在旁边看，不能只盯练习卷。",
+    example:
+      "同一条纸带：九成是练习卷 train.bin，一成是验收卷 val.bin。开训改的是模型里的数，不是把答案印上纸带。这一课不写假的罚分。",
+    myths: ["不是已经会写莎翁了。刚开始只是乱猜。", "不是只背练习卷。验收卷要看着，但不拿来改数。"],
+    remember: "开训是把练习卷上的猜错罚分往下压，并看着验收卷。",
+    footnote: "从零开始时，线性层和号码表用正态分布初始化，均值 0，标准差 0.02。init_from 默认是 scratch。",
+  },
+  {
+    id: "step",
+    purpose: "一步改一笔",
+    caption: "一批窗口，改一次",
+    mood: "talk",
+    note: "train",
+    goal: "一步做完这些事：剪一批 (x, y)，往前算，记下罚分，把错往回传，再让 AdamW 改一笔。",
+    why: "只往前算，罚分看得见，数却不动。往回传之后，优化器才按这一步的错，把数挪一点。",
+    example: `这一课一批是 ${REAL_BATCH} 段，每段 ${REAL_BLOCK} 格。梯度累加是 ${TRAIN.gradAccum}，所以这一步就改一次。单进程每步 ${TOKENS_PER_ITER.toLocaleString("zh-CN")} 个字符。`,
+    myths: ["不是把整本剧本一次读完。一步只剪一批窗口。", "不是手改每一个数。AdamW 按罚分来挪。"],
+    remember: "一批窗口：往前算，记罚分，往回传，AdamW 改一笔。",
+    footnote: `优化器是 AdamW。betas 是 ${TRAIN.beta1} 和 ${TRAIN.beta2}。学习率从 ${TRAIN.learningRate} 按余弦降到 ${TRAIN.minLr}，前 ${TRAIN.warmupIters} 步先热身。梯度裁到 ${TRAIN.gradClip}。`,
+  },
+  {
+    id: "rewrite",
+    purpose: "改块里的数",
+    caption: "遮罩不参与改",
+    mood: "point",
+    goal: "被改的是要学习的数：注意力里的投影，MLP 里的两层，还有号码表和位置表。",
+    why: "这些数决定怎么看左边、怎么混合。罚分变了，就顺着它们往回传。遮罩是盖住右边的规则，不是要学的数。",
+    example: `一共 ${MODEL.nLayer} 块。每一块先注意力，再 MLP，都加回原来的格子。号码表和最后打分的那一层是同一份。这里不逐个张量点名。`,
+    myths: ["不是把纸带上的字符改掉。改的是模型里的数。", "不是把遮罩训练掉。右边一直盖住。"],
+    remember: "改注意力和 MLP 里的数。遮罩不动。",
+    footnote: `二维权重带 weight decay ${TRAIN.weightDecay}。一维的层归一化不带。因果遮罩是 buffer，不进优化器。`,
+  },
+  {
+    id: "holdout",
+    purpose: "验收卷只用来抽查",
+    caption: "抽查的时候不改数",
+    mood: "talk",
+    note: "scrolls",
+    goal: "隔一段步数，在练习卷和验收卷上各估一次平均罚分。估的时候不改数。",
+    why: "练习卷上的罚分变小，可能只是把见过的句子背下来。验收卷没拿来改数。它不跟着变好，就是在背。",
+    example: `配置写着每 ${TRAIN.evalInterval} 步抽查一次。每次每个卷子抽 ${TRAIN.evalIters} 个批，再取平均。作者注明这套小数据容易背下来，所以抽查要勤。这里不写我们自己的罚分。`,
+    myths: ["验收卷不是第二本用来开训的书。", "抽查看见罚分，不等于这一步已经把数改好。"],
+    remember: "验收卷只抽查。背下来时，它不会跟着练习卷一齐变好。",
+    footnote: "estimate_loss 在 no_grad 里。先 model.eval()，两个卷子都算完，再 model.train()。",
+  },
+  {
+    id: "launch",
+    purpose: "用官方那一行开训",
+    caption: "命令写在上游 README",
+    mood: "point",
+    goal: "字符级莎翁的开训命令，就是官方 README 里的那一行。先准备纸带，再把配置交给 train.py。",
+    why: "配置会盖过 train.py 里给大模型准备的默认形状。不看配置，就会跑成另一套。",
+    example: `准备：${TRAIN.prepare}。开训：${TRAIN.command}。输出目录是 ${TRAIN.outDir}。这是上游命令，不是本仓库已经跑完的记录。`,
+    myths: ["不是八卡 torchrun 那条。那是另一份 GPT-2 配置。", "不是这台机器已经跑出了罚分。"],
+    remember: TRAIN.command,
+    footnote: "笔记本按 README 另加 --device=cpu --compile=False，并缩小层数。那一行也在上游，本课没有复跑。",
+  },
+  {
+    id: "enough",
+    purpose: "这一课怎样算讲完",
+    caption: "采样留到下一章",
+    mood: "react",
+    goal: "能自己讲清这一步怎么改数，并且知道验收罚分变得更小才存档。采样生成还没讲。",
+    why: `配置里最多走 ${TRAIN.maxIters} 步。那是停止条件，不是「已经写得像莎翁」的证明。存档看的是验收罚分有没有更小。`,
+    example: `这份配置把 always_save_checkpoint 设成否。验收罚分比之前更小，并且步数大于 0，才把 ckpt.pt 写进 ${TRAIN.outDir}。下一步才是 sample.py。这一章不生成台词。`,
+    myths: ["不是看见某一次练习罚分就停。练习罚分变小，可能是在背。", "不是这一章已经会往纸带后面续字。"],
+    remember: "开训讲完了。验收变好才存档。采样还没写。",
+    footnote: "检查点里有模型、优化器、model_args、步数、最好的验收罚分和配置。本仓库没有自己的训练日志，游戏里不写罚分数。",
+  },
+];
+
 export const LEVEL1_BEATS = L1;
 export const LEVEL2_BEATS = L2;
 export const LEVEL3_BEATS = L3;
-export const CHAPTER_COUNT = 3;
-export const SPINE_TOTAL = L1.length + L2.length + L3.length;
+export const LEVEL4_BEATS = L4;
+export const CHAPTER_COUNT = 4;
+export const SPINE_TOTAL = L1.length + L2.length + L3.length + L4.length;
 
 export const TITLE_BEAT = {
   id: "title",
@@ -281,19 +372,19 @@ export const TITLE_BEAT = {
   caption: "从一条长纸带讲起",
   vo: "vo-title",
   mood: "talk",
-  goal: "顺着看完：纸带、号码牌、右移一格、猜错罚分，再看每一格怎么回头看左边。",
+  goal: "顺着看完：纸带、号码牌、右移一格、猜错罚分、每一格只看左边，再看开训怎么按罚分改一笔。",
   why: "一句口号记不住。每一课分开讲：干什么、为什么、一个小例子、一句误会、一句记住。",
   remember: "从一条长纸带讲起。",
 };
 
 export const END_BEAT = {
   id: "end",
-  purpose: "纸带、右移、罚分和注意力，都对上了",
+  purpose: "纸带、右移、罚分、注意力和开训，都对上了",
   caption: "通关啦",
   vo: "vo-clear",
   mood: "react",
-  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边。",
-  remember: "通关啦。开训还没写。",
+  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边，开训怎么改一笔。",
+  remember: "通关啦。采样还没写。",
 };
 
 export function phaseText(beat, phase = 0) {

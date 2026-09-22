@@ -78,6 +78,7 @@ export default class TitleScene extends Phaser.Scene {
     this.registry.remove("level1.progress");
     this.registry.remove("level2.progress");
     this.registry.remove("level3.progress");
+    this.registry.remove("level4.progress");
     this.scene.start(key);
   }
 
@@ -87,18 +88,26 @@ export default class TitleScene extends Phaser.Scene {
       ["Level1", "1 纸带"],
       ["Level2", "2 猜字"],
       ["Level3", "3 注意力"],
+      ["Level4", "4 开训"],
     ];
-    const gap = 8;
-    const btnW = Math.min(148, (v.innerW - gap * 2) / 3);
-    const btnH = Math.max(48, Math.min(56, slot.h));
+    const cols = plan.twoRows ? 2 : 4;
+    const rows = plan.twoRows ? 2 : 1;
+    const gapX = 8;
+    const gapY = 8;
+    const btnW = Math.min(168, (v.innerW - gapX * (cols - 1)) / cols);
+    const btnH = Math.max(48, Math.min(52, (slot.h - gapY * (rows - 1)) / rows));
+    const rowW = cols * btnW + (cols - 1) * gapX;
     labels.forEach(([key, label], i) => {
-      const x = v.cx + (i - 1) * (btnW + gap);
-      createButton(this, x, slot.cy, label, () => this.startChapter(key), {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = v.cx - rowW / 2 + btnW / 2 + col * (btnW + gapX);
+      const y = slot.top + btnH / 2 + row * (btnH + gapY);
+      createButton(this, x, slot.cy && rows === 1 ? slot.cy : y, label, () => this.startChapter(key), {
         width: btnW,
         minWidth: 88,
         height: btnH,
-        fill: i === 2 ? C.gold : C.surface,
-        fontSize: 16,
+        fill: i === labels.length - 1 ? C.gold : C.surface,
+        fontSize: btnW < 120 ? 15 : 16,
       });
     });
   }
@@ -135,7 +144,8 @@ function layoutTitle(v, shell) {
     const titlesH = titleSize * 1.7;
     const previewH = tile + STICKER_SHADOW_Y + CAPTION_CLEAR + 22 + 8;
     const mascotH = Math.round((landscapeShort ? 56 : v.portrait ? 84 : 72) * s);
-    const chaptersH = Math.max(52, Math.round((landscapeShort ? 52 : 58) * s));
+    const twoRows = v.innerW < 720;
+    const chaptersH = twoRows ? Math.max(104, Math.round(112 * s)) : Math.max(52, Math.round((landscapeShort ? 52 : 58) * s));
     const gapY = Math.round(12 * s);
     const items = [
       { id: "titles", h: titlesH },
@@ -155,6 +165,7 @@ function layoutTitle(v, shell) {
       gapY,
       titleSize,
       tile,
+      twoRows,
       robotScale: (landscapeShort ? 0.28 : v.short ? 0.32 : v.compact ? 0.38 : 0.46) * Math.min(1, s + 0.1),
     };
   });

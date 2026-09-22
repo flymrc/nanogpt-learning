@@ -87,3 +87,30 @@ export const HEAD_SIZE = MODEL.nEmbd / MODEL.nHead;
 if (HEAD_SIZE !== 64 || MODEL.nHead !== 6 || MODEL.nEmbd !== 384 || MODEL.nLayer !== 6) {
   throw new Error("shakespeare_char 注意力形状应是 6 层、6 头、宽 384、每头 64");
 }
+
+/**
+ * shakespeare_char training loop from train.py + config/train_shakespeare_char.py
+ * at commit 3adf61e. Numbers the config does not set stay at train.py defaults.
+ * This repo has not logged its own loss run.
+ */
+export const TRAIN = {
+  outDir: "out-shakespeare-char",
+  evalInterval: 250,
+  evalIters: 200,
+  logInterval: 10,
+  maxIters: 5000,
+  learningRate: "1e-3",
+  minLr: "1e-4",
+  warmupIters: 100,
+  lrDecayIters: 5000,
+  beta1: 0.9,
+  beta2: 0.99,
+  weightDecay: 0.1,
+  gradClip: 1.0,
+  gradAccum: 1,
+  alwaysSaveCheckpoint: false,
+  initFrom: "scratch",
+  prepare: "python data/shakespeare_char/prepare.py",
+  command: "python train.py config/train_shakespeare_char.py",
+  sample: "python sample.py --out_dir=out-shakespeare-char",
+};
