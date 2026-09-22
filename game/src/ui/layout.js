@@ -11,10 +11,10 @@ export function lessonRhythm(v) {
   return clamp(Math.round(16 * (v?.uiScale || 1)), 12, 24);
 }
 
-/** DOM 详细笔记 / 看不懂？ / mute sit in the lesson column, never the tutor dock. */
+/** DOM 详细笔记 / 看不懂？ / mute sit in the lesson column, left of the tutor slot. */
 export function hudReservePx(v) {
-  if (v.portrait || v.w < 720) return 148;
-  return 308;
+  if (!v || !isWidePcTutor()) return 148;
+  return 300;
 }
 
 export function readSafeInsets() {
@@ -60,8 +60,8 @@ export function getView(scene) {
   const portrait = phone || h >= w * 0.92;
   const short = h < 640;
   const compact = phone || w < 720 || short;
-  const padLeft = phone ? 12 : Math.max(14, safe.left + 10);
-  const padRight = phone ? 12 : Math.max(14, safe.right + 10);
+  const padLeft = phone ? 12 : Math.max(16, safe.left + 10);
+  const padRight = phone ? 12 : Math.max(16, safe.right + 10);
   const padTop = phone ? 10 : Math.max(10, safe.top + 8);
   const padBottom = phone ? Math.max(12, safe.bottom + 8) : Math.max(16, safe.bottom + 12);
   const innerW = Math.max(200, w - padLeft - padRight);
@@ -73,7 +73,7 @@ export function getView(scene) {
   return {
     w,
     h,
-    cx: w / 2,
+    cx: padLeft + innerW / 2,
     cy: h / 2,
     portrait,
     compact,

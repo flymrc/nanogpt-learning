@@ -1,6 +1,7 @@
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { band, clamp, lessonRhythm, makeShell } from "./layout.js";
+import { tutorHangPx } from "./tutor-lane.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
@@ -116,23 +117,24 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
   stripe.fillStyle(C.gold, 1);
   stripe.fillRoundedRect(-rect.w / 2 + 8, -rect.h / 2 + 8, 10, rect.h - 16, 6);
 
+  const hang = tutorHangPx();
   const kicker = scene.add
-    .text(-rect.w / 2 + 26, -rect.h * 0.24, "这一步要干什么", uiText(phone ? 12 : 13, { color: C.goldCss }))
+    .text(-rect.w / 2 + 26, -rect.h * 0.24, "这一课", uiText(phone ? 12 : 13, { color: C.goldCss }))
     .setOrigin(0, 0.5);
   const purpose = scene.add
     .text(-rect.w / 2 + 26, rect.h * 0.16, "", displayText(Math.max(phone ? 16 : 18, Math.round(rect.h * 0.26))))
     .setOrigin(0, 0.5);
   const step = scene.add
-    .text(rect.w / 2 - 12, phone ? -rect.h * 0.24 : 0, "", uiText(phone ? 12 : 14, { color: C.muted }))
+    .text(rect.w / 2 - 12 - hang, phone ? -rect.h * 0.24 : 0, "", uiText(phone ? 12 : 14, { color: C.muted }))
     .setOrigin(1, 0.5);
 
   box.add([g, stripe, kicker, purpose, step]);
   box.setSize(rect.w, rect.h);
   box.set = (text, index, total, extra = {}) => {
-    kicker.setText(extra.kicker || "这一步要干什么");
+    kicker.setText(extra.kicker || "这一课");
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
-    const maxW = phone ? rect.w - 40 : rect.w - 88;
+    const maxW = phone ? rect.w - 40 : rect.w - 88 - hang;
     let size = Math.max(phone ? 15 : 18, Math.round(rect.h * 0.26));
     const wrapped = wrapToWidth(scene, text, size, maxW, displayText);
     purpose.setFontSize(size);
@@ -156,7 +158,7 @@ export function teach(scene, purposeUi, speech, beat, { index, total }) {
     ...beat,
     index,
     total,
-    kicker: "这一步在干什么",
+    kicker: "这一课",
   });
 }
 

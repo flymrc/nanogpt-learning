@@ -45,7 +45,7 @@ export default class EndScene extends Phaser.Scene {
       this,
       v.portrait ? v.cx + 8 : robotX + 150,
       v.portrait ? robotY + plan.robotH * 0.42 : hero.top + 28,
-      "通关啦！",
+      "通关啦",
       { pointer: v.portrait ? "none" : "left", fontSize: v.compact ? 20 : 26, maxWidth: 200 },
     );
 
@@ -57,24 +57,24 @@ export default class EndScene extends Phaser.Scene {
         icon: "deco-badge",
         fallback: "带",
         title: "台词拉成纸带",
-        caption: "一字一号，65 张牌",
-        tip: "先拉纸带，再领号码。号码只是座位号。本局只有这套莎翁字符。",
+        caption: "一字一格，再领号码",
+        tip: "先把台词拉成纸带。每个字符一张号码牌。号码只是座位号。这一课只有 65 张。",
         accent: C.teal,
       },
       {
         icon: "deco-window",
         fallback: "卷",
         title: "练习卷和验收卷",
-        caption: "验收不是答题纸",
-        tip: "九成练习、一成抽查。源码里叫 train.bin / val.bin。",
+        caption: "九成学，一成抽查",
+        tip: "同一条纸带切开。练习卷是 train.bin，验收卷是 val.bin。验收卷不是答题纸。",
         accent: C.blue,
       },
       {
         icon: "deco-star",
         fallback: "空",
-        title: "剪一段来填空",
-        caption: "错题分取平均",
-        tip: "y 只放在评分桌。评分看真答案被押了多少。本游戏没有训练，也不编造分数。",
+        title: "右移一格来猜",
+        caption: "罚分只看平均",
+        tip: "看见这张，猜右边那张。y 只放在评分桌上。猜错罚分不在这里编造数字。",
         accent: C.gold,
       },
     ];
@@ -155,7 +155,7 @@ export default class EndScene extends Phaser.Scene {
 
   toast() {
     const v = this.shell ? this.shell.v : makeShell(this).v;
-    showTooltip(this, v.cx, this.shell.footer.top - 24, "Attention 还在路上");
+    showTooltip(this, v.cx, this.shell.footer.top - 24, "下一课还没写好");
   }
 }
 

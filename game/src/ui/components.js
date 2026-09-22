@@ -3,6 +3,7 @@ import { applyMute, playSfx, readMuted, unlockAudio } from "../audio/sound.js";
 import { openNote } from "./notes.js";
 import { pointerToCss, textureScale } from "./dpr.js";
 import { TAP_MIN, clamp, getView, hudReservePx, makeShell, scaled } from "./layout.js";
+import { tutorClickGuardLeft } from "./tutor-lane.js";
 import { C, displayText, monoText, stickerColor, uiText } from "./theme.js";
 
 export function paintBackdrop(scene) {
@@ -523,7 +524,16 @@ export function bindAdvance(scene, advance) {
     if (currentlyOver?.length) return;
     const view = getView(scene);
     const pt = pointerToCss(scene, pointer);
-    if (document.documentElement.classList.contains("is-pc") && pt.x > view.w - 360 && pt.y < view.padTop + 100) return;
+    const clientX = pointer.event?.clientX;
+    const clientY = pointer.event?.clientY;
+    if (window.__nanoGPTTutorContains?.(clientX, clientY)) return;
+    if (
+      document.documentElement.classList.contains("is-pc") &&
+      pt.y < view.padTop + 78 &&
+      pt.x > tutorClickGuardLeft(view)
+    ) {
+      return;
+    }
     tryAdvance();
   });
 

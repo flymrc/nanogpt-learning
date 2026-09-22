@@ -110,7 +110,36 @@ function assertLessonLayout(scene) {
 
   const phone = !isWidePcTutor();
   const dock = document.getElementById("tutor-dock");
-  const live2dOn = dock && !dock.hidden && getComputedStyle(dock).display !== "none";
+  const dockStyle = dock ? getComputedStyle(dock) : null;
+  const live2dOn = dock && !dock.hidden && dockStyle.display !== "none";
+  const chrome = document.getElementById("pc-chrome");
+  const chromeZ = chrome ? Number.parseFloat(getComputedStyle(chrome).zIndex) : 0;
+  const dockZ = dockStyle ? Number.parseFloat(dockStyle.zIndex) : 0;
+  const dockBg = dockStyle?.backgroundColor || "";
+  const dockTransparent = dockBg === "transparent" || dockBg === "rgba(0, 0, 0, 0)";
+  const stage = document.getElementById("pc-stage");
+  const shellEl = document.getElementById("game-shell");
+  const stageRect = stage?.getBoundingClientRect();
+  const shellRect = shellEl?.getBoundingClientRect();
+  const dockRect = dock?.getBoundingClientRect();
+  const lessonFillsStage =
+    stageRect &&
+    shellRect &&
+    Math.abs(shellRect.width - stageRect.width) < 2 &&
+    Math.abs(shellRect.left - stageRect.left) < 2;
+  const overlayOk =
+    phone ||
+    (live2dOn &&
+      dockTransparent &&
+      dockStyle.position === "fixed" &&
+      dockStyle.pointerEvents === "none" &&
+      chromeZ > dockZ &&
+      dock.offsetWidth > 120 &&
+      dock.offsetWidth < window.innerWidth * 0.5 &&
+      dockRect &&
+      Math.abs(dockRect.right - window.innerWidth) < 3 &&
+      lessonFillsStage &&
+      !stage?.contains(dock));
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
   const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
@@ -120,6 +149,7 @@ function assertLessonLayout(scene) {
       overflows.length === 0 &&
       orphans.length === 0 &&
       hudOk &&
+      overlayOk &&
       (phone ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
@@ -128,6 +158,7 @@ function assertLessonLayout(scene) {
     overflows,
     orphans,
     live2dOn: Boolean(live2dOn),
+    overlayOk,
     hudParent,
     layout: document.documentElement.dataset.layout,
   };
@@ -138,7 +169,7 @@ function collectOrphanOverlays(scene) {
   const hits = [];
   const walk = (obj) => {
     if (!obj || obj.active === false) return;
-    if (obj.text === "挪一格") hits.push(obj.text);
+    if (obj.text === "挪一格" || obj.text === "右移一格") hits.push(obj.text);
     (obj.list || []).forEach(walk);
   };
   (scene.children?.list || []).forEach(walk);

@@ -184,8 +184,9 @@ async function bootLive2d() {
     // Cubism already AAs mesh edges; WebGL MSAA + transparent blend
     // drew a second halo around hair / collar / eyes.
     antialias: false,
-    backgroundColor: 0xf3ebe0,
-    backgroundAlpha: 1,
+    transparent: true,
+    backgroundColor: 0x000000,
+    backgroundAlpha: 0,
     clearBeforeRender: true,
     powerPreference: "high-performance",
   });
@@ -194,8 +195,10 @@ async function bootLive2d() {
     return;
   }
   pixiApp = app;
+  if (pixiApp.renderer) pixiApp.renderer.backgroundAlpha = 0;
   lastBufferKey = `${box.w}x${box.h}@${box.dpr}`;
   applyCanvasPixels(pixiApp, canvas, box);
+  canvas.style.background = "transparent";
 
   let loaded = null;
   try {
@@ -237,6 +240,9 @@ async function bootLive2d() {
   resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(() => resizePixi());
   resizeObserver.observe(stage);
+  if (!model.__naturalW) {
+    requestAnimationFrame(() => placeModel());
+  }
   applyBeat(currentTutor());
   installDebugProbe();
 }
@@ -287,19 +293,36 @@ function resizePixi() {
   placeModel();
 }
 
+function naturalSize(host) {
+  if (host.__naturalW && host.__naturalH) {
+    return { w: host.__naturalW, h: host.__naturalH };
+  }
+  const sx = host.scale?.x || 1;
+  const sy = host.scale?.y || 1;
+  const w = host.width / sx;
+  const h = host.height / sy;
+  if (!(w > 8) || !(h > 8)) return null;
+  host.__naturalW = w;
+  host.__naturalH = h;
+  return { w, h };
+}
+
 function placeModel() {
   if (!pixiApp || !model) return;
   const { w, h } = stageBox();
   if (w < 40 || h < 40) return;
-  // Crop to the face / upper body so the tutor is actually visible
-  // beside the lesson, not a floating torso.
-  // The whole dock is hers. Keep a small cream gutter above the hair —
-  // never a speech card on the forehead.
-  const scale = Math.min(w / 920, h / 1280);
-  model.anchor.set(0.5, 0.06);
+  const natural = naturalSize(model);
+  if (!natural) return;
+  const maxH = Math.max(120, h - 8);
+  // The dock is position:fixed; right:0. Anchor the visible mesh to that
+  // overlay's right edge, which is the viewport's right edge.
+  const scale = maxH / natural.h;
+  model.anchor.set(0.5, 0);
   model.scale.set(scale);
-  model.x = w * 0.5;
-  model.y = 18;
+  const drawnH = natural.h * scale;
+  const bodyHalf = 78;
+  model.x = Math.round(w - 10 - bodyHalf);
+  model.y = Math.max(4, (h - drawnH) * 0.02);
 }
 
 function teardownLive2d() {
@@ -408,20 +431,45 @@ function onPointerMove(event) {
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   if (rect.width < 8 || rect.height < 8) return;
-
-  const faceX = rect.left + rect.width * 0.5;
-  const faceY = rect.top + Math.min(210, rect.height * 0.2);
-  const reachX = Math.max(rect.width * 0.42, window.innerWidth * 0.32);
-  const reachY = Math.max(rect.height * 0.4, window.innerHeight * 0.34);
+  const bounds = model.getBounds?.();
+  const faceX = bounds ? rect.left + bounds.x + bounds.width * 0.5 : rect.right - 180;
+  const faceY = bounds ? rect.top + bounds.y + Math.min(bounds.height * 0.16, 200) : rect.top + 160;
+  const reachX = Math.max(220, window.innerWidth * 0.28);
+  const reachY = Math.max(180, window.innerHeight * 0.32);
   lookTarget.x = clamp((event.clientX - faceX) / reachX, -1, 1);
   lookTarget.y = clamp((faceY - event.clientY) / reachY, -1, 1);
 }
 
 function onPointerDown(event) {
   if (!model || !isWidePcTutor()) return;
-  const dock = document.getElementById("tutor-dock");
-  if (!dock || dock.hidden || !dock.contains(event.target)) return;
+  const target = event.target;
+  if (target?.closest?.("button, a, input, #pc-chrome, #notes-overlay, #lesson-book-overlay")) return;
+  if (!tutorContainsClient(event.clientX, event.clientY)) return;
   playMood("react");
+}
+
+function tutorContainsClient(x, y) {
+  if (!model || !pixiApp || !isWidePcTutor()) return false;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const canvas = pixiApp.view;
+  const bounds = model.getBounds?.();
+  if (!canvas || !bounds || bounds.width < 8) return false;
+  const rect = canvas.getBoundingClientRect();
+  const px = x - rect.left;
+  const py = y - rect.top;
+  // Hit the visible body, not the transparent padding around the mesh.
+  const insetX = bounds.width * 0.3;
+  const insetY = bounds.height * 0.04;
+  return (
+    px >= bounds.x + insetX &&
+    px <= bounds.x + bounds.width - insetX &&
+    py >= bounds.y + insetY &&
+    py <= bounds.y + bounds.height - insetY
+  );
+}
+
+if (typeof window !== "undefined") {
+  window.__nanoGPTTutorContains = tutorContainsClient;
 }
 
 function attachLookHook(host) {
@@ -508,6 +556,18 @@ function installDebugProbe() {
           }
         : null,
       dockBorder: dock ? getComputedStyle(dock).borderLeftWidth : "",
+      place: model
+        ? {
+            x: model.x,
+            y: model.y,
+            scale: model.scale?.x,
+            bounds: (() => {
+              const b = model.getBounds?.();
+              return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null;
+            })(),
+            slot: { w: box.w, h: box.h },
+          }
+        : null,
     };
   };
 }
