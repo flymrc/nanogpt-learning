@@ -97,6 +97,15 @@ export function mountCatalog() {
     }
   });
   window.addEventListener("nanogpt-lang", () => renderCatalog());
+  // Phaser listens for mousedown/touchstart on window and will hit the
+  // canvas button under a sheet. Stop the event after the sheet handles it.
+  const swallowGamePointer = (event) => {
+    if (!overlayBlocksInput()) return;
+    if (event.target?.closest?.("canvas")) return;
+    event.stopPropagation();
+  };
+  document.addEventListener("mousedown", swallowGamePointer);
+  document.addEventListener("touchstart", swallowGamePointer, { passive: true });
 
   window.__nanoGPTCatalog = () => chapterList();
   window.__nanoGPTPickChapter = (id) => pickChapter(id);

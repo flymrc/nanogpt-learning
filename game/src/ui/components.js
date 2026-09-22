@@ -159,6 +159,7 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
     scene.tweens.add({ targets: container, scale: 1, duration: 120 });
   });
   container.on("pointerdown", (pointer, _lx, _ly, event) => {
+    if (overlayBlocksInput()) return;
     event?.stopPropagation?.();
     unlockAudio(scene);
     playSfx(scene, "sfx-tap", 0.28);
