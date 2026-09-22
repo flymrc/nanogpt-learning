@@ -8,7 +8,7 @@ The prior `E2E_OK` that only walked first+last beats **missed** a real encode-be
 ## Layout modes (hard switch)
 
 - **Mobile:** `width < 1024` or portrait or mobile UA. Shell: `#mobile-chrome` (in-flow) + `#game-shell`. No Live2D. No desktop absolute HUD. No `挪一格` / window-frame overlays on the tape.
-- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. One centered `#pc-stage` owns the lesson and the tutor. `#game-shell` and `#tutor-dock` are siblings inside that stage (lesson flexes, tutor is a fixed slot). Live2D is drawn in the tutor slot, transparent, no sidebar fill. She may overlap the lesson slightly. Forehead and hair stay clear of notes and mute. `#mobile-chrome` hidden.
+- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. `#pc-stage` is the lesson only (centered). `#tutor-dock` is a `position: fixed; right: 0` overlay and does not take flex width, so hiding it does not move the lesson. Transparent, no sidebar fill. Forehead and hair stay clear of notes and mute. `#mobile-chrome` hidden.
 
 Do not share absolute coordinates, 360px dock widths, or 1080px drawers across modes.
 
@@ -29,7 +29,7 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 | Viewport | What must be true |
 | --- | --- |
 | **390×844 mobile** | Walk **all 13 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 13 beats** at least once (example tab is enough if slow). `#pc-stage` is one centered group: lesson + tutor slot. Live2D stays in that slot, **forehead free**, no gray sidebar. Parchment on both outer sides of the stage. |
+| **1440×900 PC** | Smoke **all 13 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 

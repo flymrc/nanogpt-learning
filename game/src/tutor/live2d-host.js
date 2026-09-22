@@ -314,16 +314,14 @@ function placeModel() {
   const natural = naturalSize(model);
   if (!natural) return;
   const maxH = Math.max(120, h - 8);
-  // Height-fit inside the tutor slot. x is local to #tutor-stage, which
-  // hangs 40px into the lesson. She meets the card; she is not placed
-  // from the browser's right edge.
+  // The dock is position:fixed; right:0. Anchor the visible mesh to that
+  // overlay's right edge, which is the viewport's right edge.
   const scale = maxH / natural.h;
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
   const drawnH = natural.h * scale;
-  const overlap = 40;
-  const bodyHalf = 76;
-  model.x = Math.round(overlap - 18 + bodyHalf);
+  const bodyHalf = 78;
+  model.x = Math.round(w - 10 - bodyHalf);
   model.y = Math.max(4, (h - drawnH) * 0.02);
 }
 

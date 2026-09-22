@@ -118,29 +118,28 @@ function assertLessonLayout(scene) {
   const dockBg = dockStyle?.backgroundColor || "";
   const dockTransparent = dockBg === "transparent" || dockBg === "rgba(0, 0, 0, 0)";
   const stage = document.getElementById("pc-stage");
-  const stageRect = stage?.getBoundingClientRect();
-  const dockRect = dock?.getBoundingClientRect();
   const shellEl = document.getElementById("game-shell");
-  const stageGrouped =
-    !phone &&
-    live2dOn &&
-    stage &&
-    shellEl &&
-    stage.contains(dock) &&
-    stage.contains(shellEl) &&
-    dockTransparent &&
-    dockStyle.overflow !== "hidden" &&
-    dockStyle.pointerEvents === "none" &&
-    chromeZ > dockZ &&
-    dock.offsetWidth > 160 &&
-    dock.offsetWidth < window.innerWidth * 0.45 &&
+  const stageRect = stage?.getBoundingClientRect();
+  const shellRect = shellEl?.getBoundingClientRect();
+  const dockRect = dock?.getBoundingClientRect();
+  const lessonFillsStage =
     stageRect &&
-    dockRect &&
-    Math.abs(dockRect.right - stageRect.right) < 4 &&
-    dockRect.left > stageRect.left + 200 &&
-    stageRect.left >= 12 &&
-    window.innerWidth - stageRect.right >= 12;
-  const overlayOk = phone || stageGrouped;
+    shellRect &&
+    Math.abs(shellRect.width - stageRect.width) < 2 &&
+    Math.abs(shellRect.left - stageRect.left) < 2;
+  const overlayOk =
+    phone ||
+    (live2dOn &&
+      dockTransparent &&
+      dockStyle.position === "fixed" &&
+      dockStyle.pointerEvents === "none" &&
+      chromeZ > dockZ &&
+      dock.offsetWidth > 120 &&
+      dock.offsetWidth < window.innerWidth * 0.5 &&
+      dockRect &&
+      Math.abs(dockRect.right - window.innerWidth) < 3 &&
+      lessonFillsStage &&
+      !stage?.contains(dock));
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
   const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
