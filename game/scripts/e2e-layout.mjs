@@ -1,7 +1,7 @@
 /**
  * Visual E2E for mobile 390×844 and PC 1440×900.
  * Mobile walks ALL beats × ALL 5 tabs. First+last only is NOT enough.
- * Chapter 3 adds 6 attention beats: 19 × 5 = 95 mobile, 19 PC.
+ * Chapter 5 adds 6 sampling beats: 31 × 5 = 155 mobile, 31 PC.
  * Fails if any Phaser label/bar intersects the CTA.
  * Also fails on local sticker collisions: tile/chip vs caption, chip vs chip,
  * chips under the minimum size, and placeholder tiles stacked on the first chip.
@@ -66,6 +66,8 @@ function walks(spine, { allPhases }) {
   pushLevel("Level1", spine.l1, "L1");
   pushLevel("Level2", spine.l2, "L2");
   pushLevel("Level3", spine.l3, "L3");
+  pushLevel("Level4", spine.l4, "L4");
+  pushLevel("Level5", spine.l5, "L5");
   return jobs;
 }
 
@@ -143,13 +145,10 @@ async function assertNav(page, label) {
     return state?.scene === "Level2" && state.beat === 1 && state.phase === 1;
   });
   await page.click("#catalog-toggle");
-  await page.click("[data-chapter='sample']");
-  await page.waitForSelector("#chapter-sheet:not([hidden])");
-  const sheet = await page.evaluate(() => document.getElementById("chapter-sheet-body")?.textContent || "");
-  if (sheet.length < 8) throw new Error("sample sheet empty");
-  await page.click("#chapter-sheet-close");
-  await page.waitForSelector("#catalog-overlay:not([hidden])");
-  await page.click("#catalog-close");
+  await page.click("[data-chapter='Level5']");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level5" && window.__nanoGPTState?.().beat === 0);
+  await page.click("#back-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level4");
   await page.evaluate(() => window.__nanoGPTPickChapter("Level1"));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && window.__nanoGPTState?.().beat === 0);
 }
@@ -186,6 +185,8 @@ async function assertLang(page, label) {
       ...Array.from({ length: spine.l1 }, (_, beat) => ["Level1", beat]),
       ...Array.from({ length: spine.l2 }, (_, beat) => ["Level2", beat]),
       ...Array.from({ length: spine.l3 }, (_, beat) => ["Level3", beat]),
+      ...Array.from({ length: spine.l4 }, (_, beat) => ["Level4", beat]),
+      ...Array.from({ length: spine.l5 }, (_, beat) => ["Level5", beat]),
     ];
     for (const [key, beat] of jobs) {
       for (const phase of [0, 2]) {
@@ -212,7 +213,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await ready(page);
   const guideShown = await dismissGuide(page, label);
   const spine = await page.evaluate(() => window.__nanoGPTSpine);
-  if (!spine?.l1 || !spine?.l2 || !spine?.l3 || !spine?.phases) {
+  if (!spine?.l1 || !spine?.l2 || !spine?.l3 || !spine?.l4 || !spine?.l5 || !spine?.phases) {
     throw new Error("missing __nanoGPTSpine");
   }
   const jobs = walks(spine, { allPhases });
@@ -265,6 +266,28 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.screenshot({ path: `${OUT}/${label}-pseudo-attn.png` });
   await page.click("#pseudo-close");
 
+  await page.evaluate(() => window.__nanoGPTJump("Level4", 1, 2));
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: `${OUT}/${label}-train-step.png` });
+  const trainLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  await page.click("#pseudo-toggle");
+  await page.waitForTimeout(200);
+  const pseudoTrain = await page.evaluate(readPseudo);
+  await page.screenshot({ path: `${OUT}/${label}-pseudo-train.png` });
+  await page.click("#pseudo-close");
+
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 1, 2));
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: `${OUT}/${label}-sample-loop.png` });
+  const sampleLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  await page.click("#pseudo-toggle");
+  await page.waitForTimeout(200);
+  const pseudoSample = await page.evaluate(readPseudo);
+  await page.screenshot({ path: `${OUT}/${label}-pseudo-sample.png` });
+  await page.click("#pseudo-close");
+
   const chrome = await page.evaluate(() => {
     const bar = document.getElementById("mobile-chrome");
     const actions = document.getElementById("mobile-actions");
@@ -294,7 +317,11 @@ async function runViewport(label, pageOpts, { allPhases }) {
     pseudoShift,
     pseudoLoss,
     pseudoMask,
+    pseudoTrain,
+    pseudoSample,
     attnLayout,
+    trainLayout,
+    sampleLayout,
     chrome,
   };
 }
@@ -370,9 +397,13 @@ const spineOk =
   mobile.spine.l1 === 5 &&
   mobile.spine.l2 === 8 &&
   mobile.spine.l3 === 6 &&
+  mobile.spine.l4 === 6 &&
+  mobile.spine.l5 === 6 &&
   mobile.spine.phases === 5 &&
-  pc.spine.l3 === 6;
-const walkedAll = mobile.walked === 19 * 5 && pc.walked === 19;
+  pc.spine.l3 === 6 &&
+  pc.spine.l4 === 6 &&
+  pc.spine.l5 === 6;
+const walkedAll = mobile.walked === 31 * 5 && pc.walked === 31;
 const pseudoOk =
   tipOk(mobile.pseudoEncode, "号码") &&
   tipOk(pc.pseudoEncode, "号码") &&
@@ -381,11 +412,17 @@ const pseudoOk =
   tipOk(mobile.pseudoLoss, "罚分") &&
   tipOk(pc.pseudoLoss, "罚分") &&
   tipOk(mobile.pseudoMask, "负无穷") &&
-  tipOk(pc.pseudoMask, "负无穷");
+  tipOk(pc.pseudoMask, "负无穷") &&
+  tipOk(mobile.pseudoTrain, "AdamW") &&
+  tipOk(pc.pseudoTrain, "AdamW") &&
+  tipOk(mobile.pseudoSample, "接") &&
+  tipOk(pc.pseudoSample, "接");
 const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
+const trainOk = mobile.trainLayout?.ok && pc.trainLayout?.ok;
+const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
 const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
 const flowOk = mobile.guideShown && pc.guideShown;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !chromeOk || !flowOk) {
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -394,6 +431,8 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     spineOk,
     pseudoOk,
     attnOk,
+    trainOk,
+    sampleOk,
     chromeOk,
     flowOk,
     mobileChrome: mobile.chrome,

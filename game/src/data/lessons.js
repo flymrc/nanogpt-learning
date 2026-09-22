@@ -1,4 +1,16 @@
-import { DATASET, DEMO_NEXT_CHAR, DEMO_SNIPPET, HEAD_SIZE, MODEL, VOCAB_SIZE } from "./facts.js";
+import {
+  DATASET,
+  DEMO_NEXT_CHAR,
+  DEMO_SNIPPET,
+  HEAD_SIZE,
+  MODEL,
+  REAL_BATCH,
+  REAL_BLOCK,
+  SAMPLE,
+  TOKENS_PER_ITER,
+  TRAIN,
+  VOCAB_SIZE,
+} from "./facts.js";
 
 /** 每一课五个小块。一块只讲一个意思，句子要短。 */
 export const LESSON_PHASES = [
@@ -262,18 +274,185 @@ const L3 = [
     note: "attn",
     goal: "注意力的结果加回原来的这一格。格子还在，不是换成别的纸带。",
     why: "如果直接覆盖，原来的号码信息会丢。加上去，这一格既记得自己，也记得左边。",
-    example: `六个头各做一遍提问、遮罩、重量、加总，拼成宽 ${MODEL.nEmbd}，加回 c 这一格。同一块后面还有另一层。这一章先停在这里。没有开训。`,
+    example: `六个头各做一遍提问、遮罩、重量、加总，拼成宽 ${MODEL.nEmbd}，加回 c 这一格。同一块后面还有另一层。这一章先停在这里。开训在下一章。`,
     myths: ["不是已经猜出下一个字。猜字还在更后面。", "不是六个模型。是六个头同时看同一条纸带。"],
     remember: "看完左边，加回自己这一格。",
     footnote: `x = x + 注意力(层归一化(x))。${MODEL.nLayer} 层，${MODEL.nHead} 头，dropout ${MODEL.dropout}。MLP 这一章不展开。`,
   },
 ];
 
+const L4 = [
+  {
+    id: "random",
+    purpose: "一开始只是乱猜",
+    caption: "先把练习卷上的罚分往下压",
+    mood: "point",
+    note: "train",
+    goal: "模型刚出生时，里面的数是随手填的。开训是让它在练习卷上，把猜下一个字的罚分慢慢压低。",
+    why: "纸带、右移、只看左边，都还没改这些数。不改，它就一直乱猜。验收卷放在旁边看，不能只盯练习卷。",
+    example:
+      "同一条纸带：九成是练习卷 train.bin，一成是验收卷 val.bin。开训改的是模型里的数，不是把答案印上纸带。这一课不写假的罚分。",
+    myths: ["不是已经会写莎翁了。刚开始只是乱猜。", "不是只背练习卷。验收卷要看着，但不拿来改数。"],
+    remember: "开训是把练习卷上的猜错罚分往下压，并看着验收卷。",
+    footnote: "从零开始时，线性层和号码表用正态分布初始化，均值 0，标准差 0.02。init_from 默认是 scratch。",
+  },
+  {
+    id: "step",
+    purpose: "一步改一笔",
+    caption: "一批窗口，改一次",
+    mood: "talk",
+    note: "train",
+    goal: "一步做完这些事：剪一批 (x, y)，往前算，记下罚分，把错往回传，再让 AdamW 改一笔。",
+    why: "只往前算，罚分看得见，数却不动。往回传之后，优化器才按这一步的错，把数挪一点。",
+    example: `这一课一批是 ${REAL_BATCH} 段，每段 ${REAL_BLOCK} 格。梯度累加是 ${TRAIN.gradAccum}，所以这一步就改一次。单进程每步 ${TOKENS_PER_ITER.toLocaleString("zh-CN")} 个字符。`,
+    myths: ["不是把整本剧本一次读完。一步只剪一批窗口。", "不是手改每一个数。AdamW 按罚分来挪。"],
+    remember: "一批窗口：往前算，记罚分，往回传，AdamW 改一笔。",
+    footnote: `优化器是 AdamW。betas 是 ${TRAIN.beta1} 和 ${TRAIN.beta2}。学习率从 ${TRAIN.learningRate} 按余弦降到 ${TRAIN.minLr}，前 ${TRAIN.warmupIters} 步先热身。梯度裁到 ${TRAIN.gradClip}。`,
+  },
+  {
+    id: "rewrite",
+    purpose: "改块里的数",
+    caption: "遮罩不参与改",
+    mood: "point",
+    goal: "被改的是要学习的数：注意力里的投影，MLP 里的两层，还有号码表和位置表。",
+    why: "这些数决定怎么看左边、怎么混合。罚分变了，就顺着它们往回传。遮罩是盖住右边的规则，不是要学的数。",
+    example: `一共 ${MODEL.nLayer} 块。每一块先注意力，再 MLP，都加回原来的格子。号码表和最后打分的那一层是同一份。这里不逐个张量点名。`,
+    myths: ["不是把纸带上的字符改掉。改的是模型里的数。", "不是把遮罩训练掉。右边一直盖住。"],
+    remember: "改注意力和 MLP 里的数。遮罩不动。",
+    footnote: `二维权重带 weight decay ${TRAIN.weightDecay}。一维的层归一化不带。因果遮罩是 buffer，不进优化器。`,
+  },
+  {
+    id: "holdout",
+    purpose: "验收卷只用来抽查",
+    caption: "抽查的时候不改数",
+    mood: "talk",
+    note: "scrolls",
+    goal: "隔一段步数，在练习卷和验收卷上各估一次平均罚分。估的时候不改数。",
+    why: "练习卷上的罚分变小，可能只是把见过的句子背下来。验收卷没拿来改数。它不跟着变好，就是在背。",
+    example: `配置写着每 ${TRAIN.evalInterval} 步抽查一次。每次每个卷子抽 ${TRAIN.evalIters} 个批，再取平均。作者注明这套小数据容易背下来，所以抽查要勤。这里不写我们自己的罚分。`,
+    myths: ["验收卷不是第二本用来开训的书。", "抽查看见罚分，不等于这一步已经把数改好。"],
+    remember: "验收卷只抽查。背下来时，它不会跟着练习卷一齐变好。",
+    footnote: "estimate_loss 在 no_grad 里。先 model.eval()，两个卷子都算完，再 model.train()。",
+  },
+  {
+    id: "launch",
+    purpose: "用官方那一行开训",
+    caption: "命令写在上游 README",
+    mood: "point",
+    goal: "字符级莎翁的开训命令，就是官方 README 里的那一行。先准备纸带，再把配置交给 train.py。",
+    why: "配置会盖过 train.py 里给大模型准备的默认形状。不看配置，就会跑成另一套。",
+    example: `准备：${TRAIN.prepare}。开训：${TRAIN.command}。输出目录是 ${TRAIN.outDir}。这是上游命令，不是本仓库已经跑完的记录。`,
+    myths: ["不是八卡 torchrun 那条。那是另一份 GPT-2 配置。", "不是这台机器已经跑出了罚分。"],
+    remember: TRAIN.command,
+    footnote: "笔记本按 README 另加 --device=cpu --compile=False，并缩小层数。那一行也在上游，本课没有复跑。",
+  },
+  {
+    id: "enough",
+    purpose: "这一课怎样算讲完",
+    caption: "下一章才往后面续字",
+    mood: "react",
+    goal: "能自己讲清这一步怎么改数，并且知道验收罚分变得更小才存档。往纸带后面续字是下一章。",
+    why: `配置里最多走 ${TRAIN.maxIters} 步。那是停止条件，不是「已经写得像莎翁」的证明。存档看的是验收罚分有没有更小。`,
+    example: `这份配置把 always_save_checkpoint 设成否。验收罚分比之前更小，并且步数大于 0，才把 ckpt.pt 写进 ${TRAIN.outDir}。下一步才是 sample.py。这一章不生成台词。`,
+    myths: ["不是看见某一次练习罚分就停。练习罚分变小，可能是在背。", "不是这一章已经会往纸带后面续字。"],
+    remember: "开训讲完了。验收变好才存档。下一章才往后面续字。",
+    footnote: "检查点里有模型、优化器、model_args、步数、最好的验收罚分和配置。本仓库没有自己的训练日志，游戏里不写罚分数。",
+  },
+];
+
+const L5 = [
+  {
+    id: "prompt",
+    purpose: "从开头往纸带后面接",
+    caption: "数不再改，只往后续",
+    mood: "point",
+    note: "sample",
+    goal: "采样是读已经存好的模型，从一小段开头往后面接新字符。这一课不改数。",
+    why: "开训只把罚分往下压，并在验收更好时写下检查点。要看见新格子，得另跑采样。它不把练习卷当成要抄的答案。",
+    example:
+      "默认开头是一个换行，号码是 0。也可以换成你写的一小段，或从文件读开头。本仓库没有检查点，这里不展示生成出来的台词。",
+    myths: ["不是把练习卷再抄一遍。", "不是开训日志里的罚分。"],
+    remember: "采样是从开头往纸带后面接新格子。数不再改。",
+    footnote: `sample.py 默认 init_from 是 ${SAMPLE.initFrom}，start 是换行。检查点是 ${SAMPLE.outDir}/${SAMPLE.ckpt}。采样前会 model.eval()，dropout 关掉。`,
+  },
+  {
+    id: "loop",
+    purpose: "猜一格，接上，再猜",
+    caption: "每次只抽下一格",
+    mood: "talk",
+    note: "sample",
+    goal: "模型只看当前纸带，抽出下一格的号码，接到末尾，再用更长的纸带抽下一次。",
+    why: "它一次不会交出整段台词。新格子会变成下一次能看见的左边。这和开训时「看见前面、猜下一个」是同一件事，只是没有标准答案。",
+    example: `默认每一份接 ${SAMPLE.maxNewTokens} 格。纸带比窗口长时，只留下最后 ${MODEL.blockSize} 格再往前看。默认连抽 ${SAMPLE.numSamples} 份，每一份都从同一个开头重新开始。`,
+    myths: ["不是一次写出一整段答案。是一格一格接上去。", "不是把上一份的结果当成下一份的开头。"],
+    remember: "看当前纸带，抽下一格，接上，重复。",
+    footnote:
+      "generate 在 no_grad 里。不传目标时，只给最后一格打分，loss 是空的。抽出用的是 multinomial，不是永远选最大的那格。",
+  },
+  {
+    id: "knobs",
+    purpose: "温度，以及只留前几名",
+    caption: "这一课的词表很小",
+    mood: "point",
+    note: "sample",
+    goal: "温度改的是把握摊得有多开。只留前几名，是把排在后面的格子丢掉。",
+    why: "把握太平均，抽出来更跳。把握更集中，抽出来更稳。丢掉后面的格子，是不让很冷门的字被抽到。",
+    example: `默认温度是 ${SAMPLE.temperature}。注释写：1.0 是不改，小于 1 更少随机，大于 1 更多随机。默认只留前 ${SAMPLE.topK} 名。词表只有 ${VOCAB_SIZE}，所以前 ${SAMPLE.topK} 名其实是全部 ${VOCAB_SIZE} 个字，一个也不会被丢掉。`,
+    myths: ["温度不是学习率。采样时数已经不改了。", "不是这一课真的砍掉了很多字。65 个字全都留着。"],
+    remember: `温度 ${SAMPLE.temperature} 让把握更集中。默认的前 ${SAMPLE.topK} 名，在 ${VOCAB_SIZE} 字里等于全留。`,
+    footnote:
+      "logits 先除以温度，再把没进前 k 名的格子改成负无穷，然后 softmax，再 multinomial。k 会先和词表大小取较小的那个。",
+  },
+  {
+    id: "run",
+    purpose: "用官方那一行来采样",
+    caption: "指向上游的检查点目录",
+    mood: "point",
+    note: "sample",
+    goal: "字符课的采样命令，就是官方 README 里开训之后的那一行。它去读那个目录里的检查点。",
+    why: "目录名必须和开训配置的输出目录一样。找不到 meta.pkl 时，脚本会改用 GPT-2 的切词，字符号码就对不上。",
+    example: `命令是 ${SAMPLE.command}。它读取 ${SAMPLE.outDir}/${SAMPLE.ckpt}，再用 ${SAMPLE.meta} 把号码翻回字符。本仓库没有这份检查点。上游 README 里的示例台词是作者的，不是我们跑出来的。`,
+    myths: ["不是这台机器已经印出了莎翁。", "不是八卡 GPT-2 那条命令。"],
+    remember: SAMPLE.command,
+    footnote: `只有 CPU 时，上游另写了 --device=cpu。sample.py 默认 device 是 ${SAMPLE.device}，compile 是关的，种子是 ${SAMPLE.seed}。`,
+  },
+  {
+    id: "score",
+    purpose: "采样不是正确率",
+    caption: "它不打百分数",
+    mood: "talk",
+    note: "sample",
+    goal: "采样印出来的是新纸带。它不算「对了百分之几」，也不在验收卷上重打一遍罚分。",
+    why: "验收罚分问的是：没拿来改数的窗口里，真答案被押了多少。采样没有那一格的真答案，所以没有罚分。好看的句子也不能代替那次抽查。",
+    example: "开训时，验收罚分变小才把检查点存下来。采样只是把那份存档读出来续字。读的时候不改数，也不打印一个准确率。",
+    myths: ["不是 val.bin 上的考试分数。", "不是把猜错罚分换成百分制。"],
+    remember: "采样续的是新纸带。验收罚分是另一件事。",
+    footnote: "estimate_loss 在开训里对练习卷和验收卷取平均交叉熵。generate 不传 targets，loss 是空的。",
+  },
+  {
+    id: "wrap",
+    purpose: "这条字符课走到这里",
+    caption: "五步都对着源码走过",
+    mood: "react",
+    note: "sample",
+    goal: "纸带、右移和罚分、只看左边、按罚分改数、从开头续字。字符课这条路的机制，已经能自己讲完。",
+    why: "讲完不等于这台机器已经训练过，也不等于已经印出台词。检查点不在本仓库里。每一块里的另一层会在开训时被改，但前向没有单独拆开讲。",
+    example:
+      "若要离开这 65 个字符：上游还有用 BPE 微调莎翁，以及八卡上复现 GPT-2。那是另一条纸带，号码牌不是这一课的 65 张。",
+    myths: ["不是模型已经会写剧本。", "不是还差一个正确率才算讲完。"],
+    remember: "准备、右移罚分、只看左边、开训、采样。字符课的机制走到这里。",
+    footnote:
+      "微调是 python train.py config/finetune_shakespeare.py，目录 out-shakespeare。GPT-2 是 torchrun 配 config/train_gpt2.py。本仓库都没跑过。",
+  },
+];
+
 export const LEVEL1_BEATS = L1;
 export const LEVEL2_BEATS = L2;
 export const LEVEL3_BEATS = L3;
-export const CHAPTER_COUNT = 3;
-export const SPINE_TOTAL = L1.length + L2.length + L3.length;
+export const LEVEL4_BEATS = L4;
+export const LEVEL5_BEATS = L5;
+export const CHAPTER_COUNT = 5;
+export const SPINE_TOTAL = L1.length + L2.length + L3.length + L4.length + L5.length;
 
 export const TITLE_BEAT = {
   id: "title",
@@ -281,19 +460,19 @@ export const TITLE_BEAT = {
   caption: "从一条长纸带讲起",
   vo: "vo-title",
   mood: "talk",
-  goal: "顺着看完：纸带、号码牌、右移一格、猜错罚分，再看每一格怎么回头看左边。",
+  goal: "顺着看完：纸带、号码牌、右移一格、猜错罚分、每一格只看左边、开训怎么改一笔，再从开头往后续字。",
   why: "一句口号记不住。每一课分开讲：干什么、为什么、一个小例子、一句误会、一句记住。",
   remember: "从一条长纸带讲起。",
 };
 
 export const END_BEAT = {
   id: "end",
-  purpose: "纸带、右移、罚分和注意力，都对上了",
+  purpose: "纸带、右移、罚分、注意力、开训和采样，都对上了",
   caption: "通关啦",
   vo: "vo-clear",
   mood: "react",
-  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边。",
-  remember: "通关啦。开训还没写。",
+  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边，开训怎么改一笔，采样怎么往后续。",
+  remember: "通关啦。字符课的机制走到采样。本仓库没有生成出来的台词。",
 };
 
 export function phaseText(beat, phase = 0) {

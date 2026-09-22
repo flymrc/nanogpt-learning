@@ -1,6 +1,6 @@
 import { narrateLine } from "../audio/narrate.js";
 import { unlockAudio } from "../audio/sound.js";
-import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, PHASE_COUNT } from "../data/beats.js";
+import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "../data/beats.js";
 import { chapterList, t } from "../i18n/locale.js";
 import { openGuide } from "./guide.js";
 
@@ -8,6 +8,8 @@ const BEAT_COUNTS = {
   Level1: LEVEL1_BEATS.length,
   Level2: LEVEL2_BEATS.length,
   Level3: LEVEL3_BEATS.length,
+  Level4: LEVEL4_BEATS.length,
+  Level5: LEVEL5_BEATS.length,
 };
 
 let mounted = false;
@@ -16,6 +18,8 @@ export function sceneProgressKey(sceneKey) {
   if (sceneKey === "Level1") return "level1.progress";
   if (sceneKey === "Level2") return "level2.progress";
   if (sceneKey === "Level3") return "level3.progress";
+  if (sceneKey === "Level4") return "level4.progress";
+  if (sceneKey === "Level5") return "level5.progress";
   return null;
 }
 
@@ -263,8 +267,16 @@ export function retreatToPreviousChapter(scene) {
     goScene(scene, "Level2", { beat: BEAT_COUNTS.Level2 - 1, phase: PHASE_COUNT - 1 });
     return;
   }
-  if (key === "End") {
+  if (key === "Level4") {
     goScene(scene, "Level3", { beat: BEAT_COUNTS.Level3 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Level5") {
+    goScene(scene, "Level4", { beat: BEAT_COUNTS.Level4 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "End") {
+    goScene(scene, "Level5", { beat: BEAT_COUNTS.Level5 - 1, phase: PHASE_COUNT - 1 });
     return;
   }
   scene.scene.start("Title");

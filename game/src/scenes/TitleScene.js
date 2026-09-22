@@ -90,29 +90,25 @@ export default class TitleScene extends Phaser.Scene {
   drawChapters(v, plan) {
     const slot = plan.slots.chapters;
     const chapters = chapterList();
+    const cols = plan.chapterCols;
     const rows = plan.chapterRows;
-    const perRow = plan.perRow;
-    const gap = 6;
-    const btnW = plan.btnW;
-    const btnH = Math.max(44, Math.min(plan.btnH, slot.h - 28));
-    markCaption(
-      this.add
-        .text(v.cx, slot.top + 12, t("selectChapter"), uiText(15, { color: C.goldCss }))
-        .setOrigin(0.5),
-    );
+    const gapX = 8;
+    const gapY = 8;
+    const btnW = Math.min(168, (v.innerW - gapX * (cols - 1)) / cols);
+    const fittedH = (slot.h - gapY * (rows - 1)) / rows;
+    const btnH = Math.min(52, Math.max(44, fittedH));
+    const rowW = cols * btnW + (cols - 1) * gapX;
     chapters.forEach((chapter, i) => {
-      const row = Math.floor(i / perRow);
-      const col = i % perRow;
-      const inRow = Math.min(perRow, chapters.length - row * perRow);
-      const rowW = inRow * btnW + (inRow - 1) * gap;
-      const x = v.cx - rowW / 2 + btnW / 2 + col * (btnW + gap);
-      const y = slot.top + 28 + btnH / 2 + row * (btnH + 8);
-      createButton(this, x, y, chapter.shortLabel, () => this.startChapter(chapter.id), {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = v.cx - rowW / 2 + btnW / 2 + col * (btnW + gapX);
+      const y = slot.top + btnH / 2 + row * (btnH + gapY);
+      createButton(this, x, rows === 1 ? slot.cy : y, chapter.shortLabel, () => this.startChapter(chapter.id), {
         width: btnW,
         minWidth: 64,
         height: btnH,
-        fill: chapter.playable ? (i === 0 ? C.coral : C.gold) : C.surface2,
-        fontSize: btnW < 84 ? 14 : 16,
+        fill: i === 0 ? C.coral : i === chapters.length - 1 ? C.gold : C.surface,
+        fontSize: btnW < 120 ? 15 : 16,
       });
     });
     void rows;
@@ -150,8 +146,11 @@ function layoutTitle(v, shell) {
     const titlesH = titleSize * 1.7;
     const previewH = tile + STICKER_SHADOW_Y + CAPTION_CLEAR + 22 + 8;
     const mascotH = Math.round((landscapeShort ? 56 : v.portrait ? 84 : 72) * s);
-    const chapterPlan = chapterButtonPlan(v.innerW);
-    const chaptersH = Math.max(96, Math.round((22 + chapterPlan.rows * 52 + (chapterPlan.rows - 1) * 8 + 16) * s));
+    const chapterCols = v.innerW < 720 ? 2 : 5;
+    const chapterRows = Math.ceil(5 / chapterCols);
+    const chapterBtnH = Math.max(48, Math.round((landscapeShort ? 48 : 52) * s));
+    const chapterGap = 8;
+    const chaptersH = chapterRows * chapterBtnH + (chapterRows - 1) * chapterGap;
     const gapY = Math.round(12 * s);
     const items = [
       { id: "titles", h: titlesH },
@@ -171,11 +170,10 @@ function layoutTitle(v, shell) {
       gapY,
       titleSize,
       tile,
+      chapterCols,
+      chapterRows,
       robotScale: (landscapeShort ? 0.28 : v.short ? 0.32 : v.compact ? 0.38 : 0.46) * Math.min(1, s + 0.1),
-      chapterRows: chapterPlan.rows,
-      perRow: chapterPlan.perRow,
-      btnW: chapterPlan.btnW,
-      btnH: Math.round(48 * s),
+      btnH: chapterBtnH,
     };
   });
 
@@ -187,14 +185,4 @@ function layoutTitle(v, shell) {
   });
 
   return { ...measured, slots: stacked.slots };
-}
-
-function chapterButtonPlan(innerW) {
-  const n = 5;
-  const gap = 6;
-  const one = (innerW - gap * (n - 1)) / n;
-  const rows = one < 78 ? 2 : 1;
-  const perRow = rows === 1 ? n : 3;
-  const btnW = Math.min(132, (innerW - gap * (perRow - 1)) / perRow);
-  return { rows, perRow, btnW };
 }

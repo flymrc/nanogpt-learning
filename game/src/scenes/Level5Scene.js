@@ -1,33 +1,41 @@
 import Phaser from "phaser";
-import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
+import {
+  LEVEL1_BEATS,
+  LEVEL2_BEATS,
+  LEVEL3_BEATS,
+  LEVEL4_BEATS,
+  LEVEL5_BEATS,
+  PHASE_COUNT,
+  SPINE_TOTAL,
+} from "../data/beats.js";
 import { CHAPTERS } from "../i18n/copy.js";
 import { t } from "../i18n/locale.js";
 import { retreatToPreviousChapter } from "../ui/catalog.js";
 import { ctaFor, presentBeat } from "../ui/lesson-nav.js";
-import {
-  drawLookExample,
-  drawMaskExample,
-  drawMixExample,
-  drawQkvExample,
-  drawWeightExample,
-  drawWriteExample,
-} from "../ui/attention.js";
 import { clearLayer, makeLessonFrame } from "../ui/lesson.js";
+import {
+  drawKnobsExample,
+  drawLoopExample,
+  drawPromptExample,
+  drawRunExample,
+  drawScoreExample,
+  drawWrapExample,
+} from "../ui/sample.js";
 import { finishLessonStage, paintLessonStage, teachLesson } from "../ui/textbook.js";
 import { watchResize } from "../ui/layout.js";
 
-const OFFSET = LEVEL1_BEATS.length + LEVEL2_BEATS.length;
+const OFFSET = LEVEL1_BEATS.length + LEVEL2_BEATS.length + LEVEL3_BEATS.length + LEVEL4_BEATS.length;
 
-export default class Level3Scene extends Phaser.Scene {
+export default class Level5Scene extends Phaser.Scene {
   constructor() {
-    super("Level3");
+    super("Level5");
   }
 
   create() {
     const frame = makeLessonFrame(this, {
-      level: 3,
+      level: 5,
       total: CHAPTERS.length,
-      title: t("level3Title"),
+      title: t("level5Title"),
     });
     this.frame = frame;
     this.view = frame.v;
@@ -37,13 +45,13 @@ export default class Level3Scene extends Phaser.Scene {
 
     watchResize(this, {
       restart: true,
-      persist: () => this.registry.set("level3.progress", { beat: this.beat, phase: this.phase }),
+      persist: () => this.registry.set("level5.progress", { beat: this.beat, phase: this.phase }),
     });
 
-    const saved = this.registry.get("level3.progress");
+    const saved = this.registry.get("level5.progress");
     if (saved) {
-      this.registry.remove("level3.progress");
-      this.beat = Math.min(LEVEL3_BEATS.length - 1, saved.beat || 0);
+      this.registry.remove("level5.progress");
+      this.beat = Math.min(LEVEL5_BEATS.length - 1, saved.beat || 0);
       this.phase = Math.min(PHASE_COUNT - 1, saved.phase || 0);
       this.showBeat(this.beat, { instant: true, phase: this.phase });
     } else {
@@ -58,9 +66,9 @@ export default class Level3Scene extends Phaser.Scene {
       this.showBeat(this.beat, { phase: this.phase, speak: false });
       return;
     }
-    if (this.beat >= LEVEL3_BEATS.length - 1) {
-      this.registry.remove("level3.progress");
-      this.scene.start("Level4");
+    if (this.beat >= LEVEL5_BEATS.length - 1) {
+      this.registry.remove("level5.progress");
+      this.scene.start("End");
       return;
     }
     this.beat += 1;
@@ -91,7 +99,7 @@ export default class Level3Scene extends Phaser.Scene {
 
   showBeat(index, { instant = false, phase, speak } = {}) {
     this.phase = phase ?? this.phase ?? 0;
-    const raw = LEVEL3_BEATS[index];
+    const raw = LEVEL5_BEATS[index];
     const beat = presentBeat(this, raw, { speak });
     teachLesson(this, this.frame, beat, {
       index: OFFSET + index,
@@ -99,14 +107,14 @@ export default class Level3Scene extends Phaser.Scene {
       phase: this.phase,
       instant,
     });
-    const lastBeat = index === LEVEL3_BEATS.length - 1;
+    const lastBeat = index === LEVEL5_BEATS.length - 1;
     const lastPhase = this.phase >= PHASE_COUNT - 1;
     const cta = ctaFor({
       lastBeat,
       lastPhase,
       phase: this.phase,
-      endLabel: t("toLevel4"),
-      endCaption: t("toLevel4Hint"),
+      endLabel: t("toEnd"),
+      endCaption: t("toEndHint"),
     });
     this.frame.nextBtn.setLabel(cta.label);
     this.frame.nextBtn.setCaption(cta.caption);
@@ -120,10 +128,10 @@ export default class Level3Scene extends Phaser.Scene {
 }
 
 const RENDERERS = {
-  look: drawLookExample,
-  qkv: drawQkvExample,
-  mask: drawMaskExample,
-  weights: drawWeightExample,
-  mix: drawMixExample,
-  writeback: drawWriteExample,
+  prompt: drawPromptExample,
+  loop: drawLoopExample,
+  knobs: drawKnobsExample,
+  run: drawRunExample,
+  score: drawScoreExample,
+  wrap: drawWrapExample,
 };

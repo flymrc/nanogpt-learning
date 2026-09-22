@@ -16,7 +16,7 @@ import {
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { textureScale } from "../ui/dpr.js";
 import { isWidePcTutor } from "../tutor/bus.js";
-import { TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { STICKER_SHADOW_X, TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
@@ -80,7 +80,23 @@ export default class EndScene extends Phaser.Scene {
         title: t("cardLook"),
         caption: t("cardLookCap"),
         tip: t("cardLookTip"),
+        accent: C.violet,
+      },
+      {
+        icon: "deco-scroll",
+        fallback: "训",
+        title: t("cardTrain"),
+        caption: t("cardTrainCap"),
+        tip: t("cardTrainTip"),
         accent: C.gold,
+      },
+      {
+        icon: "deco-sparkle",
+        fallback: "续",
+        title: t("cardSample"),
+        caption: t("cardSampleCap"),
+        tip: t("cardSampleTip"),
+        accent: C.coral,
       },
     ];
 
@@ -88,9 +104,11 @@ export default class EndScene extends Phaser.Scene {
     const cardW = plan.cardW;
     const cardH = plan.cardH;
     const stack = plan.stackCards;
+    const cardGap = Math.max(plan.cardGap, STICKER_SHADOW_X + 4);
 
     cards.forEach((card, i) => {
-      const x = stack ? v.cx : v.cx + (i - 1) * Math.min(cardW + 16, v.innerW / 3 + 8);
+      const pitch = cardW + cardGap;
+      const x = stack ? v.cx : v.cx + (i - (cards.length - 1) / 2) * pitch;
       const y = stack ? cardBand.top + cardH / 2 + i * (cardH + plan.cardGap) : cardBand.cy;
       const panel = this.add.container(x, y);
       const g = this.add.graphics();
@@ -104,7 +122,7 @@ export default class EndScene extends Phaser.Scene {
           this.add
             .image(iconX, iconY, card.icon)
             .setScale(
-              textureScale(card.icon === "deco-star" ? (stack ? 0.5 : 0.62) : stack ? 0.46 : 0.64),
+              textureScale(card.icon === "deco-star" ? (stack ? 0.42 : 0.5) : stack ? 0.4 : 0.52),
             ),
         );
       } else {
@@ -165,12 +183,15 @@ function layoutEnd(v, shell) {
     const robotScale = (v.compact ? 0.36 : 0.48) * Math.min(1, s + 0.08);
     const robotH = 200 * robotScale;
     const heroH = v.portrait ? robotH + 36 + titleSize : Math.max(robotH, titleSize + 24);
-    const cardW = stackCards ? Math.min(300, v.innerW - 8) : Math.min(280, (v.innerW - 24) / 3);
-    const cardGap = Math.round(10 * s);
+    const cardCount = 5;
+    const cardGap = Math.max(12, Math.round(12 * s));
+    const cardW = stackCards
+      ? Math.min(300, v.innerW - 8)
+      : Math.min(200, (v.innerW - cardGap * (cardCount - 1) - 8) / cardCount);
     const cardH = stackCards
-      ? clamp((shell.content.h - heroH - 24) / 3 - cardGap, 72, 112)
-      : clamp(140 * s, 88, 160);
-    const cardsH = stackCards ? cardH * 3 + cardGap * 2 : cardH;
+      ? clamp((shell.content.h - heroH - 24) / cardCount - cardGap, 68, 96)
+      : clamp(128 * s, 88, 150);
+    const cardsH = stackCards ? cardH * cardCount + cardGap * (cardCount - 1) : cardH;
     const gapY = Math.round(12 * s);
     const items = [
       { id: "hero", h: heroH },

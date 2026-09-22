@@ -4,6 +4,8 @@ import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
 import Level3Scene from "./scenes/Level3Scene.js";
+import Level4Scene from "./scenes/Level4Scene.js";
+import Level5Scene from "./scenes/Level5Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
 import { setLang, toggleLang } from "./i18n/locale.js";
@@ -19,7 +21,7 @@ import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
 import { applyLayoutMode } from "./ui/mode.js";
-import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, PHASE_COUNT } from "./data/beats.js";
+import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "./data/beats.js";
 
 const startCss = cssViewportSize();
 const startDpr = displayRatio();
@@ -53,7 +55,7 @@ const config = {
     roundPixels: false,
     powerPreference: "high-performance",
   },
-  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, EndScene],
+  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
 };
 
 function applyOuterViewport() {
@@ -203,6 +205,8 @@ async function boot() {
     l1: LEVEL1_BEATS.length,
     l2: LEVEL2_BEATS.length,
     l3: LEVEL3_BEATS.length,
+    l4: LEVEL4_BEATS.length,
+    l5: LEVEL5_BEATS.length,
     phases: PHASE_COUNT,
   };
 
@@ -210,6 +214,8 @@ async function boot() {
     if (key === "Level1") game.registry.set("level1.progress", { beat, phase });
     if (key === "Level2") game.registry.set("level2.progress", { beat, phase });
     if (key === "Level3") game.registry.set("level3.progress", { beat, phase });
+    if (key === "Level4") game.registry.set("level4.progress", { beat, phase });
+    if (key === "Level5") game.registry.set("level5.progress", { beat, phase });
     const active = game.scene.getScenes(true)[0];
     active?.scene.start(key);
     return key;

@@ -174,4 +174,4 @@ def forward(self, x):
 
 ## 下一步
 
-开训仍然是：`python train.py config/train_shakespeare_char.py`。等这一章的遮罩和 QKV 能自己讲顺，再决定是否本机开训。
+开训见 [notes/04-train.md](04-train.md)：`python train.py config/train_shakespeare_char.py`。采样见 [notes/05-sample.md](05-sample.md)。这一章仍然不跑训练，也不记录 loss。
