@@ -3,8 +3,9 @@ import { TITLE_BEAT } from "../data/beats.js";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, paintBackdrop } from "../ui/components.js";
-import { fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, markCaption, paintBackdrop } from "../ui/components.js";
+import { CAPTION_CLEAR, STICKER_SHADOW_Y, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { installLayoutProbe } from "../ui/e2e.js";
 import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText } from "../ui/theme.js";
 
@@ -68,37 +69,42 @@ export default class TitleScene extends Phaser.Scene {
 
     cueVoice(this, "vo-title");
     emitTutor(TITLE_BEAT);
+    this.frame = { nextBtn: this.startBtn, stage: { list: [] } };
+    installLayoutProbe(this);
   }
 
   playPreview(v, plan) {
     const sample = ["S", "e", "c", "o", "n", "d"];
     const tile = plan.tile;
     const preview = plan.slots.preview;
-    const stack = plan.stackPreview;
-    const yChars = stack ? preview.top + tile / 2 + 4 : preview.cy;
-    const gap = tile + 8;
-    const fromX = v.cx - ((sample.length - 1) * gap) / 2;
+    const captionH = 22;
+    const blockH = tile + STICKER_SHADOW_Y + CAPTION_CLEAR + captionH;
+    const top = preview.top + Math.max(0, (preview.h - blockH) / 2);
+    const yChars = top + tile / 2;
+    const pitch = tile + 8;
+    const fromX = v.cx - ((sample.length - 1) * pitch) / 2;
     sample.forEach((ch, i) => {
-      makeCharTile(this, fromX + i * gap, yChars, ch, {
+      makeCharTile(this, fromX + i * pitch, yChars, ch, {
         width: tile,
         height: tile,
         seed: ch,
       });
     });
-    this.add
-      .text(v.cx, stack ? preview.bottom - 8 : preview.bottom - 2, "一条长纸带", displayText(16, { color: C.muted }))
-      .setOrigin(0.5);
+    markCaption(
+      this.add
+        .text(v.cx, yChars + tile / 2 + STICKER_SHADOW_Y + CAPTION_CLEAR + captionH / 2, "一条长纸带", displayText(16, { color: C.muted }))
+        .setOrigin(0.5),
+    );
   }
 }
 
 function layoutTitle(v, shell) {
   const landscapeShort = v.short && !v.portrait;
-  const stackPreview = v.portrait && v.innerW < 520;
   const measured = fitMeasure(shell.content.h, (s) => {
     const titleSize = Math.min(v.portrait ? 48 : 56, v.innerW / (v.portrait ? 7.2 : 12)) * s;
     const tile = Math.max(36, Math.min(54, v.innerW / 10) * s);
     const titlesH = titleSize * 1.7;
-    const previewH = stackPreview ? tile + 36 + tile * 1.3 : Math.max(tile * 1.35, 72);
+    const previewH = tile + STICKER_SHADOW_Y + CAPTION_CLEAR + 22 + 8;
     const mascotH = Math.round((landscapeShort ? 64 : v.portrait ? 96 : 80) * s);
     const gapY = Math.round(14 * s);
     const items = [
@@ -118,7 +124,6 @@ function layoutTitle(v, shell) {
       gapY,
       titleSize,
       tile,
-      stackPreview,
       robotScale: (landscapeShort ? 0.28 : v.short ? 0.32 : v.compact ? 0.38 : 0.46) * Math.min(1, s + 0.1),
     };
   });

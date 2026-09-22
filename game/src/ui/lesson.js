@@ -1,6 +1,6 @@
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
-import { band, clamp, lessonRhythm, makeShell } from "./layout.js";
+import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
@@ -81,17 +81,31 @@ export function placeLessonCta(frame, contentBottom) {
   btn.y = Math.min(frame.shell.footer.cy, raw);
 }
 
+function layoutSpan(child) {
+  const height = child?.getData?.("height");
+  if (!(height > 1)) return null;
+  const scale = Math.abs(child.scaleY || 1);
+  const shadow = child.getData("shadow") === true ? STICKER_SHADOW_Y * scale : 0;
+  return {
+    top: child.y - (height * scale) / 2,
+    bottom: child.y + (height * scale) / 2 + shadow,
+  };
+}
+
 /** Drop or nudge example-layer children that would sit on the CTA. */
 export function keepStageAboveCta(scene, band, ceiling) {
   const layer = scene.frame?.stage;
   if (!layer) return;
   for (const child of [...(layer.list || [])]) {
-    const bounds = child.getBounds?.();
-    if (!bounds || bounds.height < 2) continue;
-    if (bounds.bottom <= ceiling + 1) continue;
-    if (bounds.bottom <= (band?.top || 0) + 8) continue;
-    const dy = ceiling - bounds.bottom;
-    if (bounds.top + dy >= (band?.top || 0) + 2) {
+    const span = layoutSpan(child);
+    const bounds = span || child.getBounds?.();
+    const top = span ? span.top : bounds?.top;
+    const bottom = span ? span.bottom : bounds?.bottom;
+    if (bottom == null || bottom - top < 2) continue;
+    if (bottom <= ceiling + 1) continue;
+    if (bottom <= (band?.top || 0) + 8) continue;
+    const dy = ceiling - bottom;
+    if (top + dy >= (band?.top || 0) + 2) {
       child.y += dy;
     } else {
       scene.tweens?.killTweensOf(child);
@@ -103,6 +117,11 @@ export function keepStageAboveCta(scene, band, ceiling) {
 export function layerBottom(layer, fallback) {
   let bottom = fallback || 0;
   for (const child of layer?.list || []) {
+    const span = layoutSpan(child);
+    if (span) {
+      bottom = Math.max(bottom, span.bottom);
+      continue;
+    }
     const bounds = child.getBounds?.();
     if (bounds) bottom = Math.max(bottom, bounds.bottom);
   }
@@ -184,6 +203,10 @@ export function makeIconCard(scene, x, y, { glyph, label, accent = C.gold, width
     .setOrigin(0.5);
   box.add([g, stripe, icon, cap]);
   box.setSize(width, height);
+  box.setData("kind", "card");
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("shadow", true);
   return box;
 }
 
@@ -200,6 +223,10 @@ export function makeBigStat(scene, x, y, { value, label, width, height, accent =
     .setOrigin(0.5);
   box.add([g, bar, val, cap]);
   box.setSize(width, height);
+  box.setData("kind", "card");
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("shadow", true);
   return box;
 }
 
