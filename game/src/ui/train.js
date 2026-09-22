@@ -56,7 +56,7 @@ export function drawEnoughExample(scene, stage, opts) {
     { glyph: "停", label: "步数到了", accent: C.blue },
     { glyph: "存", label: "验收更好", accent: C.gold },
     { glyph: "续", label: "还没写", accent: C.violet },
-  ], "采样留到下一章。");
+  ], "下一章才往后面续字。");
 }
 
 function drawCardRow(scene, stage, { instant } = {}, cards, caption) {

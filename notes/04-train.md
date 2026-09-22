@@ -198,10 +198,10 @@ README 写：一块 A100 上，上面的 GPU 命令大约 3 分钟，最好的 v
 - 验收卷只抽查；这份配置在验收罚分变好时才写 `ckpt.pt`。
 - 启动命令是 README 那一行，`max_iters = 5000` 是停止条件，不是「写得像莎翁」的证明。
 
-采样还没有做。上游 README 的下一行是：
+采样见 [notes/05-sample.md](05-sample.md)。上游 README 的下一行是：
 
 ```sh
 python sample.py --out_dir=out-shakespeare-char
 ```
 
-`model.generate` 会把新抽出的字符接回纸带再往前看。那是下一章的事。本仓库没有采样输出。
+`model.generate` 会把新抽出的字符接回纸带再往前看。那一章才讲。本仓库没有采样输出。

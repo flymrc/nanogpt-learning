@@ -114,3 +114,26 @@ export const TRAIN = {
   command: "python train.py config/train_shakespeare_char.py",
   sample: "python sample.py --out_dir=out-shakespeare-char",
 };
+
+/**
+ * sample.py defaults at commit 3adf61e, plus the README command that points
+ * out_dir at the shakespeare_char checkpoint. This repo has no ckpt.pt and
+ * has not reproduced a sample. top_k stays 200 in the script; the char vocab
+ * is 65, so min(top_k, vocab) keeps every token.
+ */
+export const SAMPLE = {
+  command: "python sample.py --out_dir=out-shakespeare-char",
+  cpuCommand: "python sample.py --out_dir=out-shakespeare-char --device=cpu",
+  outDir: "out-shakespeare-char",
+  ckpt: "ckpt.pt",
+  initFrom: "resume",
+  start: "\n",
+  numSamples: 10,
+  maxNewTokens: 500,
+  temperature: 0.8,
+  topK: 200,
+  seed: 1337,
+  device: "cuda",
+  compile: false,
+  meta: "data/shakespeare_char/meta.pkl",
+};
