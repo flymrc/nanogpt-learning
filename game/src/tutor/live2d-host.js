@@ -314,14 +314,15 @@ function placeModel() {
   const natural = naturalSize(model);
   if (!natural) return;
   const maxH = Math.max(120, h - 8);
-  // The dock is position:fixed; right:0. Anchor the visible mesh to that
-  // overlay's right edge, which is the viewport's right edge.
+  // The dock stays position:fixed; right:0 and does not take lesson width.
+  // RIGHT_INSET pulls hair/arm off the viewport edge (was flush at ~2px).
   const scale = maxH / natural.h;
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
   const drawnH = natural.h * scale;
   const bodyHalf = 78;
-  model.x = Math.round(w - 10 - bodyHalf);
+  const RIGHT_INSET = 28;
+  model.x = Math.round(w - RIGHT_INSET - bodyHalf);
   model.y = Math.max(4, (h - drawnH) * 0.02);
 }
 
