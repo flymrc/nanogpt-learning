@@ -104,10 +104,9 @@ async function runViewport(label, pageOpts, { allPhases }) {
 }
 
 async function assertMuteSlash(page) {
-  await page.evaluate(() => {
-    const btn = document.getElementById("mute-toggle");
-    if (btn && !btn.classList.contains("is-muted")) btn.click();
-  });
+  const already = await page.evaluate(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
+  if (!already) await page.click("#mute-toggle");
+  await page.waitForFunction(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
   await page.waitForTimeout(200);
   const box = await page.evaluate(() => {
     const btn = document.getElementById("mute-toggle");
@@ -126,7 +125,7 @@ async function assertMuteSlash(page) {
   if (box.position === "static" || !box.centerInside) {
     throw new Error(`mute slash escaped the button ${JSON.stringify(box)}`);
   }
-  await page.evaluate(() => document.getElementById("mute-toggle")?.click());
+  await page.click("#mute-toggle");
   return box;
 }
 
