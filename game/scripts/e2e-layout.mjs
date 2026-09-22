@@ -98,8 +98,35 @@ async function runViewport(label, pageOpts, { allPhases }) {
   const notesOpen = await page.evaluate(() => !document.getElementById("notes-overlay")?.hidden);
   await page.screenshot({ path: `${OUT}/${label}-glossary.png` });
   await page.click("#notes-close");
+  const muteSlash = await assertMuteSlash(page);
   await page.close();
-  return { reports, bookOpen, notesOpen, walked: jobs.length };
+  return { reports, bookOpen, notesOpen, muteSlash, walked: jobs.length };
+}
+
+async function assertMuteSlash(page) {
+  const already = await page.evaluate(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
+  if (!already) await page.click("#mute-toggle");
+  await page.waitForFunction(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
+  await page.waitForTimeout(200);
+  const box = await page.evaluate(() => {
+    const btn = document.getElementById("mute-toggle");
+    const slash = btn?.querySelector(".mute-toggle__slash");
+    const br = btn.getBoundingClientRect();
+    const sr = slash.getBoundingClientRect();
+    const cx = sr.x + sr.width / 2;
+    const cy = sr.y + sr.height / 2;
+    return {
+      position: getComputedStyle(btn).position,
+      centerInside: cx >= br.left && cx <= br.right && cy >= br.top && cy <= br.bottom,
+      btn: { x: br.x, y: br.y, w: br.width, h: br.height },
+      slash: { x: sr.x, y: sr.y, w: sr.width, h: sr.height },
+    };
+  });
+  if (box.position === "static" || !box.centerInside) {
+    throw new Error(`mute slash escaped the button ${JSON.stringify(box)}`);
+  }
+  await page.click("#mute-toggle");
+  return box;
 }
 
 const mobile = await runViewport(

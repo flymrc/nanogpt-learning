@@ -342,7 +342,6 @@ html.is-mobile #pc-chrome {
   pointer-events: auto;
 }
 
-#mobile-actions .mute-toggle,
 #mobile-actions .notes-toggle,
 #mobile-actions .book-toggle {
   position: static;
@@ -354,9 +353,24 @@ html.is-mobile #pc-chrome {
   font-size: 13px;
 }
 
+/* Keep the button as the slash's containing block. position:static lets the
+   absolute slash anchor to #app-layout and draw through the center of the lesson. */
 #mobile-actions .mute-toggle {
+  position: relative;
+  overflow: hidden;
   width: 36px;
+  height: 36px;
   padding: 0;
+  border-width: 4px;
+  border-radius: 14px;
+  box-shadow: 3px 4px 0 rgba(59, 42, 46, 0.18);
+}
+
+#mobile-actions .mute-toggle__slash {
+  width: 16px;
+  height: 3px;
+  margin: -1.5px 0 0 -8px;
+  border-width: 1.5px;
 }
 
 #mobile-actions .mute-toggle__speaker {
