@@ -315,13 +315,13 @@ function placeModel() {
   if (!natural) return;
   const maxH = Math.max(120, h - 8);
   // The dock stays position:fixed; right:0 and does not take lesson width.
-  // RIGHT_INSET pulls hair/arm off the viewport edge (was flush at ~2px).
+  // Idle swings the sleeve past the viewport. 78px leaves that pose about 20px in.
   const scale = maxH / natural.h;
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
   const drawnH = natural.h * scale;
   const bodyHalf = 78;
-  const RIGHT_INSET = 28;
+  const RIGHT_INSET = 78;
   model.x = Math.round(w - RIGHT_INSET - bodyHalf);
   model.y = Math.max(4, (h - drawnH) * 0.02);
 }
