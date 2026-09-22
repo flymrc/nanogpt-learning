@@ -338,6 +338,210 @@ function tipOk(tip, needle) {
   );
 }
 
+function speechMockSource(mode) {
+  return `(() => {
+    const mode = ${JSON.stringify(mode)};
+    const ja = { voiceURI: "Google 日本語", name: "Google 日本語", lang: "ja-JP", localService: false, default: false };
+    const kyoko = { voiceURI: "Kyoko", name: "Kyoko", lang: "ja-JP", localService: true, default: false };
+    const zh = { voiceURI: "Microsoft Huihui", name: "Microsoft Huihui", lang: "zh-CN", localService: true, default: true };
+    const voices = mode === "ja" ? [zh, kyoko, ja] : [zh];
+    let ready = mode !== "ja";
+    const listeners = new Set();
+    window.__nanoGPTReleaseVoices = () => {
+      ready = true;
+      listeners.forEach((fn) => {
+        try { fn(); } catch (err) { console.error(err); }
+      });
+    };
+    class FakeUtterance {
+      constructor(text) {
+        this.text = String(text ?? "");
+        this.lang = "";
+        this.voice = null;
+        this.rate = 1;
+        this.pitch = 1;
+        this.volume = 1;
+        this.onend = null;
+        this.onerror = null;
+        this.onstart = null;
+      }
+    }
+    window.SpeechSynthesisUtterance = FakeUtterance;
+    const synth = {
+      speaking: false,
+      pending: false,
+      paused: false,
+      onvoiceschanged: null,
+      getVoices() { return ready ? voices.slice() : []; },
+      addEventListener(type, fn) {
+        if (type === "voiceschanged" && typeof fn === "function") listeners.add(fn);
+      },
+      removeEventListener(type, fn) {
+        if (type === "voiceschanged") listeners.delete(fn);
+      },
+      cancel() {
+        this.speaking = false;
+        this.pending = false;
+      },
+      resume() { this.paused = false; },
+      pause() { this.paused = true; },
+      speak(utter) {
+        this.speaking = true;
+        this.pending = false;
+        window.__nanoGPTUtterance = utter;
+        setTimeout(() => {
+          if (window.__nanoGPTUtterance !== utter) return;
+          this.speaking = false;
+          if (typeof utter.onend === "function") utter.onend();
+        }, 30);
+      },
+    };
+    try {
+      Object.defineProperty(window, "speechSynthesis", { configurable: true, get() { return synth; } });
+    } catch (err) {
+      window.__speechMockError = String(err);
+    }
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-game-muted", "0");
+    localStorage.removeItem("nanogpt-lang");
+  })();`;
+}
+
+const MOBILE_UA =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1";
+
+async function openSpeechPage(browser, { mode, label }) {
+  const mobile = label !== "pc";
+  const page = await browser.newPage({
+    viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
+    isMobile: mobile,
+    hasTouch: mobile,
+    userAgent: mobile ? MOBILE_UA : undefined,
+  });
+  await page.addInitScript(speechMockSource(mode));
+  await ready(page);
+  const hooked = await page.evaluate((expected) => {
+    const count = window.speechSynthesis?.getVoices?.().length;
+    return {
+      ok: typeof window.__nanoGPTReleaseVoices === "function" && count === expected && !window.__speechMockError,
+      count,
+      error: window.__speechMockError || "",
+    };
+  }, mode === "ja" ? 0 : 1);
+  if (!hooked?.ok) throw new Error(`speech mock missing (${label}) ${JSON.stringify(hooked)}`);
+  const guide = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === false);
+  if (guide) {
+    await page.click("#guide-close");
+    await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === true);
+  }
+  return page;
+}
+
+async function assertJaSpeech(browser) {
+  const voiced = await pageWithJaVoice(browser);
+  const missing = await pageWithoutJaVoice(browser, "mobile");
+  const missingPc = await pageWithoutJaVoice(browser, "pc");
+  return { voiced: true, missing: missing && missingPc, voicedSpeak: voiced };
+}
+
+async function pageWithJaVoice(browser) {
+  const page = await openSpeechPage(browser, { mode: "ja", label: "mobile" });
+  await page.click("#lang-toggle");
+  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && window.__nanoGPTState?.().beat === 0);
+  await page.waitForTimeout(200);
+  const early = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak"));
+  if (early.length) throw new Error(`spoke before voiceschanged ${JSON.stringify(early)}`);
+  const waited = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).some((entry) => entry.op === "wait"));
+  if (!waited) throw new Error(`did not wait for voiceschanged ${JSON.stringify(await page.evaluate(() => window.__nanoGPTSpeechLog))}`);
+  await page.evaluate(() => window.__nanoGPTReleaseVoices());
+  await page.waitForFunction(() => {
+    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak" && entry.lang === "ja-JP" && String(entry.voice).includes("日本"));
+    return Boolean(hit && hit.text);
+  });
+  const first = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak").at(-1));
+  if (first.voiceLang && String(first.voiceLang).toLowerCase().startsWith("zh")) {
+    throw new Error(`ja utterance used a Chinese voice ${JSON.stringify(first)}`);
+  }
+  const note = await page.evaluate(() => document.getElementById("voice-note")?.textContent || "");
+  if (!note.includes("音声")) throw new Error(`voiced note ${note}`);
+  if ((await page.evaluate(() => document.getElementById("voice-note")?.dataset.missing)) === "1") {
+    throw new Error("missing-voice tip showed even though a ja voice exists");
+  }
+  await page.screenshot({ path: `${OUT}/ja-speak-voice.png` });
+
+  const beforeMute = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak").length);
+  await page.click("#mute-toggle");
+  await page.waitForFunction(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
+  await page.waitForTimeout(180);
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 1, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().beat === 1);
+  await page.waitForTimeout(250);
+  const whileMuted = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak").length);
+  if (whileMuted !== beforeMute) throw new Error(`spoke while muted ${whileMuted} vs ${beforeMute}`);
+  const mutedState = await page.evaluate(() => window.__nanoGPTNarration?.() || {});
+  if (mutedState.playing) throw new Error(`still playing while muted ${JSON.stringify(mutedState)}`);
+
+  await page.click("#mute-toggle");
+  await page.waitForFunction(() => !(document.getElementById("mute-toggle")?.classList.contains("is-muted")));
+  await page.waitForFunction((min) => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak").length > min, beforeMute);
+  const resumed = await page.evaluate(() => (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak").at(-1));
+  if (resumed.lang !== "ja-JP" || !String(resumed.voice).includes("日本")) {
+    throw new Error(`unmute did not resume ja ${JSON.stringify(resumed)}`);
+  }
+
+  await page.click("#lang-toggle");
+  await page.waitForFunction(() => document.documentElement.lang === "zh-CN");
+  await page.waitForFunction(() => {
+    const row = window.__nanoGPTNarration?.() || {};
+    return String(row.lang || "").startsWith("zh") && (row.source === "clip" || row.source === "speech");
+  });
+  const zh = await page.evaluate(() => window.__nanoGPTNarration?.() || {});
+  if (String(zh.lang).startsWith("ja")) throw new Error(`lang toggle left ja narration ${JSON.stringify(zh)}`);
+
+  await page.click("#lang-toggle");
+  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.waitForFunction(() => {
+    const speaks = (window.__nanoGPTSpeechLog || []).filter((entry) => entry.op === "speak" && entry.lang === "ja-JP");
+    return speaks.length >= 3 && String(speaks.at(-1).voice).includes("日本");
+  });
+  await page.close();
+  return first;
+}
+
+async function pageWithoutJaVoice(browser, label) {
+  const page = await openSpeechPage(browser, { mode: "none", label });
+  await page.click("#lang-toggle");
+  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1");
+  await page.waitForFunction(() => {
+    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak");
+    const note = document.getElementById("voice-note");
+    const text = note?.textContent || "";
+    return Boolean(
+      hit &&
+        hit.lang === "ja-JP" &&
+        !hit.voice &&
+        note?.dataset.missing === "1" &&
+        text.includes("Chrome") &&
+        text.includes("日本語") &&
+        text.includes("安装"),
+    );
+  });
+  const row = await page.evaluate(() => window.__nanoGPTNarration?.() || {});
+  if (!row.missingVoice || row.lang !== "ja-JP") throw new Error(`missing voice state ${label} ${JSON.stringify(row)}`);
+  const layout = await page.evaluate(() => window.__nanoGPTAssertLayout?.());
+  if (layout && !layout.ok) {
+    throw new Error(`missing-voice layout ${label} ${JSON.stringify({ overlaps: layout.overlaps, overflows: layout.overflows })}`);
+  }
+  await page.screenshot({ path: `${OUT}/ja-missing-voice-${label}.png` });
+  await page.close();
+  return true;
+}
+
 async function assertMuteSlash(page) {
   const already = await page.evaluate(() => document.getElementById("mute-toggle")?.classList.contains("is-muted"));
   if (!already) await page.click("#mute-toggle");
@@ -364,6 +568,8 @@ async function assertMuteSlash(page) {
   return box;
 }
 
+const speech = await assertJaSpeech(browser);
+
 const mobile = await runViewport(
   "mobile",
   {
@@ -388,7 +594,7 @@ const pc = await runViewport(
 
 await browser.close();
 
-const summary = { mobile, pc };
+const summary = { mobile, pc, speech };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports].filter((r) => !r.ok);
@@ -422,7 +628,8 @@ const trainOk = mobile.trainLayout?.ok && pc.trainLayout?.ok;
 const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
 const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
 const flowOk = mobile.guideShown && pc.guideShown;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk) {
+const speechOk = speech?.voiced === true && speech?.missing === true;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -435,8 +642,10 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     sampleOk,
     chromeOk,
     flowOk,
+    speechOk,
+    speech,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked}`);
+console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} jaSpeech=1`);

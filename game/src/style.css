@@ -794,6 +794,12 @@ html.has-game-cursor * {
   pointer-events: none;
 }
 
+.voice-note.is-missing {
+  color: #9a3b45;
+  pointer-events: auto;
+  cursor: help;
+}
+
 html.is-mobile .voice-note {
   flex: 1 1 100%;
   min-width: 0;

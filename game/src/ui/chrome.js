@@ -60,9 +60,27 @@ export function bindVoiceNote() {
   const note = document.getElementById("voice-note");
   if (!note || note.dataset.bound === "1") return;
   note.dataset.bound = "1";
+  note.setAttribute("aria-live", "polite");
   window.addEventListener("nanogpt-narration", (event) => {
     const detail = event.detail || {};
     const text = String(detail.text || "").replace(/\s+/g, " ").trim();
+    const ja = String(detail.lang || "").toLowerCase().startsWith("ja");
+    if (detail.missingVoice && ja) {
+      const tip = t("voiceMissing");
+      note.textContent = tip;
+      note.title = tip;
+      note.setAttribute("aria-label", tip);
+      note.dataset.live = "1";
+      note.dataset.missing = "1";
+      note.dataset.lang = detail.lang || "";
+      note.dataset.source = detail.source || "";
+      note.classList.add("is-missing");
+      return;
+    }
+    note.classList.remove("is-missing");
+    note.dataset.missing = "";
+    note.removeAttribute("title");
+    note.removeAttribute("aria-label");
     if (!text) {
       note.textContent = t("voiceIdle");
       note.dataset.live = "";

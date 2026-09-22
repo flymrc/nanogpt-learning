@@ -153,9 +153,8 @@ async function boot() {
     if (!scene || scene.sys.settings.key === "Boot") return;
     game.registry.set("forceSpeak", true);
     const key = scene.sys.settings.key;
-    if (key === "Level1" || key === "Level2" || key === "Level3") {
-      const id = key === "Level1" ? "level1" : key === "Level2" ? "level2" : "level3";
-      game.registry.set(`${id}.progress`, { beat: scene.beat || 0, phase: scene.phase || 0 });
+    if (/^Level[1-5]$/.test(key)) {
+      game.registry.set(`${key.toLowerCase()}.progress`, { beat: scene.beat || 0, phase: scene.phase || 0 });
     }
     scene.scene.restart();
   };
