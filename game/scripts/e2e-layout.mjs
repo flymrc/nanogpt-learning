@@ -76,6 +76,13 @@ async function runViewport(label, pageOpts, { allPhases }) {
   }
   const jobs = walks(spine, { allPhases });
   const reports = [];
+  await page.waitForTimeout(400);
+  const titleResult = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  await page.screenshot({ path: `${OUT}/${label}-title.png` });
+  reports.push({ name: `${label}-title`, ...titleResult });
+  if (!titleResult?.ok) console.error(`FAIL ${label} title overlaps=${JSON.stringify(titleResult?.overlaps || [])}`);
+  else console.log(`ok ${label} title`);
+
   for (const [key, beat, phase, name] of jobs) {
     const result = await jumpAndAssert(page, key, beat, phase, `${label}-${name}`);
     reports.push(result);
@@ -86,17 +93,6 @@ async function runViewport(label, pageOpts, { allPhases }) {
       console.log(`ok ${label} ${name} overlaps=${overlap}`);
     }
   }
-
-  const title = await page.evaluate(() => {
-    window.__nanoGPTJump("Title", 0, 0);
-    return true;
-  });
-  await page.waitForTimeout(700);
-  const titleResult = await page.evaluate(() => window.__nanoGPTAssertLayout());
-  await page.screenshot({ path: `${OUT}/${label}-title.png` });
-  reports.push({ name: `${label}-title`, ...titleResult, jumped: title });
-  if (!titleResult?.ok) console.error(`FAIL ${label} title overlaps=${JSON.stringify(titleResult?.overlaps || [])}`);
-  else console.log(`ok ${label} title`);
 
   await page.click("#book-toggle");
   await page.waitForTimeout(250);
