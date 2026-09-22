@@ -3,6 +3,22 @@ import { cssViewportSize, displayRatio, syncRetinaCamera } from "./dpr.js";
 import { C } from "./theme.js";
 
 export const TAP_MIN = 48;
+
+/** Drop shadow drawn by sticker graphics. Layout gaps must clear this. */
+export const STICKER_SHADOW_X = 5;
+export const STICKER_SHADOW_Y = 8;
+
+/** Body-to-body gap. Wider than the drop shadow so AABBs do not touch. */
+export const CHIP_GAP_X = 6;
+export const CHIP_GAP_Y = 10;
+
+/** Smallest 号码牌 that still fits a 12px number above the stripe. */
+export const MIN_CHIP_W = 32;
+export const MIN_CHIP_H = 40;
+export const MIN_ID_FONT = 12;
+
+/** Empty space required between a tile/chip (including its shadow) and a caption. */
+export const CAPTION_CLEAR = 12;
 export { cssViewportSize, displayRatio } from "./dpr.js";
 
 /** Even gaps: 12–16 on phone, 12–24 on PC. */
@@ -255,6 +271,72 @@ export function flowPositions(count, { y, tileW, tileH, gapX, gapY, innerW, cx }
       rows,
     };
   });
+}
+
+/**
+ * Pack `count` tiles into `width`×`maxHeight`, preferring wider tiles.
+ * Callers that need 号码牌 should keep the default min size.
+ */
+export function fitChipGrid(count, {
+  left = 0,
+  top = 0,
+  width = 320,
+  maxHeight = Infinity,
+  maxW = 52,
+  maxH = 68,
+  minW = MIN_CHIP_W,
+  minH = MIN_CHIP_H,
+  gapX = CHIP_GAP_X,
+  gapY = CHIP_GAP_Y,
+} = {}) {
+  const pack = (cols, tileW, tileH) => {
+    const safeCols = Math.max(1, cols);
+    const rows = Math.max(1, Math.ceil(Math.max(0, count) / safeCols));
+    const positions = [];
+    for (let i = 0; i < count; i += 1) {
+      const r = Math.floor(i / safeCols);
+      const c = i % safeCols;
+      const inRow = Math.min(safeCols, count - r * safeCols);
+      const rowW = inRow * tileW + Math.max(0, inRow - 1) * gapX;
+      const start = left + (width - rowW) / 2 + tileW / 2;
+      positions.push({
+        x: start + c * (tileW + gapX),
+        y: top + r * (tileH + gapY) + tileH / 2,
+        row: r,
+        col: c,
+      });
+    }
+    const height = rows * tileH + Math.max(0, rows - 1) * gapY;
+    return { cols: safeCols, rows, tileW, tileH, positions, height, gapX, gapY };
+  };
+
+  if (count <= 0) return pack(1, minW, minH);
+
+  let best = null;
+  const consider = (cols, tileW, tileH) => {
+    const packed = pack(cols, tileW, tileH);
+    const score = tileW * 1000 + tileH;
+    if (!best || score > best.score) best = { score, packed };
+  };
+
+  for (let rows = 1; rows <= count; rows += 1) {
+    const cols = Math.ceil(count / rows);
+    const rawW = (width - Math.max(0, cols - 1) * gapX) / cols;
+    if (rawW < minW - 0.05) continue;
+    const tileW = Math.min(maxW, rawW);
+    let tileH = Math.min(maxH, Math.max(minH, tileW * 1.32));
+    const natural = rows * tileH + Math.max(0, rows - 1) * gapY;
+    if (natural <= maxHeight + 0.5) {
+      consider(cols, tileW, tileH);
+      continue;
+    }
+    const fitH = (maxHeight - Math.max(0, rows - 1) * gapY) / rows;
+    if (fitH >= minH - 0.05) consider(cols, tileW, Math.min(tileH, fitH));
+  }
+
+  if (best) return best.packed;
+  const cols = Math.max(1, Math.floor((width + gapX) / (minW + gapX)));
+  return pack(cols, minW, minH);
 }
 
 export function tokenMetrics(count, innerW, { maxW = 62, maxH = 82, minW = 24, gap = 6 } = {}) {

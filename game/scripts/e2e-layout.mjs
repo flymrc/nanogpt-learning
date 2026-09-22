@@ -3,6 +3,9 @@
  * Mobile walks ALL beats × ALL 5 tabs. First+last only is NOT enough.
  * Chapter 3 adds 6 attention beats: 19 × 5 = 95 mobile, 19 PC.
  * Fails if any Phaser label/bar intersects the CTA.
+ * Also fails on local sticker collisions: tile/chip vs caption, chip vs chip,
+ * chips under the minimum size, and placeholder tiles stacked on the first chip.
+ * Big-band checks alone missed that class (caption on the Second tiles, ellipsis on S).
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,7 +24,7 @@ mkdirSync(OUT, { recursive: true });
 const BASE = process.env.E2E_URL || "http://127.0.0.1:4182/";
 
 const PHASE_NAMES = ["goal", "why", "example", "myth", "remember"];
-const SNAP = /L1-b1-p2|L2-b5-p0|L2-b2-p2|L1-b0-p0/;
+const SNAP = /title|L1-b1-p2|L2-b0-p0|L2-b5-p0|L2-b2-p2|L1-b0-p0/;
 
 const chromium = await loadChromium();
 const browser = await chromium.launch({
@@ -40,7 +43,7 @@ async function ready(page) {
 async function jumpAndAssert(page, key, beat, phase, name) {
   await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
-  await page.waitForTimeout(450);
+  await page.waitForTimeout(600);
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (SNAP.test(name) || result.overlaps?.length || result.overflows?.length || !result.ok) {
     await page.screenshot({ path: `${OUT}/${name}.png` });
@@ -103,6 +106,14 @@ async function runViewport(label, pageOpts, { allPhases }) {
   }
   const jobs = walks(spine, { allPhases });
   const reports = [];
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 20000 });
+  await page.waitForTimeout(500);
+  const titleResult = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  await page.screenshot({ path: `${OUT}/${label}-title.png` });
+  reports.push({ name: `${label}-title`, ...titleResult });
+  if (!titleResult?.ok) console.error(`FAIL ${label} title overlaps=${JSON.stringify(titleResult?.overlaps || [])}`);
+  else console.log(`ok ${label} title`);
+
   for (const [key, beat, phase, name] of jobs) {
     const result = await jumpAndAssert(page, key, beat, phase, `${label}-${name}`);
     reports.push(result);

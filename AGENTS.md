@@ -5,6 +5,8 @@ This repo is a Phaser lesson. Layout bugs on a phone are **your** bugs.
 
 The prior `E2E_OK` that only walked first+last beats **missed** a real encode-beat CTA overlap. That class of miss is not allowed again.
 
+A later `E2E_OK` still **missed** local sticker collisions, because the probe only compared big bands (header, purpose, tabs, body, tape, CTA) plus stage-child bounds against the CTA. Phaser `getBounds()` also ignores Graphics, so drop shadows were invisible to the check. That let two live bugs ship: the title tiles for Second sitting on 「一条长纸带」, and the clip-beat ellipsis placeholders stacked on each other and on the first chip, with number labels crushed into the stripe. Do not treat a green big-band run as proof that tiles and chips are clear of each other.
+
 ## Layout modes (hard switch)
 
 - **Mobile:** `width < 1024` or portrait or mobile UA. Shell: `#mobile-chrome` (in-flow) + `#game-shell`. No Live2D. No desktop absolute HUD. No `挪一格` / window-frame overlays on the tape.
@@ -38,6 +40,12 @@ Bounding boxes of **header, purpose, tabs, body, tape/example (or row-stream / r
 Also required:
 
 - Check **HTML chrome vs each other AND vs Phaser canvas labels/bars**. Sample every `stage` child against the CTA box. Fail if the CTA intersects any lesson label/bar (the 「按字符编号」-on-button bug).
+- **Local sticker boxes, not just big bands.** Measure each tile, chip, placeholder, and card from its layout size plus the drop shadow (`+5` right, `+8` down), not from Phaser `getBounds()`. Fail when:
+  - a tile, chip, placeholder, or card comes within 12px of a caption or label (the Second / 「一条长纸带」 bug, shadows included);
+  - any two of those pieces intersect, including chip-vs-chip and placeholder-vs-placeholder;
+  - a placeholder intersects the first real chip (ellipsis tiles piled on S);
+  - a 号码牌 is under 32×40, its number font is under 12px, or the number intersects the glyph or the bottom stripe.
+- Also assert the title scene. The 95-step mobile walk (19×5) and the 19 PC beats stay required; the title check is extra, not a substitute.
 - Open and close **详细笔记** and **看不懂？**
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
