@@ -76,7 +76,8 @@ async function runViewport(label, pageOpts, { allPhases }) {
   }
   const jobs = walks(spine, { allPhases });
   const reports = [];
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 20000 });
+  await page.waitForTimeout(500);
   const titleResult = await page.evaluate(() => window.__nanoGPTAssertLayout());
   await page.screenshot({ path: `${OUT}/${label}-title.png` });
   reports.push({ name: `${label}-title`, ...titleResult });
