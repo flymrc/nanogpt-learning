@@ -11,10 +11,10 @@ export function lessonRhythm(v) {
   return clamp(Math.round(16 * (v?.uiScale || 1)), 12, 24);
 }
 
-/** DOM 详细笔记 / 看不懂？ / mute sit in the lesson column, left of the tutor slot. */
+/** DOM 伪代码 / 详细笔记 / 看不懂？ / mute sit in the lesson column. */
 export function hudReservePx(v) {
   if (!v || !isWidePcTutor()) return 148;
-  return 300;
+  return 440;
 }
 
 export function readSafeInsets() {

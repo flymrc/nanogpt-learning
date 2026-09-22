@@ -28,8 +28,8 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 
 | Viewport | What must be true |
 | --- | --- |
-| **390×844 mobile** | Walk **all 13 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 13 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
+| **390×844 mobile** | Walk **all 19 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). Counts: chapter 1 = 5, chapter 2 = 8, chapter 3 attention = 6, so **95** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
+| **1440×900 PC** | Smoke **all 19 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 
@@ -52,7 +52,7 @@ npx vite preview --host 127.0.0.1 --port 4182
 E2E_URL=http://127.0.0.1:4182/ E2E_OUT=/tmp/nanogpt-e2e npm run e2e
 ```
 
-Helper script: `game/scripts/e2e-layout.mjs`. It must walk 65 mobile steps (13×5) and 13 PC beats.
+Helper script: `game/scripts/e2e-layout.mjs`. It must walk 95 mobile steps (19×5) and 19 PC beats, and open 伪代码 on encode / shift / loss / attention.
 
 ## Game facts (do not invent)
 

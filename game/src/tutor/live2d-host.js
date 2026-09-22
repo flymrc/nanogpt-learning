@@ -444,7 +444,7 @@ function onPointerMove(event) {
 function onPointerDown(event) {
   if (!model || !isWidePcTutor()) return;
   const target = event.target;
-  if (target?.closest?.("button, a, input, #pc-chrome, #notes-overlay, #lesson-book-overlay")) return;
+  if (target?.closest?.("button, a, input, #pc-chrome, #notes-overlay, #lesson-book-overlay, #pseudo-overlay")) return;
   if (!tutorContainsClient(event.clientX, event.clientY)) return;
   playMood("react");
 }

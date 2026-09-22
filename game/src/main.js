@@ -3,17 +3,19 @@ import BootScene from "./scenes/BootScene.js";
 import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
+import Level3Scene from "./scenes/Level3Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted } from "./audio/sound.js";
 import { mountMuteHud } from "./audio/mute-hud.js";
 import { mountNotesHud } from "./ui/notes.js";
+import { mountPseudoHud } from "./ui/pseudo.js";
 import { mountTutorBook } from "./ui/textbook.js";
 import { mountGameCursor } from "./ui/cursor.js";
 import { mountTutorHost, syncTutorHost } from "./tutor/live2d-host.js";
 import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "./ui/dpr.js";
 import { readSafeInsets } from "./ui/layout.js";
 import { applyLayoutMode } from "./ui/mode.js";
-import { LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT } from "./data/beats.js";
+import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, PHASE_COUNT } from "./data/beats.js";
 
 const startCss = cssViewportSize();
 const startDpr = displayRatio();
@@ -47,7 +49,7 @@ const config = {
     roundPixels: false,
     powerPreference: "high-performance",
   },
-  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, EndScene],
+  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, EndScene],
 };
 
 function applyOuterViewport() {
@@ -108,6 +110,7 @@ async function boot() {
 
   mountMuteHud(() => window.__nanoGPTGame);
   mountNotesHud();
+  mountPseudoHud();
   mountTutorBook();
   mountTutorHost();
 
@@ -167,12 +170,14 @@ async function boot() {
   window.__nanoGPTSpine = {
     l1: LEVEL1_BEATS.length,
     l2: LEVEL2_BEATS.length,
+    l3: LEVEL3_BEATS.length,
     phases: PHASE_COUNT,
   };
 
   window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
     if (key === "Level1") game.registry.set("level1.progress", { beat, phase });
     if (key === "Level2") game.registry.set("level2.progress", { beat, phase });
+    if (key === "Level3") game.registry.set("level3.progress", { beat, phase });
     const active = game.scene.getScenes(true)[0];
     active?.scene.start(key);
     return key;

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
+import { syncPseudo } from "../ui/pseudo.js";
 import { cueVoice } from "../audio/sound.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
@@ -34,6 +35,7 @@ export default class EndScene extends Phaser.Scene {
     addMuteToggle(this, shell);
     cueVoice(this, "vo-clear");
     emitTutor(END_BEAT);
+    syncPseudo(END_BEAT);
 
     const plan = layoutEnd(v, shell);
     const hero = plan.slots.hero;
@@ -63,18 +65,18 @@ export default class EndScene extends Phaser.Scene {
       },
       {
         icon: "deco-window",
-        fallback: "卷",
-        title: "练习卷和验收卷",
-        caption: "九成学，一成抽查",
-        tip: "同一条纸带切开。练习卷是 train.bin，验收卷是 val.bin。验收卷不是答题纸。",
+        fallback: "移",
+        title: "右移一格来猜",
+        caption: "罚分只看平均",
+        tip: "看见这张，猜右边那张。y 只放在评分桌上。猜错罚分不在这里编造数字。",
         accent: C.blue,
       },
       {
         icon: "deco-star",
         fallback: "空",
-        title: "右移一格来猜",
-        caption: "罚分只看平均",
-        tip: "看见这张，猜右边那张。y 只放在评分桌上。猜错罚分不在这里编造数字。",
+        title: "只看左边",
+        caption: "提问、遮罩、加总",
+        tip: "每一格回头看自己和左边。右边盖住。按重量把内容加回来。这一章没有开训。",
         accent: C.gold,
       },
     ];
@@ -155,7 +157,7 @@ export default class EndScene extends Phaser.Scene {
 
   toast() {
     const v = this.shell ? this.shell.v : makeShell(this).v;
-    showTooltip(this, v.cx, this.shell.footer.top - 24, "下一课还没写好");
+    showTooltip(this, v.cx, this.shell.footer.top - 24, "开训还没写");
   }
 }
 

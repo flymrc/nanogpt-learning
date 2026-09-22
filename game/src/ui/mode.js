@@ -24,7 +24,7 @@ export function applyLayoutMode() {
 
   const home = pc ? pcChrome : mobileActions;
   if (home) {
-    ["book-toggle", "notes-toggle", "mute-toggle"].forEach((id) => {
+    ["pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"].forEach((id) => {
       const btn = document.getElementById(id);
       if (btn && btn.parentElement !== home) home.appendChild(btn);
     });

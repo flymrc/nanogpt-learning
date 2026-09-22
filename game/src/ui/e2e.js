@@ -68,6 +68,12 @@ function collectBoxes(scene) {
     const box = domBox(card || notes, "glossary");
     if (box) boxes.push(box);
   }
+  const pseudo = document.getElementById("pseudo-overlay");
+  if (pseudo && !pseudo.hidden) {
+    const card = pseudo.querySelector(".pseudo-card");
+    const box = domBox(card || pseudo, "pseudo-drawer");
+    if (box) boxes.push(box);
+  }
   return boxes.filter(Boolean);
 }
 
@@ -83,7 +89,7 @@ function offsetBand(band, origin) {
 function assertLessonLayout(scene) {
   const boxes = collectBoxes(scene);
   const overlaps = [];
-  const closedNames = new Set(["notes-drawer", "glossary"]);
+  const closedNames = new Set(["notes-drawer", "glossary", "pseudo-drawer"]);
   for (let i = 0; i < boxes.length; i += 1) {
     for (let j = i + 1; j < boxes.length; j += 1) {
       const a = boxes[i];

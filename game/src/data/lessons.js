@@ -1,4 +1,4 @@
-import { DATASET, DEMO_NEXT_CHAR, DEMO_SNIPPET, VOCAB_SIZE } from "./facts.js";
+import { DATASET, DEMO_NEXT_CHAR, DEMO_SNIPPET, HEAD_SIZE, MODEL, VOCAB_SIZE } from "./facts.js";
 
 /** 每一课五个小块。一块只讲一个意思，句子要短。 */
 export const LESSON_PHASES = [
@@ -189,9 +189,91 @@ const L2 = [
   },
 ];
 
+const L3 = [
+  {
+    id: "look",
+    purpose: "每个位置回头看前面",
+    caption: "含自己，不含右边",
+    mood: "point",
+    note: "attn",
+    goal: "注意力让每一格回头看自己和左边。纸带还是那一条。",
+    why: "猜下一个字，不能只盯着自己这一格。前面的号码牌是线索。右边还没发生，不能拿来当线索。",
+    example: "纸带开头是 S、e、c、o。轮到 c 时，它能看 S、e、c。不能看右边的 o。S 那一格只能看自己。",
+    myths: ["不是整句一下读成一个意思。", "不是去翻右边的答案。右边留给评分桌。"],
+    remember: "每一格只回头看左边和自己。",
+    footnote: `窗口最长 ${MODEL.blockSize} 格，和 block_size 一样。这一步叫因果自注意力。`,
+  },
+  {
+    id: "qkv",
+    purpose: "一格拆成提问、标签、内容",
+    caption: "问、签、内容",
+    mood: "talk",
+    note: "qkv",
+    goal: "每一格先变出三样东西：提问、标签、内容。",
+    why: "回头看要用同一套比较。提问去问。标签被问。内容才是要搬回来的东西。",
+    example: "轮到 e。e 拿出提问。S 和 e 各自亮出标签。对得上的，才把那一格的内容搬一点回来。三样来自同一次切开。",
+    myths: ["提问不是一句中文。它是这一格的一组数。", "内容不是原来的字符。字符早就换成号码，再变成一串数。"],
+    remember: "提问去找标签，搬回来的是内容。",
+    footnote: `一次线性层吐出 3 份再切开。每一份宽 ${MODEL.nEmbd}。这一路的线性层不带 bias。`,
+  },
+  {
+    id: "mask",
+    purpose: "右边的格子直接盖住",
+    caption: "下三角，右边是空",
+    mood: "point",
+    note: "mask",
+    goal: "比较的时候，右边的格子分数改成不可能。",
+    why: "光说别看右边不够。分数表上，右边要变成负无穷，后面才不会分到重量。",
+    example: "三行是谁在问：S、e、c。四列是看谁：S、e、c、o。左下打勾，右上打叉。c 可以看 S、e、c，不能看 o。",
+    myths: ["遮罩不是把右边的字从纸带上剪掉。字还在，只是这一格不准看。", "不是等训练时才遮。结构里就盖住。"],
+    remember: "右上角盖住，不能偷看右边。",
+    footnote: "手动路径用下三角，0 的位置填负无穷。有快速路径时用 is_causal，规则一样。",
+  },
+  {
+    id: "weights",
+    purpose: "允许看的格子分走一份重量",
+    caption: "加起来是一整份",
+    mood: "talk",
+    note: "softmax",
+    goal: "能看的格子比一比有多像，再分成一份重量。右边的重量是 0。",
+    why: "不能只说都看一看。要有多少搬多少。像的多搬，不像的少搬。一份重量加起来刚好是 1。",
+    example: "轮到 c。它只在 S、e、c 上分重量，三格加起来是一整份。o 的重量是 0。这里不写假的小数，模型还没训练。",
+    myths: ["重量不是罚分。罚分在评分桌上，这一章还没开训。", "不是平均每人一份。像的可以分得多。"],
+    remember: "能看的格子一起分走一整份重量。",
+    footnote: `分数先除以 √${HEAD_SIZE}。每头宽 ${HEAD_SIZE}，因为 ${MODEL.nEmbd}÷${MODEL.nHead}。然后做 softmax。`,
+  },
+  {
+    id: "mix",
+    purpose: "按重量把内容加起来",
+    caption: "搬回这一格",
+    mood: "point",
+    goal: "用刚才的重量，把能看的格子的内容加起来。",
+    why: "提问和标签只决定搬多少。真正搬回来的是内容。加总以后，这一格就带上了左边的线索。",
+    example: "轮到 c。新内容 = S 的内容×重量 + e 的内容×重量 + c 的内容×重量。o 的重量是 0，一点也不进这个和。",
+    myths: ["不是把字符拼成一个新字。加的是内容。", "不是只抄左边最近的一格。每一格按自己的重量进和。"],
+    remember: "新的一格 = 各格的重量 × 内容，加在一起。",
+    footnote: `六个头各算一份，再拼回宽 ${MODEL.nEmbd}，然后过一次输出投影。`,
+  },
+  {
+    id: "writeback",
+    purpose: "汇总加回原来的这一格",
+    caption: "纸带还在，多了一笔",
+    mood: "react",
+    note: "attn",
+    goal: "注意力的结果加回原来的这一格。格子还在，不是换成别的纸带。",
+    why: "如果直接覆盖，原来的号码信息会丢。加上去，这一格既记得自己，也记得左边。",
+    example: `六个头各做一遍提问、遮罩、重量、加总，拼成宽 ${MODEL.nEmbd}，加回 c 这一格。同一块后面还有另一层。这一章先停在这里。没有开训。`,
+    myths: ["不是已经猜出下一个字。猜字还在更后面。", "不是六个模型。是六个头同时看同一条纸带。"],
+    remember: "看完左边，加回自己这一格。",
+    footnote: `x = x + 注意力(层归一化(x))。${MODEL.nLayer} 层，${MODEL.nHead} 头，dropout ${MODEL.dropout}。MLP 这一章不展开。`,
+  },
+];
+
 export const LEVEL1_BEATS = L1;
 export const LEVEL2_BEATS = L2;
-export const SPINE_TOTAL = L1.length + L2.length;
+export const LEVEL3_BEATS = L3;
+export const CHAPTER_COUNT = 3;
+export const SPINE_TOTAL = L1.length + L2.length + L3.length;
 
 export const TITLE_BEAT = {
   id: "title",
@@ -199,19 +281,19 @@ export const TITLE_BEAT = {
   caption: "从一条长纸带讲起",
   vo: "vo-title",
   mood: "talk",
-  goal: "顺着看完：纸带、号码牌、右移一格、猜下一个、猜错罚分。",
+  goal: "顺着看完：纸带、号码牌、右移一格、猜错罚分，再看每一格怎么回头看左边。",
   why: "一句口号记不住。每一课分开讲：干什么、为什么、一个小例子、一句误会、一句记住。",
   remember: "从一条长纸带讲起。",
 };
 
 export const END_BEAT = {
   id: "end",
-  purpose: "纸带、号码牌、右移和罚分，都对上了",
+  purpose: "纸带、右移、罚分和注意力，都对上了",
   caption: "通关啦",
   vo: "vo-clear",
   mood: "react",
-  goal: "你现在能自己讲完：纸带怎么拉，号码怎么领，答案怎么右移一格，罚分怎么算。",
-  remember: "通关啦。下一课还没写。",
+  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边。",
+  remember: "通关啦。开训还没写。",
 };
 
 export function phaseText(beat, phase = 0) {

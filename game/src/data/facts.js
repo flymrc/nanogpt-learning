@@ -68,3 +68,22 @@ export const DATASET = {
 
 export const CHARSET_PRINTABLE =
   "↵ !$&',-.3:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+/**
+ * shakespeare_char shape from config/train_shakespeare_char.py.
+ * bias stays false: train.py default, and that config file does not assign bias.
+ */
+export const MODEL = {
+  nLayer: 6,
+  nHead: 6,
+  nEmbd: 384,
+  blockSize: REAL_BLOCK,
+  dropout: 0.2,
+  bias: false,
+};
+
+export const HEAD_SIZE = MODEL.nEmbd / MODEL.nHead;
+
+if (HEAD_SIZE !== 64 || MODEL.nHead !== 6 || MODEL.nEmbd !== 384 || MODEL.nLayer !== 6) {
+  throw new Error("shakespeare_char 注意力形状应是 6 层、6 头、宽 384、每头 64");
+}

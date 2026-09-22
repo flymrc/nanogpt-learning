@@ -173,4 +173,4 @@ Attention / QKV 是「如何从 `x` 算出每个位置表示」的内部实现�
 
 ## 下一步
 
-第 3 步展开 `model.py`：Embedding → Causal Self-Attention（QKV）→ MLP → 残差 / LayerNorm，并对照 `n_layer=6, n_head=6, n_embd=384`。讲清后再决定是否本机开训。
+第 3 步先写因果自注意力，见 [notes/03-causal-self-attention.md](03-causal-self-attention.md)。MLP 和开训仍往后放。

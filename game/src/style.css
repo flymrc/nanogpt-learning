@@ -198,6 +198,18 @@ html.is-mobile #mobile-chrome:not([hidden]) {
   display: flex;
 }
 
+@media (max-width: 520px) {
+  html.is-mobile #mobile-chrome:not([hidden]) {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  html.is-mobile .mobile-chrome__actions {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+}
+
 html.is-pc #mobile-chrome {
   display: none !important;
 }
@@ -266,7 +278,8 @@ html.is-mobile #pc-chrome {
 
 .mute-toggle,
 .notes-toggle,
-.book-toggle {
+.book-toggle,
+.pseudo-toggle {
   box-sizing: border-box;
   border: 5px solid #3b2a2e;
   border-radius: 18px;
@@ -331,7 +344,8 @@ html.is-mobile #pc-chrome {
 }
 
 #pc-chrome .notes-toggle,
-#pc-chrome .book-toggle {
+#pc-chrome .book-toggle,
+#pc-chrome .pseudo-toggle {
   position: relative;
   top: auto;
   right: auto;
@@ -343,7 +357,8 @@ html.is-mobile #pc-chrome {
 }
 
 #mobile-actions .notes-toggle,
-#mobile-actions .book-toggle {
+#mobile-actions .book-toggle,
+#mobile-actions .pseudo-toggle {
   position: static;
   height: 36px;
   padding: 0 8px;
@@ -381,7 +396,9 @@ html.is-mobile #pc-chrome {
 .notes-toggle:hover,
 .notes-toggle[aria-expanded="true"],
 .book-toggle:hover,
-.book-toggle[aria-expanded="true"] {
+.book-toggle[aria-expanded="true"],
+.pseudo-toggle:hover,
+.pseudo-toggle[aria-expanded="true"] {
   background: #ffe7a8;
   transform: scale(1.04);
 }
@@ -440,6 +457,84 @@ html.is-mobile .lesson-book-card {
   margin: 0;
   font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
   font-size: 24px;
+}
+
+#pseudo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(59, 42, 46, 0.28);
+}
+
+html.is-mobile #pseudo-overlay {
+  padding: 10px;
+  align-items: stretch;
+}
+
+#pseudo-overlay[hidden] {
+  display: none !important;
+}
+
+.pseudo-card {
+  width: min(520px, 100%);
+  max-height: min(84dvh, 640px);
+  overflow: auto;
+  padding: 18px 18px 16px;
+  background: #fffdf8;
+  border: 5px solid #3b2a2e;
+  border-radius: 22px;
+  box-shadow: 6px 8px 0 rgba(59, 42, 46, 0.2);
+  color: #3b2a2e;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+}
+
+html.is-mobile .pseudo-card {
+  width: 100%;
+  max-height: none;
+  height: 100%;
+  border-radius: 18px;
+}
+
+.pseudo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pseudo-head h2 {
+  margin: 0;
+  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-size: 24px;
+}
+
+.pseudo-block {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 3px solid #3b2a2e;
+  border-radius: 14px;
+  background: #fff8ee;
+}
+
+.pseudo-block h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: #c48400;
+}
+
+.pseudo-block p,
+.pseudo-block pre {
+  margin: 0;
+  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: #3b2a2e;
 }
 
 #notes-overlay {

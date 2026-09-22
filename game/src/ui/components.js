@@ -514,6 +514,7 @@ export function bindAdvance(scene, advance) {
   const tryAdvance = () => {
     if (!document.getElementById("notes-overlay")?.hidden) return;
     if (!document.getElementById("lesson-book-overlay")?.hidden) return;
+    if (!document.getElementById("pseudo-overlay")?.hidden) return;
     unlockAudio(scene);
     if (scene.busy) return;
     playSfx(scene, "sfx-tap", 0.2);

@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 import { TITLE_BEAT } from "../data/beats.js";
+import { syncPseudo } from "../ui/pseudo.js";
 import { cueVoice, unlockAudio } from "../audio/sound.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addFooterCta, addMuteToggle, bindAdvance, makeCharTile, paintBackdrop } from "../ui/components.js";
+import { addFooterCta, addMuteToggle, bindAdvance, createButton, makeCharTile, paintBackdrop } from "../ui/components.js";
 import { fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText } from "../ui/theme.js";
@@ -40,6 +41,7 @@ export default class TitleScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.playPreview(v, plan);
+    this.drawChapters(v, plan);
 
     const mascot = plan.slots.mascot;
     const robotX = v.portrait ? v.left + 48 : v.left + 80;
@@ -51,23 +53,51 @@ export default class TitleScene extends Phaser.Scene {
     });
 
     this.advance = () => {
-      if (!this.game.registry.get("assetsReady")) return;
-      unlockAudio(this);
-      this.registry.remove("level1.progress");
-      this.registry.remove("level2.progress");
-      this.scene.start("Level1");
+      this.startChapter("Level1");
     };
 
     this.startBtn = addFooterCta(this, {
       shell,
       label: "开始",
-      caption: "点一下",
+      caption: "第 1 章",
       onClick: () => this.advance(),
     });
     bindAdvance(this, () => this.advance());
 
     cueVoice(this, "vo-title");
     emitTutor(TITLE_BEAT);
+    syncPseudo(TITLE_BEAT);
+  }
+
+  startChapter(key) {
+    if (!this.game.registry.get("assetsReady")) return;
+    unlockAudio(this);
+    this.registry.remove("level1.progress");
+    this.registry.remove("level2.progress");
+    this.registry.remove("level3.progress");
+    this.scene.start(key);
+  }
+
+  drawChapters(v, plan) {
+    const slot = plan.slots.chapters;
+    const labels = [
+      ["Level1", "1 纸带"],
+      ["Level2", "2 猜字"],
+      ["Level3", "3 注意力"],
+    ];
+    const gap = 8;
+    const btnW = Math.min(148, (v.innerW - gap * 2) / 3);
+    const btnH = Math.max(48, Math.min(56, slot.h));
+    labels.forEach(([key, label], i) => {
+      const x = v.cx + (i - 1) * (btnW + gap);
+      createButton(this, x, slot.cy, label, () => this.startChapter(key), {
+        width: btnW,
+        minWidth: 88,
+        height: btnH,
+        fill: i === 2 ? C.gold : C.surface,
+        fontSize: 16,
+      });
+    });
   }
 
   playPreview(v, plan) {
@@ -99,12 +129,14 @@ function layoutTitle(v, shell) {
     const tile = Math.max(36, Math.min(54, v.innerW / 10) * s);
     const titlesH = titleSize * 1.7;
     const previewH = stackPreview ? tile + 36 + tile * 1.3 : Math.max(tile * 1.35, 72);
-    const mascotH = Math.round((landscapeShort ? 64 : v.portrait ? 96 : 80) * s);
-    const gapY = Math.round(14 * s);
+    const mascotH = Math.round((landscapeShort ? 56 : v.portrait ? 84 : 72) * s);
+    const chaptersH = Math.round((landscapeShort ? 52 : 58) * s);
+    const gapY = Math.round(12 * s);
     const items = [
       { id: "titles", h: titlesH },
       { id: "preview", h: previewH },
       { id: "mascot", h: mascotH },
+      { id: "chapters", h: chaptersH, w: v.innerW },
     ];
     const stacked = stackSlots(items, {
       top: 0,

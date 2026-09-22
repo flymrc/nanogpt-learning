@@ -1,6 +1,7 @@
 /**
  * Visual E2E for mobile 390×844 and PC 1440×900.
  * Mobile walks ALL beats × ALL 5 tabs. First+last only is NOT enough.
+ * Chapter 3 adds 6 attention beats: 19 × 5 = 95 mobile, 19 PC.
  * Fails if any Phaser label/bar intersects the CTA.
  */
 import { createRequire } from "node:module";
@@ -61,14 +62,43 @@ function walks(spine, { allPhases }) {
   };
   pushLevel("Level1", spine.l1, "L1");
   pushLevel("Level2", spine.l2, "L2");
+  pushLevel("Level3", spine.l3, "L3");
   return jobs;
+}
+
+function readPseudo() {
+  const lines = (document.getElementById("pseudo-code")?.textContent || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return {
+    open: !document.getElementById("pseudo-overlay")?.hidden,
+    does: document.getElementById("pseudo-does")?.textContent || "",
+    metaphor: document.getElementById("pseudo-metaphor")?.textContent || "",
+    myth: document.getElementById("pseudo-myth")?.textContent || "",
+    lines: lines.length,
+    text: lines.join("\n"),
+  };
+}
+
+async function openPseudoShot(page, key, beat, phase, file) {
+  await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForTimeout(400);
+  await page.click("#pseudo-toggle");
+  await page.waitForTimeout(200);
+  const tip = await page.evaluate(readPseudo);
+  if (file) await page.screenshot({ path: file });
+  await page.click("#pseudo-close");
+  await page.waitForTimeout(120);
+  return tip;
 }
 
 async function runViewport(label, pageOpts, { allPhases }) {
   const page = await browser.newPage(pageOpts);
   await ready(page);
   const spine = await page.evaluate(() => window.__nanoGPTSpine);
-  if (!spine?.l1 || !spine?.l2 || !spine?.phases) {
+  if (!spine?.l1 || !spine?.l2 || !spine?.l3 || !spine?.phases) {
     throw new Error("missing __nanoGPTSpine");
   }
   const jobs = walks(spine, { allPhases });
@@ -98,9 +128,61 @@ async function runViewport(label, pageOpts, { allPhases }) {
   const notesOpen = await page.evaluate(() => !document.getElementById("notes-overlay")?.hidden);
   await page.screenshot({ path: `${OUT}/${label}-glossary.png` });
   await page.click("#notes-close");
+
+  const pseudoEncode = await openPseudoShot(page, "Level1", 1, 0, `${OUT}/${label}-pseudo-encode.png`);
+  const pseudoShift = await openPseudoShot(page, "Level2", 2, 2, null);
+  const pseudoLoss = await openPseudoShot(page, "Level2", 6, 0, null);
+  await page.evaluate(() => window.__nanoGPTJump("Level3", 2, 2));
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: `${OUT}/${label}-attn-mask.png` });
+  const attnLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  await page.click("#pseudo-toggle");
+  await page.waitForTimeout(200);
+  const pseudoMask = await page.evaluate(readPseudo);
+  await page.screenshot({ path: `${OUT}/${label}-pseudo-attn.png` });
+  await page.click("#pseudo-close");
+
+  const chrome = await page.evaluate(() => {
+    const bar = document.getElementById("mobile-chrome");
+    const actions = document.getElementById("mobile-actions");
+    const br = bar?.getBoundingClientRect();
+    const ar = actions?.getBoundingClientRect();
+    return {
+      chromeRight: br ? br.right : 0,
+      actionsRight: ar ? ar.right : 0,
+      width: window.innerWidth,
+    };
+  });
+
   const muteSlash = await assertMuteSlash(page);
   await page.close();
-  return { reports, bookOpen, notesOpen, muteSlash, walked: jobs.length };
+  return {
+    reports,
+    bookOpen,
+    notesOpen,
+    muteSlash,
+    walked: jobs.length,
+    spine,
+    pseudoEncode,
+    pseudoShift,
+    pseudoLoss,
+    pseudoMask,
+    attnLayout,
+    chrome,
+  };
+}
+
+function tipOk(tip, needle) {
+  return Boolean(
+    tip?.open &&
+      tip.does &&
+      tip.metaphor &&
+      tip.myth &&
+      tip.lines >= 3 &&
+      tip.lines <= 8 &&
+      (!needle || tip.text.includes(needle) || tip.does.includes(needle) || tip.metaphor.includes(needle)),
+  );
 }
 
 async function assertMuteSlash(page) {
@@ -158,13 +240,35 @@ writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports].filter((r) => !r.ok);
 const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen;
-const walkedAll = mobile.walked === 13 * 5 && pc.walked === 13;
-if (failed.length || !overlays || !walkedAll) {
+const spineOk =
+  mobile.spine.l1 === 5 &&
+  mobile.spine.l2 === 8 &&
+  mobile.spine.l3 === 6 &&
+  mobile.spine.phases === 5 &&
+  pc.spine.l3 === 6;
+const walkedAll = mobile.walked === 19 * 5 && pc.walked === 19;
+const pseudoOk =
+  tipOk(mobile.pseudoEncode, "号码") &&
+  tipOk(pc.pseudoEncode, "号码") &&
+  tipOk(mobile.pseudoShift, "右") &&
+  tipOk(pc.pseudoShift, "右") &&
+  tipOk(mobile.pseudoLoss, "罚分") &&
+  tipOk(pc.pseudoLoss, "罚分") &&
+  tipOk(mobile.pseudoMask, "负无穷") &&
+  tipOk(pc.pseudoMask, "负无穷");
+const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
+const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !chromeOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
     pcWalked: pc.walked,
     overlays,
+    spineOk,
+    pseudoOk,
+    attnOk,
+    chromeOk,
+    mobileChrome: mobile.chrome,
   });
   process.exit(1);
 }

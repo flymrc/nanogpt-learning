@@ -1,4 +1,5 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
+import { syncPseudo } from "./pseudo.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
@@ -119,6 +120,7 @@ export function teachLesson(scene, frame, beat, { index, total, phase = 0, insta
     kicker: meta.kicker,
     caption: lessonCaption(beat, phase),
   });
+  syncPseudo(beat);
   renderTutorBook({ ...beat, index, total, phase });
   if (instant) return meta;
   return meta;

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
+import { CHAPTER_COUNT, LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
 import { cueVoice } from "../audio/sound.js";
 import {
   drawBlankExample,
@@ -23,7 +23,7 @@ export default class Level2Scene extends Phaser.Scene {
   create() {
     const frame = makeLessonFrame(this, {
       level: 2,
-      total: 2,
+      total: CHAPTER_COUNT,
       title: "剪开，猜下一个",
     });
     this.frame = frame;
@@ -57,7 +57,7 @@ export default class Level2Scene extends Phaser.Scene {
     }
     if (this.beat >= LEVEL2_BEATS.length - 1) {
       this.registry.remove("level2.progress");
-      this.scene.start("End");
+      this.scene.start("Level3");
       return;
     }
     this.beat += 1;
@@ -82,8 +82,8 @@ export default class Level2Scene extends Phaser.Scene {
     if (this.phase === 0 && beat.vo) cueVoice(this, beat.vo);
     const lastBeat = index === LEVEL2_BEATS.length - 1;
     const lastPhase = this.phase >= PHASE_COUNT - 1;
-    this.frame.nextBtn.setLabel(lastBeat && lastPhase ? "看结果" : lastPhase ? "下一课" : "下一页");
-    this.frame.nextBtn.setCaption(lastBeat && lastPhase ? "通关" : lastPhase ? "换一课" : `${this.phase + 1}/${PHASE_COUNT}`);
+    this.frame.nextBtn.setLabel(lastBeat && lastPhase ? "下一章" : lastPhase ? "下一课" : "下一页");
+    this.frame.nextBtn.setCaption(lastBeat && lastPhase ? "第 3 章" : lastPhase ? "换一课" : `${this.phase + 1}/${PHASE_COUNT}`);
     this.children.bringToTop(this.frame.nextBtn);
 
     clearLayer(this.frame.stage);
