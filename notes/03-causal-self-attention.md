@@ -174,4 +174,4 @@ def forward(self, x):
 
 ## 下一步
 
-开训见 [notes/04-train.md](04-train.md)：`python train.py config/train_shakespeare_char.py`。这一章仍然不跑训练，也不记录 loss。
+开训见 [notes/04-train.md](04-train.md)：`python train.py config/train_shakespeare_char.py`。采样见 [notes/05-sample.md](05-sample.md)。这一章仍然不跑训练，也不记录 loss。

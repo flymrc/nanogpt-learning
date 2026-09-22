@@ -79,6 +79,7 @@ export default class TitleScene extends Phaser.Scene {
     this.registry.remove("level2.progress");
     this.registry.remove("level3.progress");
     this.registry.remove("level4.progress");
+    this.registry.remove("level5.progress");
     this.scene.start(key);
   }
 
@@ -89,13 +90,15 @@ export default class TitleScene extends Phaser.Scene {
       ["Level2", "2 猜字"],
       ["Level3", "3 注意力"],
       ["Level4", "4 开训"],
+      ["Level5", "5 采样"],
     ];
-    const cols = plan.twoRows ? 2 : 4;
-    const rows = plan.twoRows ? 2 : 1;
+    const cols = plan.chapterCols;
+    const rows = plan.chapterRows;
     const gapX = 8;
     const gapY = 8;
     const btnW = Math.min(168, (v.innerW - gapX * (cols - 1)) / cols);
-    const btnH = Math.max(48, Math.min(52, (slot.h - gapY * (rows - 1)) / rows));
+    const fittedH = (slot.h - gapY * (rows - 1)) / rows;
+    const btnH = Math.min(52, Math.max(44, fittedH));
     const rowW = cols * btnW + (cols - 1) * gapX;
     labels.forEach(([key, label], i) => {
       const col = i % cols;
@@ -144,8 +147,11 @@ function layoutTitle(v, shell) {
     const titlesH = titleSize * 1.7;
     const previewH = tile + STICKER_SHADOW_Y + CAPTION_CLEAR + 22 + 8;
     const mascotH = Math.round((landscapeShort ? 56 : v.portrait ? 84 : 72) * s);
-    const twoRows = v.innerW < 720;
-    const chaptersH = twoRows ? Math.max(104, Math.round(112 * s)) : Math.max(52, Math.round((landscapeShort ? 52 : 58) * s));
+    const chapterCols = v.innerW < 720 ? 2 : 5;
+    const chapterRows = Math.ceil(5 / chapterCols);
+    const chapterBtnH = Math.max(48, Math.round((landscapeShort ? 48 : 52) * s));
+    const chapterGap = 8;
+    const chaptersH = chapterRows * chapterBtnH + (chapterRows - 1) * chapterGap;
     const gapY = Math.round(12 * s);
     const items = [
       { id: "titles", h: titlesH },
@@ -165,7 +171,8 @@ function layoutTitle(v, shell) {
       gapY,
       titleSize,
       tile,
-      twoRows,
+      chapterCols,
+      chapterRows,
       robotScale: (landscapeShort ? 0.28 : v.short ? 0.32 : v.compact ? 0.38 : 0.46) * Math.min(1, s + 0.1),
     };
   });

@@ -19,7 +19,7 @@
 | 2 | 开训前：`get_batch` → `(x,y)` → `cross_entropy` 契约 | **笔记已完成**（2026-09-20） | [notes/02-batch-and-loss.md](notes/02-batch-and-loss.md) |
 | 3 | Causal Self-Attention（`model.py` 的 QKV / 遮罩 / softmax / 加权汇总） | **笔记已完成**（2026-09-22） | [notes/03-causal-self-attention.md](notes/03-causal-self-attention.md) |
 | 4 | 开训：`python train.py config/train_shakespeare_char.py` | **笔记已完成**（2026-09-22），本机未跑 loss | [notes/04-train.md](notes/04-train.md) |
-| 5 | 采样：`python sample.py --out_dir=out-shakespeare-char` | 未开始 | — |
+| 5 | 采样：`python sample.py --out_dir=out-shakespeare-char` | **笔记已完成**（2026-09-22），本机未跑采样 | [notes/05-sample.md](notes/05-sample.md) |
 
 ### 第 1 步实跑记录（本机）
 
@@ -33,7 +33,7 @@
 - `block_size=256`, `batch_size=64` → 单卡默认每 iter `16384` tokens
 - `y` 是 `x` 右移 1 位的 next-token 目标
 - `meta.pkl` 提供 `vocab_size=65`；loss 为 `F.cross_entropy`
-- **本机仍未开训**。第 4 步笔记只核对循环和配置，不记录 loss 曲线。
+- **本机仍未开训，也没有采样输出。** 第 4 步只核对循环和配置。第 5 步只核对 `sample.py` / `model.generate`。上游 README 里的台词示例不是本仓库的结果。
 
 ---
 
@@ -41,14 +41,14 @@
 
 ```
 notes/          # 按步骤展开的学习笔记
-game/           # Phaser 3 闯关：第 1–4 章点击动画（见 game/README.md）
+game/           # Phaser 3 闯关：第 1–5 章点击动画（见 game/README.md）
 experiments/    # 训练日志、loss、采样样例（待用）
 code/           # 自己的改动 / 对照实现（待用）
 ```
 
 想把笔记变成可点的动画，进入 [`game/`](game/)：`cd game && npm install && npm run dev`。
 
-游戏用 25 拍把笔记讲成纸带类比：第 1–2 章 13 拍，第 3 章 6 拍讲因果注意力，第 4 章 6 拍讲开训。每一课可以点「伪代码」。宽屏电脑右侧会出 Live2D 助教，手机不加载。采样还没写。详情见 [`game/README.md`](game/README.md)。
+游戏用 31 拍把笔记讲成纸带类比：第 1–2 章 13 拍，第 3 章 6 拍讲因果注意力，第 4 章 6 拍讲开训，第 5 章 6 拍讲采样。每一课可以点「伪代码」。宽屏电脑右侧会出 Live2D 助教，手机不加载。详情见 [`game/README.md`](game/README.md)。
 
 ## 参考
 

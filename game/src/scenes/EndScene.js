@@ -14,7 +14,7 @@ import {
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
 import { textureScale } from "../ui/dpr.js";
 import { isWidePcTutor } from "../tutor/bus.js";
-import { TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { STICKER_SHADOW_X, TAP_MIN, clamp, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { syncMobileChrome } from "../ui/mode.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
@@ -84,8 +84,16 @@ export default class EndScene extends Phaser.Scene {
         fallback: "训",
         title: "按罚分改一笔",
         caption: "验收更好才存档",
-        tip: "一批窗口：往前算，记罚分，往回传，AdamW 改一笔。遮罩不动。采样还没写。",
+        tip: "一批窗口：往前算，记罚分，往回传，AdamW 改一笔。遮罩不动。验收更好才存档。",
         accent: C.gold,
+      },
+      {
+        icon: "deco-sparkle",
+        fallback: "续",
+        title: "从开头往后续",
+        caption: "不是正确率",
+        tip: "读检查点，从换行或你给的开头，一格一格接上新字符。不改数，也不打百分数。本仓库没有生成出来的台词。",
+        accent: C.coral,
       },
     ];
 
@@ -93,9 +101,10 @@ export default class EndScene extends Phaser.Scene {
     const cardW = plan.cardW;
     const cardH = plan.cardH;
     const stack = plan.stackCards;
+    const cardGap = Math.max(plan.cardGap, STICKER_SHADOW_X + 4);
 
     cards.forEach((card, i) => {
-      const pitch = Math.min(cardW + 12, (v.innerW - 8) / cards.length);
+      const pitch = cardW + cardGap;
       const x = stack ? v.cx : v.cx + (i - (cards.length - 1) / 2) * pitch;
       const y = stack ? cardBand.top + cardH / 2 + i * (cardH + plan.cardGap) : cardBand.cy;
       const panel = this.add.container(x, y);
@@ -153,20 +162,17 @@ export default class EndScene extends Phaser.Scene {
       this.scene.start("Title");
     }, { width: btnW, height: btnH });
 
-    const stub = createButton(
+    createButton(
       this,
       shell.footer.cx + btnW / 2 + 8,
       btnY,
       "采样",
-      () => this.toast(),
-      { width: btnW, height: btnH, fill: C.surface2 },
+      () => {
+        this.registry.remove("level5.progress");
+        this.scene.start("Level5");
+      },
+      { width: btnW, height: btnH, fill: C.gold },
     );
-    stub.setAlpha(0.95);
-  }
-
-  toast() {
-    const v = this.shell ? this.shell.v : makeShell(this).v;
-    showTooltip(this, v.cx, this.shell.footer.top - 24, "采样还没写");
   }
 }
 
@@ -178,9 +184,11 @@ function layoutEnd(v, shell) {
     const robotScale = (v.compact ? 0.36 : 0.48) * Math.min(1, s + 0.08);
     const robotH = 200 * robotScale;
     const heroH = v.portrait ? robotH + 36 + titleSize : Math.max(robotH, titleSize + 24);
-    const cardCount = 4;
-    const cardW = stackCards ? Math.min(300, v.innerW - 8) : Math.min(220, (v.innerW - 36) / cardCount);
-    const cardGap = Math.round(10 * s);
+    const cardCount = 5;
+    const cardGap = Math.max(12, Math.round(12 * s));
+    const cardW = stackCards
+      ? Math.min(300, v.innerW - 8)
+      : Math.min(200, (v.innerW - cardGap * (cardCount - 1) - 8) / cardCount);
     const cardH = stackCards
       ? clamp((shell.content.h - heroH - 24) / cardCount - cardGap, 68, 96)
       : clamp(128 * s, 88, 150);

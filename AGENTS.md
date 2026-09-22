@@ -30,8 +30,8 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 
 | Viewport | What must be true |
 | --- | --- |
-| **390×844 mobile** | Walk **all 25 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). Counts: chapter 1 = 5, chapter 2 = 8, chapter 3 attention = 6, chapter 4 train = 6, so **125** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 25 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
+| **390×844 mobile** | Walk **all 31 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). Counts: chapter 1 = 5, chapter 2 = 8, chapter 3 attention = 6, chapter 4 train = 6, chapter 5 sample = 6, so **155** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
+| **1440×900 PC** | Smoke **all 31 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 
@@ -45,7 +45,7 @@ Also required:
   - any two of those pieces intersect, including chip-vs-chip and placeholder-vs-placeholder;
   - a placeholder intersects the first real chip (ellipsis tiles piled on S);
   - a 号码牌 is under 32×40, its number font is under 12px, or the number intersects the glyph or the bottom stripe.
-- Also assert the title scene. The 125-step mobile walk (25×5) and the 25 PC beats stay required; the title check is extra, not a substitute.
+- Also assert the title scene. The 155-step mobile walk (31×5) and the 31 PC beats stay required; the title check is extra, not a substitute.
 - Open and close **详细笔记** and **看不懂？**
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
@@ -60,7 +60,7 @@ npx vite preview --host 127.0.0.1 --port 4182
 E2E_URL=http://127.0.0.1:4182/ E2E_OUT=/tmp/nanogpt-e2e npm run e2e
 ```
 
-Helper script: `game/scripts/e2e-layout.mjs`. It must walk 125 mobile steps (25×5) and 25 PC beats, and open 伪代码 on encode / shift / loss / attention / train.
+Helper script: `game/scripts/e2e-layout.mjs`. It must walk 155 mobile steps (31×5) and 31 PC beats, and open 伪代码 on encode / shift / loss / attention / train / sample.
 
 ## Game facts (do not invent)
 
