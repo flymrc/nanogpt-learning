@@ -13,10 +13,10 @@ export function drawPromptExample(scene, stage, opts) {
     opts,
     [
       { glyph: "存", label: L("存档", "保存"), accent: C.gold },
-      { glyph: "起", label: L("换行", "改行"), accent: C.teal },
-      { glyph: "续", label: L("往后", "続ける"), accent: C.coral },
+      { glyph: "起", label: L("空行", "空行"), accent: C.teal },
+      { glyph: "续", label: L("接下去", "足す"), accent: C.coral },
     ],
-    L("从开头接新格子。旋钮不再拧。", "先頭から新しいマス。つまみは回さない。"),
+    L("从开头往后续。旋钮不再拧。", "先頭から続ける。つまみは回さない。"),
   );
 }
 
@@ -41,10 +41,10 @@ export function drawKnobsExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "温", label: "0.8", accent: C.coral },
-      { glyph: "留", label: L("65 全留", "65残す"), accent: C.violet },
+      { glyph: "稳", label: L("拧得稳", "安定"), accent: C.coral },
+      { glyph: "乱", label: L("拧得乱", "乱れる"), accent: C.violet },
     ],
-    L("前 200 名，在这一课等于全留。", "上位200は、この課では全残し。"),
+    L("大人叫温度。65 个字全留。", "大人は温度。65字は全部残す。"),
   );
 }
 
@@ -57,7 +57,7 @@ export function drawRunExample(scene, stage, opts) {
       { glyph: "档", label: L("存档", "保存"), accent: C.gold },
       { glyph: "表", label: L("对照表", "対照"), accent: C.teal },
     ],
-    L("要打的字在伪代码里。没有台词。", "打つ字は擬似コード。せりふはない。"),
+    L("要打的字在详细笔记里。没有台词。", "打つ字は詳細ノート。せりふはない。"),
   );
 }
 
@@ -70,7 +70,7 @@ export function drawScoreExample(scene, stage, opts) {
       { glyph: "续", label: L("新纸带", "新しい"), accent: C.coral },
       { glyph: "罚", label: L("另一件事", "別の話"), accent: C.blue },
     ],
-    L("不打正确率。", "正答率は出さない。"),
+    L("好看不等于过关。", "きれいで合格ではない。"),
   );
 }
 
