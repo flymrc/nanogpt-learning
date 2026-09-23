@@ -617,8 +617,8 @@ const pseudoOk =
   tipOk(pc.pseudoShift, "右") &&
   tipOk(mobile.pseudoLoss, "罚分") &&
   tipOk(pc.pseudoLoss, "罚分") &&
-  tipOk(mobile.pseudoMask, "负无穷") &&
-  tipOk(pc.pseudoMask, "负无穷") &&
+  tipOk(mobile.pseudoMask, "盖住") &&
+  tipOk(pc.pseudoMask, "盖住") &&
   tipOk(mobile.pseudoTrain, "AdamW") &&
   tipOk(pc.pseudoTrain, "AdamW") &&
   tipOk(mobile.pseudoSample, "接") &&

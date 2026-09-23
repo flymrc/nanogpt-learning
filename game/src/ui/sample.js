@@ -12,11 +12,11 @@ export function drawPromptExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "存", label: L("检查点", "保存"), accent: C.gold },
-      { glyph: "起", label: L("换行", "改行"), accent: C.teal },
-      { glyph: "续", label: L("往后", "続ける"), accent: C.coral },
+      { glyph: "存", label: L("存档", "保存"), accent: C.gold },
+      { glyph: "起", label: L("空行", "空行"), accent: C.teal },
+      { glyph: "续", label: L("接下去", "足す"), accent: C.coral },
     ],
-    L("从开头接新格子。不改数。", "先頭から新しいマス。数は直さない。"),
+    L("从开头往后续。旋钮不再拧。", "先頭から続ける。つまみは回さない。"),
   );
 }
 
@@ -41,10 +41,10 @@ export function drawKnobsExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "温", label: "0.8", accent: C.coral },
-      { glyph: "留", label: L("65 全留", "65残す"), accent: C.violet },
+      { glyph: "稳", label: L("拧得稳", "安定"), accent: C.coral },
+      { glyph: "乱", label: L("拧得乱", "乱れる"), accent: C.violet },
     ],
-    L("前 200 名，在这一课等于全留。", "上位200は、この課では全残し。"),
+    L("大人叫温度。65 个字全留。", "大人は温度。65字は全部残す。"),
   );
 }
 
@@ -54,10 +54,10 @@ export function drawRunExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "点", label: "ckpt.pt", accent: C.gold },
-      { glyph: "表", label: "meta.pkl", accent: C.teal },
+      { glyph: "档", label: L("存档", "保存"), accent: C.gold },
+      { glyph: "表", label: L("对照表", "対照"), accent: C.teal },
     ],
-    L("上游命令。本仓库没有样本。", "上流のコマンド。サンプルはない。"),
+    L("要打的字在详细笔记里。没有台词。", "打つ字は詳細ノート。せりふはない。"),
   );
 }
 
@@ -70,7 +70,7 @@ export function drawScoreExample(scene, stage, opts) {
       { glyph: "续", label: L("新纸带", "新しい"), accent: C.coral },
       { glyph: "罚", label: L("另一件事", "別の話"), accent: C.blue },
     ],
-    L("不打正确率。", "正答率は出さない。"),
+    L("好看不等于过关。", "きれいで合格ではない。"),
   );
 }
 
@@ -83,10 +83,10 @@ export function drawWrapExample(scene, stage, opts) {
       { glyph: "带", label: L("纸带", "テープ"), accent: C.teal },
       { glyph: "移", label: L("右移", "右へ"), accent: C.blue },
       { glyph: "看", label: L("左边", "左"), accent: C.violet },
-      { glyph: "改", label: L("开训", "学習"), accent: C.gold },
-      { glyph: "续", label: L("采样", "生成"), accent: C.coral },
+      { glyph: "拧", label: L("拧旋钮", "つまみ"), accent: C.gold },
+      { glyph: "续", label: L("续字", "続く"), accent: C.coral },
     ],
-    L("字符课的机制走到这里。", "文字の課の仕組みはここまで。"),
+    L("五步都能讲给朋友。", "五つの手順を友だちに話せる。"),
   );
 }
 

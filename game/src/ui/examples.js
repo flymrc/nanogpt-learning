@@ -46,7 +46,7 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
   scene.frame.stage.add(tag);
   const ceiling = exampleCeiling(scene, stage);
   const gridTop = stage.top + tag.height + CAPTION_CLEAR;
-  const noteRaw = L("空格写成 ␣，换行写成 ↵。一个字占一格。", "空白は ␣、改行は ↵。一文字が一マス。");
+  const noteRaw = L("空格写成 ␣，换行写成 ↵。一个字占一格。", "空白は ␣、改行は ↵。一つの字が一マス。");
   const noteText = wrapToWidth(scene, noteRaw, 13, stage.w - 8, uiText);
   const noteReserve = 40;
   const grid = fitChipGrid(CHARS.length, {
@@ -84,7 +84,7 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
 
 export function drawEncodeExample(scene, stage, { instant } = {}) {
   const phone = !isWidePcTutor();
-  const tag = addSectionTag(scene, L("一字一号", "一文字一番号"), C.gold, {
+  const tag = addSectionTag(scene, L("一字一号", "一字一番号"), C.gold, {
     left: stage.left,
     top: stage.top,
     note: "plates",
@@ -144,10 +144,10 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
   scene.frame.tapeRows = [{ name: "tape", left: stage.left, top: gridTop, w: stage.w, h: grid.height }];
   if (phone) return;
   placeFactBelow(scene, stage, gridTop + grid.height, {
-    value: L("一字一号", "一文字一番号"),
+    value: L("一字一号", "一字一番号"),
     label: L("不是把词切开", "単語では切らない"),
     note: "bpe",
-    tip: L("另一种切法叫 BPE，会把词切碎。这一课一个字符一张牌。", "別の切り方 BPE は語を砕く。この課は一文字に一枚。"),
+    tip: L("不是把词语切成小碎块。这一课一个字一张牌。", "言葉を小さく砕きません。この課は一つの字に一枚。"),
     accent: C.violet,
     width: Math.min(320, stage.w - 12),
     height: 48,
@@ -209,7 +209,7 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
   placeFactBelow(scene, stage, gridTop + grid.height, {
     value: L("只有 65 张", "65 枚だけ"),
     label: L("只数这套剧本", "この脚本だけ"),
-    tip: L("剧本里出现过的字符，去重以后是 65 个。", "脚本に出た文字は、重複を除くと 65。"),
+    tip: L("剧本里出现过的字，相同的只算一张，一共 65 张。", "脚本に出た字は、同じものを一枚にして、65 枚。"),
     accent: C.pink,
     width: Math.min(200, stage.w * 0.4),
     height: 48,
@@ -237,22 +237,22 @@ export function drawClipExample(scene, stage, opts) {
 }
 
 export function drawSeenExample(scene, stage, opts) {
-  drawWindowRows(scene, stage, opts, { showX: true, showY: false, xTag: L("x 现在看见的", "x 今見ている") });
+  drawWindowRows(scene, stage, opts, { showX: true, showY: false, xTag: L("线索牌", "手がかり札") });
 }
 
 export function drawShiftExample(scene, stage, opts) {
   drawWindowRows(scene, stage, opts, {
     showX: true,
     showY: true,
-    xTag: L("x 现在看见的", "x 今見ている"),
-    yTag: L("y 右移一格", "y を右へ"),
+    xTag: L("现在看见", "今見ている"),
+    yTag: L("答案排", "答えの列"),
     linkShift: true,
     alignArrows: true,
   });
 }
 
 export function drawBlankExample(scene, stage, opts) {
-  const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: L("线索 x", "手がかり x"), yTag: L("答案 y", "答え y") });
+  const rows = drawWindowRows(scene, stage, opts, { showX: true, showY: true, allOn: true, xTag: L("现在看见", "今見ている"), yTag: L("答案排", "答えの列") });
   const boardH = 58;
   const boardY = (rows?.bottom || stage.top) + 40;
   if (boardY + boardH / 2 <= stage.bottom) {
@@ -280,7 +280,7 @@ export function drawChoiceExample(scene, stage, { instant } = {}) {
 }
 
 export function drawDeskExample(scene, stage, opts) {
-  drawWindowRows(scene, stage, opts, { showX: true, showY: true, xTag: L("线索 x", "手がかり x"), yTag: L("评分桌 y", "採点机 y"), linkShift: true });
+  drawWindowRows(scene, stage, opts, { showX: true, showY: true, xTag: L("手里的线索", "手持ちの手がかり"), yTag: L("老师桌", "先生の机"), linkShift: true });
 }
 
 export function drawScoreExample(scene, stage, { instant } = {}) {
@@ -316,9 +316,9 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
   });
   const tip = placeFactBelow(scene, stage, gridTop + grid.height, {
     value: L("真答案是 e", "正解は e"),
-    label: L("押得矮，罚分就大", "低いと罰点が大きい"),
+    label: L("把握矮，错题分就大", "自信が低いと罰点が大きい"),
     note: "penalty",
-    tip: L("只看真答案那一格。这一课不写假的罚分。", "正解のマスだけを見る。偽の罰点は書かない。"),
+    tip: L("只看真答案那张把握高不高。这一课不写假的数字。", "本当の答えの一枚だけ、自信が高いかを見る。偽の数字は書かない。"),
     accent: C.coral,
     width: Math.min(340, stage.w - 12),
     height: 46,
@@ -334,9 +334,9 @@ export function drawMeanExample(scene, stage, { instant } = {}) {
   ]);
   placeFactBelow(scene, stage, row.bottom, {
     value: L("不编分数", "点数は作らない"),
-    label: L("通关还没训练", "クリアは未学習"),
+    label: L("还没改规矩", "決まりはまだ"),
     note: "penalty",
-    tip: L("这一课没有训练，也不写出假的罚分。", "この課に学習は無く、偽の罰点も書かない。"),
+    tip: L("这章只讲怎么记错题分。不写假的分数。", "この章は、まちがいの点数の書き方だけ。偽の点数は書かない。"),
     accent: C.pink,
     width: Math.min(320, stage.w - 12),
     height: 48,
