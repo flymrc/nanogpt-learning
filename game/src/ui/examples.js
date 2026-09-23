@@ -46,7 +46,7 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
   scene.frame.stage.add(tag);
   const ceiling = exampleCeiling(scene, stage);
   const gridTop = stage.top + tag.height + CAPTION_CLEAR;
-  const noteRaw = L("空格写成 ␣，换行写成 ↵。一个字占一格。", "空白は ␣、改行は ↵。一文字が一マス。");
+  const noteRaw = L("空格写成 ␣，换行写成 ↵。一个字占一格。", "空白は ␣、改行は ↵。一つの字が一マス。");
   const noteText = wrapToWidth(scene, noteRaw, 13, stage.w - 8, uiText);
   const noteReserve = 40;
   const grid = fitChipGrid(CHARS.length, {
@@ -84,7 +84,7 @@ export function drawTapeExample(scene, stage, { instant } = {}) {
 
 export function drawEncodeExample(scene, stage, { instant } = {}) {
   const phone = !isWidePcTutor();
-  const tag = addSectionTag(scene, L("一字一号", "一文字一番号"), C.gold, {
+  const tag = addSectionTag(scene, L("一字一号", "一字一番号"), C.gold, {
     left: stage.left,
     top: stage.top,
     note: "plates",
@@ -144,10 +144,10 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
   scene.frame.tapeRows = [{ name: "tape", left: stage.left, top: gridTop, w: stage.w, h: grid.height }];
   if (phone) return;
   placeFactBelow(scene, stage, gridTop + grid.height, {
-    value: L("一字一号", "一文字一番号"),
+    value: L("一字一号", "一字一番号"),
     label: L("不是把词切开", "単語では切らない"),
     note: "bpe",
-    tip: L("不是把词语切成小碎块。这一课一个字一张牌。", "言葉を小さく砕きません。この課は一文字に一枚。"),
+    tip: L("不是把词语切成小碎块。这一课一个字一张牌。", "言葉を小さく砕きません。この課は一つの字に一枚。"),
     accent: C.violet,
     width: Math.min(320, stage.w - 12),
     height: 48,
