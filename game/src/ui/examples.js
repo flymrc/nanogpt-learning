@@ -147,7 +147,7 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     value: L("一字一号", "一文字一番号"),
     label: L("不是把词切开", "単語では切らない"),
     note: "bpe",
-    tip: L("把单词切成小碎块，大人叫 BPE。这一课不用。一个字一张牌。", "単語を小さく砕く方法を、大人は BPE と呼びます。この課では使いません。一文字に一枚。"),
+    tip: L("不是把词语切成小碎块。这一课一个字一张牌。", "言葉を小さく砕きません。この課は一文字に一枚。"),
     accent: C.violet,
     width: Math.min(320, stage.w - 12),
     height: 48,
@@ -209,7 +209,7 @@ export function drawVocabExample(scene, stage, { instant } = {}) {
   placeFactBelow(scene, stage, gridTop + grid.height, {
     value: L("只有 65 张", "65 枚だけ"),
     label: L("只数这套剧本", "この脚本だけ"),
-    tip: L("剧本里出现过的字符，去重以后是 65 个。", "脚本に出た文字は、重複を除くと 65。"),
+    tip: L("剧本里出现过的字，相同的只算一张，一共 65 张。", "脚本に出た字は、同じものを一枚にして、65 枚。"),
     accent: C.pink,
     width: Math.min(200, stage.w * 0.4),
     height: 48,

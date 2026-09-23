@@ -26,7 +26,7 @@ export function drawStepExample(scene, stage, opts) {
 
 export function drawRewriteExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
-    { glyph: "注", label: L("注意力", "注意"), accent: C.gold },
+    { glyph: "左", label: L("看左边", "左だけ"), accent: C.gold },
     { glyph: "层", label: L("混合", "まぜる"), accent: C.teal },
     { glyph: "罩", label: L("不改", "固定"), accent: C.violet },
   ], L("右边一直盖住。", "右はずっと隠す。"));

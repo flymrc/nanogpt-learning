@@ -84,7 +84,7 @@ export function drawWrapExample(scene, stage, opts) {
       { glyph: "移", label: L("右移", "右へ"), accent: C.blue },
       { glyph: "看", label: L("左边", "左"), accent: C.violet },
       { glyph: "改", label: L("开训", "学習"), accent: C.gold },
-      { glyph: "续", label: L("采样", "生成"), accent: C.coral },
+      { glyph: "续", label: L("续字", "続く"), accent: C.coral },
     ],
     L("五步都能讲给朋友。", "五つの手順を友だちに話せる。"),
   );
