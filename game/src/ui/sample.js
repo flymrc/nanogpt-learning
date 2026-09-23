@@ -16,7 +16,7 @@ export function drawPromptExample(scene, stage, opts) {
       { glyph: "起", label: L("换行", "改行"), accent: C.teal },
       { glyph: "续", label: L("往后", "続ける"), accent: C.coral },
     ],
-    L("从开头接新格子。不改数。", "先頭から新しいマス。数は直さない。"),
+    L("从开头接新格子。旋钮不再拧。", "先頭から新しいマス。つまみは回さない。"),
   );
 }
 
@@ -54,10 +54,10 @@ export function drawRunExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "点", label: "ckpt.pt", accent: C.gold },
-      { glyph: "表", label: "meta.pkl", accent: C.teal },
+      { glyph: "档", label: L("存档", "保存"), accent: C.gold },
+      { glyph: "表", label: L("对照表", "対照"), accent: C.teal },
     ],
-    L("说明里的命令。没有台词。", "説明のコマンド。せりふはない。"),
+    L("要打的字在伪代码里。没有台词。", "打つ字は擬似コード。せりふはない。"),
   );
 }
 
@@ -83,7 +83,7 @@ export function drawWrapExample(scene, stage, opts) {
       { glyph: "带", label: L("纸带", "テープ"), accent: C.teal },
       { glyph: "移", label: L("右移", "右へ"), accent: C.blue },
       { glyph: "看", label: L("左边", "左"), accent: C.violet },
-      { glyph: "改", label: L("开训", "学習"), accent: C.gold },
+      { glyph: "拧", label: L("拧旋钮", "つまみ"), accent: C.gold },
       { glyph: "续", label: L("续字", "続く"), accent: C.coral },
     ],
     L("五步都能讲给朋友。", "五つの手順を友だちに話せる。"),

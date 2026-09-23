@@ -8,10 +8,10 @@ const GAP = Math.max(8, CHIP_GAP_X);
 
 export function drawRandomExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
-    { glyph: "乱", label: L("刚出生", "生まれ"), accent: C.coral },
+    { glyph: "乱", label: L("随手拧", "適当"), accent: C.coral },
     { glyph: "练", label: L("练习卷", "練習"), accent: C.gold },
     { glyph: "验", label: L("看着", "見る"), accent: C.teal },
-  ], L("罚分往下压。验收卷在旁边。", "罰点を下げる。確認は横に置く。"));
+  ], L("按错题分拧旋钮。验收卷在旁边。", "罰点でつまみを回す。確認は横。"));
 }
 
 export function drawStepExample(scene, stage, opts) {
@@ -20,23 +20,24 @@ export function drawStepExample(scene, stage, opts) {
     { glyph: "前", label: L("往前", "前へ"), accent: C.teal },
     { glyph: "罚", label: L("罚分", "罰点"), accent: C.coral },
     { glyph: "回", label: L("回传", "戻す"), accent: C.violet },
-    { glyph: "改", label: L("改数", "直す"), accent: C.gold },
-  ], L("一次剪几段，改一笔。", "一度に数段切って、一筆。"));
+    { glyph: "拧", label: L("拧一点", "回す"), accent: C.gold },
+  ], L("改分器拧一点。", "直し器が少し回す。"));
 }
 
 export function drawRewriteExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
     { glyph: "左", label: L("看左边", "左だけ"), accent: C.gold },
-    { glyph: "层", label: L("混合", "まぜる"), accent: C.teal },
-    { glyph: "罩", label: L("不改", "固定"), accent: C.violet },
-  ], L("右边一直盖住。", "右はずっと隠す。"));
+    { glyph: "混", label: L("再混", "まぜる"), accent: C.teal },
+    { glyph: "号", label: L("记号", "記号"), accent: C.blue },
+    { glyph: "盖", label: L("不拧", "固定"), accent: C.violet },
+  ], L("右边的盖子不进改分器。", "右のふたは直し器に入らない。"));
 }
 
 export function drawHoldoutExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
-    { glyph: "练", label: L("用来改", "直す"), accent: C.gold },
-    { glyph: "验", label: L("只抽查", "抜く"), accent: C.teal },
-  ], L("抽查的时候不改数。", "抜き打ちのあいだは直さない。"));
+    { glyph: "练", label: L("可能背", "暗記"), accent: C.gold },
+    { glyph: "验", label: L("不拧", "回さない"), accent: C.teal },
+  ], L("验收错题分不降，就是在背。", "確認の罰点が下がらなければ暗記。"));
 }
 
 export function drawLaunchExample(scene, stage, opts) {
@@ -45,10 +46,10 @@ export function drawLaunchExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "备", label: "prepare.py", accent: C.blue },
-      { glyph: "训", label: "train.py", accent: C.coral },
+      { glyph: "备", label: L("准备纸带", "用意"), accent: C.blue },
+      { glyph: "拧", label: L("开始拧", "回す"), accent: C.coral },
     ],
-    L("说明里的命令。我们没跑过。", "説明のコマンド。まだ走っていない。"),
+    L("要打的字在伪代码里。", "打つ字は擬似コードにある。"),
   );
 }
 
