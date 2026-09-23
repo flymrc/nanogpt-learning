@@ -48,7 +48,7 @@ Also required:
 - Also assert the title scene. The 155-step mobile walk (31×5) and the 31 PC beats stay required; the title check is extra, not a substitute.
 - Open and close **详细笔记** and **看不懂？**
 - **导读** shows once on a fresh profile (`nanogpt-seen-guide` unset), stays hidden after dismiss + reload, and reopens from **目录**.
-- **目录** lists 5 chapters (纸带和号码 / 剪开猜下一个 / 只看左边 / 按错题分拧旋钮 / 从开头往后续). Short buttons stay 纸带 / 猜下一个 / 看左边 / 改一改 / 往后写. The in-lesson header for chapter 4 is 按罚分改一笔. The in-lesson header for chapter 5 is 一格一格接下去. Every chapter starts at beat 0 and can be revisited. **返回** steps to the previous phase, then the previous beat, then the previous chapter.
+- **目录** lists 5 chapters (纸带和号码 / 剪开猜下一个 / 只看左边 / 按罚分改一笔 / 从开头往后续). Short buttons stay 纸带 / 猜下一个 / 看左边 / 改一改 / 往后写. In-lesson headers use those same chapter titles. Every chapter starts at beat 0 and can be revisited. **返回** steps to the previous phase, then the previous beat, then the previous chapter.
 - **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core beat lines and 伪代码 open are narrated (existing Chinese clips when `zh` and a clip exists; Web Speech otherwise, including all Japanese).
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
