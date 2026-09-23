@@ -27,9 +27,9 @@ export function drawStepExample(scene, stage, opts) {
 export function drawRewriteExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
     { glyph: "注", label: L("注意力", "注意"), accent: C.gold },
-    { glyph: "层", label: "MLP", accent: C.teal },
+    { glyph: "层", label: L("混合", "まぜる"), accent: C.teal },
     { glyph: "罩", label: L("不改", "固定"), accent: C.violet },
-  ], L("遮罩继续盖住右边。", "マスクは右を隠し続ける。"));
+  ], L("右边一直盖住。", "右はずっと隠す。"));
 }
 
 export function drawHoldoutExample(scene, stage, opts) {
@@ -48,7 +48,7 @@ export function drawLaunchExample(scene, stage, opts) {
       { glyph: "备", label: "prepare.py", accent: C.blue },
       { glyph: "训", label: "train.py", accent: C.coral },
     ],
-    L("上游命令。本仓库没跑罚分。", "上流のコマンド。罰点は出していない。"),
+    L("说明里的命令。我们没跑过。", "説明のコマンド。まだ走っていない。"),
   );
 }
 

@@ -147,7 +147,7 @@ export function drawEncodeExample(scene, stage, { instant } = {}) {
     value: L("一字一号", "一文字一番号"),
     label: L("不是把词切开", "単語では切らない"),
     note: "bpe",
-    tip: L("另一种切法叫 BPE，会把词切碎。这一课一个字符一张牌。", "別の切り方 BPE は語を砕く。この課は一文字に一枚。"),
+    tip: L("把单词切成小碎块，大人叫 BPE。这一课不用。一个字一张牌。", "単語を小さく砕く方法を、大人は BPE と呼びます。この課では使いません。一文字に一枚。"),
     accent: C.violet,
     width: Math.min(320, stage.w - 12),
     height: 48,

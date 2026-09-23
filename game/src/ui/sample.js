@@ -12,7 +12,7 @@ export function drawPromptExample(scene, stage, opts) {
     stage,
     opts,
     [
-      { glyph: "存", label: L("检查点", "保存"), accent: C.gold },
+      { glyph: "存", label: L("存档", "保存"), accent: C.gold },
       { glyph: "起", label: L("换行", "改行"), accent: C.teal },
       { glyph: "续", label: L("往后", "続ける"), accent: C.coral },
     ],
@@ -57,7 +57,7 @@ export function drawRunExample(scene, stage, opts) {
       { glyph: "点", label: "ckpt.pt", accent: C.gold },
       { glyph: "表", label: "meta.pkl", accent: C.teal },
     ],
-    L("上游命令。本仓库没有样本。", "上流のコマンド。サンプルはない。"),
+    L("说明里的命令。没有台词。", "説明のコマンド。せりふはない。"),
   );
 }
 
@@ -86,7 +86,7 @@ export function drawWrapExample(scene, stage, opts) {
       { glyph: "改", label: L("开训", "学習"), accent: C.gold },
       { glyph: "续", label: L("采样", "生成"), accent: C.coral },
     ],
-    L("字符课的机制走到这里。", "文字の課の仕組みはここまで。"),
+    L("五步都能讲给朋友。", "五つの手順を友だちに話せる。"),
   );
 }
 

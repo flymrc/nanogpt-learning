@@ -26,7 +26,7 @@ export function drawLookExample(scene, stage, { instant } = {}) {
 export function drawQkvExample(scene, stage, { instant } = {}) {
   const cards = [
     { glyph: L("问", "問"), label: L("提问", "問い"), accent: C.coral },
-    { glyph: L("签", "札"), label: L("标签", "札"), accent: C.gold },
+    { glyph: L("牌", "札"), label: L("名牌", "名札"), accent: C.gold },
     { glyph: L("内", "中"), label: L("内容", "中身"), accent: C.teal },
   ];
   const row = drawCards(scene, stage, cards, { instant });
@@ -34,7 +34,7 @@ export function drawQkvExample(scene, stage, { instant } = {}) {
     value: L("一次切开", "一度に切る"),
     label: L("三份来自同一格", "三つは同じマス"),
     note: "qkv",
-    tip: L("提问去比标签。搬回来的才是内容。", "問いで札を比べる。運び戻すのは中身。"),
+    tip: L("提问去比名牌。搬回来的才是内容。", "問いで名札を比べます。運び戻すのは中身です。"),
     accent: C.violet,
   });
 }
