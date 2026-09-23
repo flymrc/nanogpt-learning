@@ -17,9 +17,8 @@ export function drawRandomExample(scene, stage, opts) {
 export function drawStepExample(scene, stage, opts) {
   drawCardRow(scene, stage, opts, [
     { glyph: "剪", label: L("几段", "数段"), accent: C.blue },
-    { glyph: "前", label: L("往前", "前へ"), accent: C.teal },
-    { glyph: "罚", label: L("罚分", "罰点"), accent: C.coral },
-    { glyph: "回", label: L("回传", "戻す"), accent: C.violet },
+    { glyph: "罚", label: L("错题分", "罰点"), accent: C.coral },
+    { glyph: "回", label: L("往回指", "指す"), accent: C.violet },
     { glyph: "拧", label: L("拧一点", "回す"), accent: C.gold },
   ], L("改分器拧一点。", "直し器が少し回す。"));
 }

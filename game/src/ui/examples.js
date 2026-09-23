@@ -316,9 +316,9 @@ export function drawScoreExample(scene, stage, { instant } = {}) {
   });
   const tip = placeFactBelow(scene, stage, gridTop + grid.height, {
     value: L("真答案是 e", "正解は e"),
-    label: L("押得矮，罚分就大", "低いと罰点が大きい"),
+    label: L("把握矮，错题分就大", "自信が低いと罰点が大きい"),
     note: "penalty",
-    tip: L("只看真答案那张写得高不高。这一课不写假的数字。", "本当の答えの一枚だけ、高く書いたかを見る。偽の数字は書かない。"),
+    tip: L("只看真答案那张把握高不高。这一课不写假的数字。", "本当の答えの一枚だけ、自信が高いかを見る。偽の数字は書かない。"),
     accent: C.coral,
     width: Math.min(340, stage.w - 12),
     height: 46,
