@@ -109,6 +109,8 @@ export function keepStageAboveCta(scene, band, ceiling) {
     const dy = ceiling - bottom;
     if (top + dy >= (band?.top || 0) + 2) {
       child.y += dy;
+    } else if (child.getData?.("artPart")) {
+      // Lesson pictures stay on the page. Callers shrink them into the band.
     } else {
       scene.tweens?.killTweensOf(child);
       child.destroy();

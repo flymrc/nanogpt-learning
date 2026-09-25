@@ -6,6 +6,8 @@ import {
   CAPTION_CLEAR,
   CHIP_GAP_X,
   CHIP_GAP_Y,
+  MIN_CHIP_H,
+  MIN_CHIP_W,
   STICKER_SHADOW_Y,
   fitChipGrid,
 } from "./layout.js";
@@ -13,6 +15,158 @@ import { C, uiText, wrapToWidth } from "./theme.js";
 
 function ceilingOf(scene, stage) {
   return Math.min(stage.bottom - 2, ctaCeiling(scene.frame) - 4);
+}
+
+const SCHEME_VISUALS = new Set([
+  "bars", "truebar", "penalty", "wheel", "temp",
+  "guess", "random", "back", "nudge", "save", "load",
+]);
+const STATS_VISUALS = new Set([
+  "vocab", "split", "batch", "average", "exam", "loop", "flags", "embed", "heads", "layers",
+]);
+const SCHEME_CARD_H = 48;
+const SCHEME_CAPTION_H = 18;
+
+function tagArt(node, part) {
+  if (node?.setData) node.setData("artPart", part);
+  return node;
+}
+
+function countOf(list) {
+  return Array.isArray(list) ? list.length : 0;
+}
+
+function schemeBlock() {
+  return SCHEME_CARD_H + STICKER_SHADOW_Y + CAPTION_CLEAR + SCHEME_CAPTION_H;
+}
+
+function chipCols(width) {
+  return Math.max(1, Math.floor((Math.max(80, width) + CHIP_GAP_X) / (MIN_CHIP_W + CHIP_GAP_X)));
+}
+
+function chipBlock(count, width) {
+  const rows = Math.max(1, Math.ceil(Math.max(1, count) / chipCols(width)));
+  return rows * MIN_CHIP_H + Math.max(0, rows - 1) * CHIP_GAP_Y + STICKER_SHADOW_Y + 6;
+}
+
+function tileBlock(count, width, maxTile = 40) {
+  const gaps = Math.max(0, count - 1) * CHIP_GAP_X;
+  const tile = Math.min(maxTile, Math.max(18, (Math.max(80, width) - gaps) / Math.max(1, count)));
+  return tile + STICKER_SHADOW_Y + 4;
+}
+
+function pairCount(visual, shared) {
+  if (visual === "assign") return countOf(shared.marks);
+  if (visual === "same") return countOf(shared.glyphs) + countOf(shared.side);
+  if (visual === "decode") return countOf(shared.ids);
+  return countOf(shared.glyphs);
+}
+
+function statCount(visual) {
+  if (visual === "vocab" || visual === "split" || visual === "exam") return 2;
+  return 1;
+}
+
+/** Minimum example-band height so the picture can shrink instead of disappearing. */
+export function artBandReserve(page, phase = 0, width = 320) {
+  const visual = page?.visual;
+  if (!visual) return 64;
+  const shared = page.shared || {};
+  const slot = exampleSlot(page);
+  const tile = 28 + STICKER_SHADOW_Y + 6;
+  if (visual === "compare" || visual === "shares" || visual === "mix") {
+    return tileBlock(countOf(shared.glyphs) || 3, width, 40) + 6 + schemeBlock();
+  }
+  if (SCHEME_VISUALS.has(visual)) return schemeBlock();
+  if (STATS_VISUALS.has(visual)) return 78 + STICKER_SHADOW_Y + 4;
+  if (visual === "pattern") {
+    let height = 0;
+    (shared.rows || []).filter(Boolean).forEach((row) => {
+      height += tileBlock(row.length, width, 46);
+    });
+    if (slot?.glyphs?.length) height += tileBlock(slot.glyphs.length, width, 46);
+    return Math.max(tile, height);
+  }
+  if (visual === "cards") {
+    return tileBlock(countOf(shared.open), width, 46) + tileBlock(countOf(shared.closed), width, 46);
+  }
+  if (visual === "right" || visual === "fix" || visual === "cells" || visual === "spaces" || visual === "clip" || visual === "append" || visual === "causal" || visual === "baskets") {
+    const glyphs = visual === "baskets" ? (shared.baskets || shared.glyphs) : shared.glyphs;
+    let height = tileBlock(countOf(glyphs) || 1, width, 46);
+    if (slot?.glyphs?.length) height += tileBlock(slot.glyphs.length, width, 40);
+    return height;
+  }
+  if (visual === "shift" || visual === "blanks") {
+    const topCount = countOf(shared.top || shared.glyphs) || 1;
+    const bottomCount = countOf(shared.bottom || shared.answers) || 1;
+    return tileBlock(topCount, width, 46) + tileBlock(bottomCount, width, 46);
+  }
+  if (visual === "chain") {
+    return 64 + STICKER_SHADOW_Y + 8 + tileBlock(countOf(shared.letters) || 1, width, 40);
+  }
+  if (visual === "stars") return 64 + STICKER_SHADOW_Y + 4;
+  if (visual === "sign") return tileBlock(countOf(shared.glyphs) || 1, width, 40) + 8 + 72 + STICKER_SHADOW_Y;
+  if (visual === "start") return chipBlock(1, width);
+  if (visual === "encode" || visual === "same" || visual === "assign" || visual === "decode") {
+    let height = chipBlock(pairCount(visual, shared) || 1, width);
+    if (visual === "decode" && phase >= 2) height += tileBlock(countOf(shared.glyphs) || 1, width, 40) + 6;
+    if (visual === "assign" && slot?.glyphs?.length) height += tileBlock(slot.glyphs.length, width, 36) + 6;
+    return height;
+  }
+  return tile;
+}
+
+/** What each skeleton visual must actually paint. Counts come from the page, not from what happened to draw. */
+export function expectedArt(page, phase = 0) {
+  const visual = page?.visual;
+  if (!visual) return null;
+  const shared = page.shared || {};
+  const slot = exampleSlot(page);
+  const showResult = phase >= 2;
+  const parts = [];
+  const need = (part, min) => {
+    if (min > 0) parts.push({ part, min });
+  };
+  if (visual === "pattern" || visual === "right" || visual === "cards" || visual === "fix") {
+    let count = 0;
+    const rows = visual === "pattern" ? (shared.rows || []) : [visual === "cards" ? shared.open : shared.glyphs];
+    rows.filter(Boolean).forEach((row) => {
+      count += countOf(row);
+    });
+    if (visual === "cards") count += countOf(shared.closed);
+    count += countOf(slot?.glyphs);
+    need("tiles", count);
+  } else if (visual === "chain") {
+    need("words", countOf(slot?.glyphs));
+    need("tiles", countOf(shared.letters));
+  } else if (visual === "start") {
+    parts.push({ part: "start", any: ["chips", "tiles"], min: 1 });
+  } else if (visual === "cells" || visual === "spaces" || visual === "clip" || visual === "append" || visual === "causal") {
+    need("tiles", countOf(shared.glyphs));
+  } else if (visual === "baskets") {
+    need("tiles", countOf(showResult ? shared.baskets : shared.glyphs));
+  } else if (STATS_VISUALS.has(visual)) {
+    need("stats", statCount(visual));
+  } else if (visual === "assign" || visual === "same" || visual === "encode" || visual === "decode") {
+    need("chips", pairCount(visual, shared));
+    if (visual === "decode" && showResult) need("tiles", countOf(shared.glyphs));
+    if (visual === "assign") need("tiles", countOf(slot?.glyphs));
+  } else if (visual === "shift" || visual === "blanks") {
+    need("tiles", countOf(shared.top || shared.glyphs) + countOf(shared.bottom || shared.answers));
+  } else if (SCHEME_VISUALS.has(visual)) {
+    need("scheme", 1);
+    need("scheme-label", 1);
+  } else if (visual === "compare" || visual === "shares" || visual === "mix") {
+    need("tiles", countOf(shared.glyphs));
+    need("scheme", 1);
+    need("scheme-label", 1);
+  } else if (visual === "sign") {
+    need("tiles", countOf(shared.glyphs));
+    need("sign", 1);
+  } else if (visual === "stars") {
+    need("words", 3);
+  }
+  return { visual, parts };
 }
 
 function packSingleRow(count, { left, top, width, maxW, maxH, gapX, maxHeight }) {
@@ -29,12 +183,12 @@ function packSingleRow(count, { left, top, width, maxW, maxH, gapX, maxHeight })
   return { tileW: tile, tileH: tile, positions, height: tile };
 }
 
-function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46, maxH = 46, onTap, singleRow = false, patternRow = null } = {}) {
+function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46, maxH = 46, onTap, singleRow = false, patternRow = null, artPart = "tiles" } = {}) {
   if (!glyphs?.length) return null;
   const ceiling = ceilingOf(scene, stage);
-  const maxHeight = ceiling - top - 4;
-  if (maxHeight < (singleRow ? 12 : minH)) return null;
-  const grid = singleRow
+  const maxHeight = Math.max(8, ceiling - top - 4);
+  const looseMin = 12;
+  let grid = singleRow
     ? packSingleRow(glyphs.length, {
       left: stage.left,
       top,
@@ -51,18 +205,29 @@ function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46,
       maxHeight,
       maxW,
       maxH,
-      minW,
-      minH,
+      minW: Math.min(minW, looseMin),
+      minH: Math.min(minH, looseMin),
       gapX: CHIP_GAP_X,
       gapY: CHIP_GAP_Y,
     });
-  if (!singleRow && grid.height > maxHeight + 1) return null;
+  if (grid.height > maxHeight + 1) {
+    grid = packSingleRow(glyphs.length, {
+      left: stage.left,
+      top,
+      width: stage.w,
+      maxW: Math.min(maxW, maxHeight),
+      maxH: Math.min(maxH, maxHeight),
+      gapX: CHIP_GAP_X,
+      maxHeight,
+    });
+  }
   const nodes = glyphs.map((glyph, index) => {
     const node = makeCharTile(scene, grid.positions[index].x, grid.positions[index].y, String(glyph), {
       width: grid.tileW,
       height: grid.tileH,
       seed: `${glyph}-${index}`,
     });
+    tagArt(node, artPart);
     if (patternRow != null) node.setData("patternRow", patternRow);
     scene.frame.stage.add(node);
     if (onTap) {
@@ -107,19 +272,19 @@ function drawChips(scene, stage, pairs, top) {
       height: grid.tileH,
       accent: C.teal,
     });
+    tagArt(chip, "chips");
     scene.frame.stage.add(chip);
   });
   return { bottom: top + grid.height + STICKER_SHADOW_Y };
 }
 
-function drawWordRow(scene, stage, words, top) {
+function drawWordRow(scene, stage, words, top, { leave = 0 } = {}) {
   if (!words?.length) return null;
   const gap = 8;
-  const height = 64;
-  const width = Math.min(108, (stage.w - gap * (words.length - 1)) / words.length);
-  if (width < 64) return null;
   const ceiling = ceilingOf(scene, stage);
-  if (top + height + STICKER_SHADOW_Y > ceiling) return null;
+  const room = ceiling - top - leave - STICKER_SHADOW_Y - 2;
+  const height = Math.min(64, Math.max(28, room));
+  const width = Math.max(28, Math.min(108, (stage.w - gap * (words.length - 1)) / words.length));
   const rowW = words.length * width + (words.length - 1) * gap;
   const x0 = stage.cx - rowW / 2 + width / 2;
   words.forEach((word, index) => {
@@ -130,6 +295,10 @@ function drawWordRow(scene, stage, words, top) {
       height,
       accent: C.gold,
     });
+    card.list?.forEach((child) => {
+      if (child.type === "Text" && child.width > width - 16) child.setScale((width - 16) / child.width);
+    });
+    tagArt(card, "words");
     scene.frame.stage.add(card);
   });
   return { bottom: top + height + STICKER_SHADOW_Y };
@@ -138,11 +307,10 @@ function drawWordRow(scene, stage, words, top) {
 function drawStats(scene, stage, cards, top) {
   if (!cards?.length) return null;
   const gap = 10;
-  const height = 78;
-  const width = Math.min(200, (stage.w - gap * (cards.length - 1)) / cards.length);
-  if (width < 96) return null;
   const ceiling = ceilingOf(scene, stage);
-  if (top + height + STICKER_SHADOW_Y > ceiling) return null;
+  const room = ceiling - top - STICKER_SHADOW_Y - 2;
+  const height = Math.min(78, Math.max(36, room));
+  const width = Math.max(64, Math.min(200, (stage.w - gap * (cards.length - 1)) / cards.length));
   const rowW = cards.length * width + (cards.length - 1) * gap;
   const x0 = stage.cx - rowW / 2 + width / 2;
   cards.forEach((card, index) => {
@@ -153,6 +321,10 @@ function drawStats(scene, stage, cards, top) {
       height,
       accent: card.accent || C.coral,
     });
+    node.list?.forEach((child) => {
+      if (child.type === "Text" && child.width > width - 28) child.setScale((width - 28) / child.width);
+    });
+    tagArt(node, "stats");
     scene.frame.stage.add(node);
   });
   return { bottom: top + height + STICKER_SHADOW_Y };
@@ -160,12 +332,13 @@ function drawStats(scene, stage, cards, top) {
 
 function drawScheme(scene, stage, top, caption, paint) {
   const ceiling = ceilingOf(scene, stage);
-  const width = Math.min(stage.w - 4, 520);
-  const height = Math.min(110, ceiling - top - 36);
-  if (width < 120 || height < 64) return null;
+  const width = Math.max(72, Math.min(stage.w - 4, 520));
+  const room = Math.max(28, ceiling - top - 2);
+  const block = caption ? STICKER_SHADOW_Y + CAPTION_CLEAR + SCHEME_CAPTION_H : STICKER_SHADOW_Y;
+  const height = Math.min(110, Math.max(20, room - block));
   const card = scene.add.container(stage.cx, top + height / 2);
   const g = scene.add.graphics();
-  drawSticker(g, -width / 2, -height / 2, width, height, 16, C.surface);
+  drawSticker(g, -width / 2, -height / 2, width, height, Math.min(16, height * 0.2), C.surface);
   const layout = paint(g, width, height) || null;
   card.add(g);
   card.setSize(width, height);
@@ -173,44 +346,57 @@ function drawScheme(scene, stage, top, caption, paint) {
   card.setData("width", width);
   card.setData("height", height);
   card.setData("shadow", true);
+  tagArt(card, "scheme");
   scene.frame.stage.add(card);
-  const capY = top + height + STICKER_SHADOW_Y + CAPTION_CLEAR;
-  if (caption && capY + 16 <= ceiling) {
+  let bottom = top + height + STICKER_SHADOW_Y;
+  if (caption) {
+    const capY = top + height + STICKER_SHADOW_Y + CAPTION_CLEAR;
     const note = markCaption(
       scene.add.text(stage.cx, capY, caption, uiText(13, { color: C.muted })).setOrigin(0.5, 0),
     );
+    if (note.width > stage.w - 4) note.setScale((stage.w - 4) / note.width);
+    const limit = ceiling - capY;
+    if (note.height > limit && limit > 6) note.setScale(Math.min(note.scaleX, limit / note.height));
+    tagArt(note, "scheme-label");
     scene.frame.stage.add(note);
+    bottom = capY + Math.max(SCHEME_CAPTION_H, note.displayHeight || note.height || SCHEME_CAPTION_H);
   }
-  return { bottom: capY + 18, card, width, height, layout };
+  return { bottom, card, width, height, layout };
 }
 
 function paintBars(g, width, height, { highlight = -1, short = false, count = 8, labelRoom = false, zeroFrom = count } = {}) {
-  const gap = 6;
+  const font = height >= 44 ? 12 : 11;
+  const gap = Math.max(3, Math.min(6, width * 0.04));
+  const side = Math.max(8, Math.min(18, width * 0.06));
+  const inner = Math.max(count * 6, width - side * 2);
   const barW = count === 1
-    ? Math.min(84, width - 48)
-    : Math.min(28, (width - 36 - gap * Math.max(0, count - 1)) / count);
+    ? Math.min(84, inner)
+    : Math.max(6, Math.min(28, (inner - gap * Math.max(0, count - 1)) / count));
   const total = count * barW + Math.max(0, count - 1) * gap;
   const x0 = -total / 2;
-  const base = height / 2 - (labelRoom ? 22 : 16);
-  const tall = labelRoom ? height - 48 : height - 36;
+  const labelBand = labelRoom ? font + 10 : 4;
+  const topPad = Math.max(4, Math.min(12, height * 0.14));
+  const base = height / 2 - labelBand;
+  const tall = Math.max(4, base + height / 2 - topPad);
   for (let index = 0; index < count; index += 1) {
     const zero = index >= zeroFrom;
-    const h = zero ? 6 : short && index === highlight ? tall * 0.28 : tall * (0.35 + ((index * 37) % 50) / 100);
+    const h = zero ? Math.min(6, tall) : short && index === highlight ? Math.max(3, tall * 0.28) : tall * (0.35 + ((index * 37) % 50) / 100);
     const x = x0 + index * (barW + gap);
     const color = zero ? 0xc4b8ae : index === highlight ? C.coral : C.teal;
     g.fillStyle(color, zero ? 0.55 : index === highlight ? 1 : 0.85);
-    g.fillRoundedRect(x, base - h, barW, h, 4);
+    const radius = Math.max(1, Math.min(4, barW / 2, h / 2));
+    g.fillRoundedRect(x, base - h, barW, Math.max(2, h), radius);
   }
-  return { barW, gap, base, count, x0 };
+  return { barW, gap, base, count, x0, labelFont: font };
 }
 
 function labelBars(scene, drawn, labels, { highlight = -1, zeroFrom = labels.length } = {}) {
   if (!drawn?.card || !drawn.layout || !labels?.length) return;
-  const { barW, gap, base, x0 } = drawn.layout;
+  const { barW, gap, base, x0, labelFont = 12 } = drawn.layout;
   labels.forEach((label, index) => {
     const zero = index >= zeroFrom;
     const x = x0 + index * (barW + gap) + barW / 2;
-    const text = scene.add.text(x, base + 2, zero ? "0" : label, uiText(12, {
+    const text = scene.add.text(x, base + 1, zero ? "0" : label, uiText(labelFont, {
       color: zero ? C.muted : index === highlight ? C.coralCss : C.text,
     })).setOrigin(0.5, 0);
     drawn.card.add(text);
@@ -230,11 +416,12 @@ function paintWheel(g, width, height, grown = false) {
     { label: "b", share: 0.3 },
     { label: "c", share: grown ? 0.08 : 0.2 },
   ];
+  const pad = Math.max(6, Math.min(18, height * 0.16));
   const gap = 8;
-  const inner = width - 36;
-  let x = -width / 2 + 18;
-  const y = -height / 2 + 18;
-  const h = height - 36;
+  const inner = width - pad * 2;
+  let x = -width / 2 + pad;
+  const y = -height / 2 + pad;
+  const h = Math.max(8, height - pad * 2);
   faces.forEach((face, index) => {
     const w = Math.max(18, inner * face.share - gap);
     g.fillStyle(index === 0 ? C.gold : index === 1 ? C.blue : C.pink, 1);
@@ -256,13 +443,14 @@ function drawSign(scene, stage, top, message) {
     probe.setFontSize(size);
     probe.setText(wrapped);
   }
-  const height = Math.max(72, probe.height + 28);
+  const room = ceiling - top - STICKER_SHADOW_Y - 2;
+  let height = Math.max(36, Math.min(Math.max(72, probe.height + 28), Math.max(36, room)));
+  if (room < 36) height = Math.max(24, room);
   probe.destroy();
-  if (top + height + STICKER_SHADOW_Y > ceiling) return null;
   const card = scene.add.container(stage.cx, top + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, 16, C.surface);
-  const stripe = scene.add.rectangle(-width / 2 + 12, 0, 8, height - 20, C.coral).setOrigin(0.5);
+  const stripe = scene.add.rectangle(-width / 2 + 12, 0, 8, Math.max(8, height - 16), C.coral).setOrigin(0.5);
   const text = scene.add.text(8, 0, wrapped, uiText(size, { align: "center", lineSpacing: 4 })).setOrigin(0.5);
   card.add([g, stripe, text]);
   card.setSize(width, height);
@@ -270,6 +458,7 @@ function drawSign(scene, stage, top, message) {
   card.setData("width", width);
   card.setData("height", height);
   card.setData("shadow", true);
+  tagArt(card, "sign");
   scene.frame.stage.add(card);
   return { bottom: top + height + STICKER_SHADOW_Y };
 }
@@ -284,7 +473,12 @@ function revealTile(node, glyph) {
  * Pieces stay inside the example band. Charts are one card labelled 示意 / イメージ図.
  */
 export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
-  if (!page || stage.h < 48) return;
+  if (!page) {
+    if (scene.frame) scene.frame.artExpect = null;
+    return;
+  }
+  if (scene.frame) scene.frame.artExpect = expectedArt(page, phase);
+  if (!stage || stage.h < 8) return;
   const shared = page.shared || {};
   const visual = page.visual;
   const showResult = phase >= 2;
@@ -294,7 +488,12 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
 
   if (visual === "pattern" || visual === "right" || visual === "cards" || visual === "fix") {
     const rows = visual === "pattern" ? shared.rows : [visual === "cards" ? shared.open : shared.glyphs];
-    rows.filter(Boolean).forEach((row, rowIndex) => {
+    const rowList = rows.filter(Boolean);
+    const planned = rowList.length + (visual === "cards" ? 1 : 0) + (slot?.glyphs?.length ? 1 : 0);
+    const budget = Math.max(16, ceilingOf(scene, stage) - top - Math.max(0, planned - 1) * 4);
+    const tileMax = Math.max(14, Math.min(46, budget / Math.max(1, planned) - STICKER_SHADOW_Y));
+    const sequence = visual === "pattern" || visual === "cards" || visual === "right" || visual === "fix";
+    rowList.forEach((row, rowIndex) => {
       const glyphs = row.map((glyph) => {
         if (!showResult || glyph !== "＿") return glyph;
         if (visual === "pattern") return shared.reveal?.[rowIndex] || glyph;
@@ -302,8 +501,10 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
         return glyph;
       });
       const drawn = drawTiles(scene, stage, glyphs, top, {
-        singleRow: visual === "pattern",
+        singleRow: sequence,
         patternRow: visual === "pattern" ? rowIndex : null,
+        maxW: tileMax,
+        maxH: tileMax,
         onTap: (node, glyph) => {
           if (glyph !== "＿") return;
           const next = visual === "pattern" ? shared.reveal?.[rowIndex] : visual === "fix" ? shared.right : "■";
@@ -314,7 +515,7 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     });
     if (visual === "cards") {
       const closed = (shared.closed || []).map((glyph, index) => (showResult && index === 0 ? shared.reveal || glyph : glyph));
-      const extra = drawTiles(scene, stage, closed, top);
+      const extra = drawTiles(scene, stage, closed, top, { singleRow: true, maxW: tileMax, maxH: tileMax });
       if (extra) top = extra.bottom + 4;
     }
     if (slot?.glyphs?.length) {
@@ -322,6 +523,8 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
       drawTiles(scene, stage, localGlyphs, top, {
         singleRow: visual === "pattern",
         patternRow: visual === "pattern" ? "local" : null,
+        maxW: tileMax,
+        maxH: tileMax,
       });
     }
     return;
@@ -329,7 +532,8 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
 
   if (visual === "chain") {
     const words = slot?.glyphs || [];
-    const row = drawWordRow(scene, stage, words, top);
+    const leave = tileBlock(countOf(shared.letters) || 1, stage.w, 40) + 8;
+    const row = drawWordRow(scene, stage, words, top, { leave });
     if (row) top = row.bottom + 8;
     drawTiles(scene, stage, shared.letters || [], top);
     return;
@@ -451,11 +655,13 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     if (cards.length) drawStats(scene, stage, cards, top);
     else {
       drawScheme(scene, stage, top, scheme || t("art.locked"), (g, w, h) => {
+        const pad = Math.min(16, Math.max(4, h * 0.18));
         g.fillStyle(C.violet, 0.35);
-        g.fillRoundedRect(-w / 2 + 16, -h / 2 + 16, w - 32, h - 32, 10);
+        g.fillRoundedRect(-w / 2 + pad, -h / 2 + pad, Math.max(8, w - pad * 2), Math.max(8, h - pad * 2), 8);
         if (visual === "back" || visual === "nudge") {
           g.fillStyle(C.coral, 1);
-          g.fillTriangle(0, -h / 2 + 22, -10, -h / 2 + 40, 10, -h / 2 + 40);
+          const tip = -h / 2 + pad + 4;
+          g.fillTriangle(0, tip, -8, tip + 14, 8, tip + 14);
         }
       });
     }
@@ -484,13 +690,15 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     const focus = focusIndex(shared);
     const zeroFrom = visual === "mix" ? glyphs.length : focus + 1;
     if (glyphs.length) {
-      const row = drawTiles(scene, stage, glyphs, top, { maxW: 40, maxH: 40 });
+      const tileRoom = Math.max(16, ceilingOf(scene, stage) - top - schemeBlock() - 6 - STICKER_SHADOW_Y);
+      const tileMax = Math.min(40, tileRoom);
+      const row = drawTiles(scene, stage, glyphs, top, { maxW: tileMax, maxH: tileMax, singleRow: true });
       row?.nodes?.forEach((node, index) => {
         if (index >= zeroFrom) node.setAlpha(0.35);
       });
       if (row) top = row.bottom + 6;
     }
-    const drawn = drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
+    const drawn = drawScheme(scene, stage, top, scheme || t("schematic"), (g, w, h) => paintBars(g, w, h, {
       highlight: focus,
       count: glyphs.length || 3,
       labelRoom: true,

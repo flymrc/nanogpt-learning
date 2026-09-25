@@ -144,6 +144,8 @@ function assertLessonLayout(scene) {
   }
   const patternHits = collectPatternRowHits(scene, origin);
   for (const hit of patternHits) overlaps.push(hit);
+  const artHits = collectArtHits(scene, origin);
+  for (const hit of artHits) overlaps.push(hit);
 
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
@@ -401,6 +403,50 @@ function collectPatternRowHits(scene, origin) {
     const centers = list.map((box) => box.y + box.h / 2);
     const spread = Math.max(...centers) - Math.min(...centers);
     if (spread > 8) hits.push(["pattern-row", String(row)]);
+  }
+  return hits;
+}
+
+/**
+ * Every lesson page must paint its skeleton visual inside the viewport.
+ * A missing chart (height bail-out) is the same failure as an overlap.
+ */
+function collectArtHits(scene, origin) {
+  const expect = scene.frame?.artExpect;
+  if (!expect) return [];
+  if (!expect.parts?.length) return [["art-missing", expect.visual || "page", "unmapped"]];
+  const found = new Map();
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false || obj.alpha === 0) return;
+    const part = obj.getData?.("artPart");
+    if (part) {
+      const box = pieceBox(obj, origin);
+      if (box && box.w > 1 && box.h > 1) {
+        const list = found.get(part) || [];
+        list.push(box);
+        found.set(part, list);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const viewW = window.innerWidth;
+  const viewH = window.innerHeight;
+  const inside = (box) => box.x >= -2 && box.y >= -2 && box.x + box.w <= viewW + 2 && box.y + box.h <= viewH + 2;
+  const hits = [];
+  for (const spec of expect.parts) {
+    const pool = spec.any
+      ? spec.any.flatMap((name) => found.get(name) || [])
+      : (found.get(spec.part) || []);
+    const label = spec.any ? spec.any.join("|") : spec.part;
+    if (pool.length < (spec.min || 1)) {
+      hits.push(["art-missing", expect.visual, label, String(pool.length)]);
+      continue;
+    }
+    for (const box of pool) {
+      if (!(box.rawW > 1) || !(box.rawH > 1)) hits.push(["art-size", expect.visual, label]);
+      if (!inside(box)) hits.push(["art-offscreen", expect.visual, label]);
+    }
   }
   return hits;
 }

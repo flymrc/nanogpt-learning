@@ -5,6 +5,7 @@ import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
 import { installLayoutProbe } from "./e2e.js";
+import { artBandReserve } from "./page-art.js";
 import { ctaCeiling, keepStageAboveCta, layerBottom, placeLessonCta } from "./lesson.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
@@ -255,7 +256,7 @@ function paintBookMarks(scene, parent, source, size, originX, originY, lineH) {
   probe.destroy();
 }
 
-export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
+export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = {}) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
   const phone = !isWidePcTutor();
@@ -263,14 +264,18 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
   const copy = cardCopy(beat, phase);
-  const maxH = phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
-  const maxTextH = maxH - 46;
+  const preferred = phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
+  const available = stage.bottom - cardTop - rhythm;
+  const yielded = available - Math.max(0, reserve);
+  const maxH = Math.min(preferred, Math.max(48, yielded));
+  const maxTextH = Math.max(16, maxH - 46);
   const startSize = phone ? 15 : 16;
   const shownFit = fitPlain(scene, copy.shown, startSize, 13, wrap, maxTextH);
   const revealFit = copy.reveal ? fitPlain(scene, copy.reveal, startSize, 13, wrap, maxTextH) : null;
   const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);
   const textH = Math.max(shownFit.height, revealFit?.height || 0);
-  const height = Math.min(maxH, Math.max(phone ? 78 : 86, 36 + textH + 12));
+  const floor = Math.min(phone ? 78 : 86, maxH);
+  const height = Math.min(maxH, Math.max(floor, Math.min(maxH, 36 + textH + 12)));
   const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, phone ? 14 : 18, C.surface);
@@ -316,8 +321,11 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
 }
 
 export function paintLessonStage(scene, beat, phase, onPick) {
+  const phone = !isWidePcTutor();
+  const artW = Math.max(80, scene.frame.stageBand.w - (phone ? 16 : 32));
+  const reserve = artBandReserve(beat, phase, artW) + 12;
   const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick);
-  const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom });
+  const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom, reserve });
   const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v);
   scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };
   scene.frame.lastCard = { left: scene.frame.stageBand.left, top: card.bottom - card.height, w: scene.frame.stageBand.w, h: card.height };
