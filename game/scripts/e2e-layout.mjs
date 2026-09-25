@@ -377,6 +377,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
     await assertVo(page, "Level3", 3);
     await page.screenshot({ path: `${OUT}/${label}-zh-c3-p3.png` });
   }
+  if (label === "mobile") await assertKeyLines(page);
 
   const pseudoEncode = await openPseudoShot(page, "Level1", 7, 0, `${OUT}/${label}-pseudo-encode.png`);
   const pseudoShift = await openPseudoShot(page, "Level2", 2, 2, null);
@@ -668,6 +669,40 @@ async function pageWithoutJaVoice(browser, label) {
   await page.screenshot({ path: `${OUT}/ja-missing-voice-${label}.png` });
   await page.close();
   return true;
+}
+
+async function assertKeyLines(page) {
+  const cases = [
+    ["Level1", 2, 1, ["空格画成", "一共 15 格"], "zh-c1-p2-look"],
+    ["Level2", 1, 1, ["真的一段是 256 格"], "zh-c2-p1-look"],
+    ["Level2", 3, 1, ["第 8 题：看 F 到 i 八个字，猜 t"], "zh-c2-p3-look"],
+    ["Level3", 1, 1, ["一行说『这是什么字』", "它排第几", "把两行加起来"], "zh-c3-p1-look"],
+    ["Level5", 0, 1, ["小G 每次只接一个字"], "zh-c5-intro-look"],
+    ["Level5", 0, 2, ["新的字"], "zh-c5-intro-do"],
+  ];
+  for (const [key, beat, phase, needles, file] of cases) {
+    await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
+    await page.waitForFunction(() => window.__nanoGPTCard?.shown, { timeout: 15000 });
+    await page.waitForTimeout(300);
+    const card = await page.evaluate(() => window.__nanoGPTCard || {});
+    const shown = String(card.shown || "");
+    for (const needle of needles) {
+      if (!shown.includes(needle)) {
+        throw new Error(`key sentence dropped ${file} missing ${needle} shown=${shown}`);
+      }
+    }
+    await page.screenshot({ path: `${OUT}/mobile-${file}.png` });
+  }
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 4, 1));
+  await page.waitForTimeout(300);
+  await page.click("#book-toggle");
+  await page.waitForTimeout(250);
+  const detail = await page.evaluate(() => document.getElementById("tutor-book")?.textContent || "");
+  if (!detail.includes("数字「3」1 种") || detail.includes("数字 3 种")) {
+    throw new Error(`c1-p4 category count ${detail}`);
+  }
+  await page.screenshot({ path: `${OUT}/mobile-zh-c1-p4-detail.png` });
+  await page.click("#lesson-book-close");
 }
 
 async function assertMuteSlash(page) {
