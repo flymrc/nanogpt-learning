@@ -134,12 +134,13 @@ function assertLessonLayout(scene) {
 
   const locals = collectLocalHits(scene, origin, cta, shell);
   for (const hit of locals) overlaps.push(hit);
+
+  const phone = !isWidePcTutor();
   if (!phone) {
     const tutorHits = collectTutorTextHits(scene, origin);
     for (const hit of tutorHits) overlaps.push(hit);
   }
 
-  const phone = !isWidePcTutor();
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
   const live2dOn = dock && !dock.hidden && dockStyle.display !== "none";
