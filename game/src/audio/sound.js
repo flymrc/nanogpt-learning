@@ -1,19 +1,7 @@
 const MUTE_KEY = "nanogpt-game-muted";
 
-export const AUDIO_KEYS = [
-  "bgm",
-  "vo-title",
-  "vo-level1",
-  "vo-map",
-  "vo-reuse",
-  "vo-level2",
-  "vo-shift",
-  "vo-next",
-  "vo-loss",
-  "vo-clear",
-  "sfx-tap",
-  "sfx-pop",
-];
+/** Lesson lines use Web Speech. Old zh mp3 clips do not match the new script. */
+export const AUDIO_KEYS = ["bgm", "sfx-tap", "sfx-pop"];
 
 let startTimer = 0;
 

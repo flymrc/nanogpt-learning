@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "e2e": "node scripts/e2e-layout.mjs"
+    "i18n": "node scripts/i18n-parity.mjs",
+    "e2e": "node scripts/i18n-parity.mjs && node scripts/e2e-layout.mjs"
   },
   "dependencies": {
     "phaser": "^3.88.2"

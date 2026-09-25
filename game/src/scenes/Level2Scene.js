@@ -1,20 +1,10 @@
 import Phaser from "phaser";
-import { LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
-import { CHAPTERS } from "../i18n/copy.js";
+import { CHAPTER_COUNT, LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
 import { t } from "../i18n/locale.js";
 import { retreatToPreviousChapter } from "../ui/catalog.js";
 import { ctaFor, presentBeat } from "../ui/lesson-nav.js";
-import {
-  drawBlankExample,
-  drawChoiceExample,
-  drawClipExample,
-  drawDeskExample,
-  drawMeanExample,
-  drawScoreExample,
-  drawSeenExample,
-  drawShiftExample,
-} from "../ui/examples.js";
 import { clearLayer, makeLessonFrame } from "../ui/lesson.js";
+import { drawPageArt } from "../ui/page-art.js";
 import { finishLessonStage, paintLessonStage, teachLesson } from "../ui/textbook.js";
 import { watchResize } from "../ui/layout.js";
 
@@ -26,7 +16,7 @@ export default class Level2Scene extends Phaser.Scene {
   create() {
     const frame = makeLessonFrame(this, {
       level: 2,
-      total: CHAPTERS.length,
+      total: CHAPTER_COUNT,
       title: t("level2Title"),
     });
     this.frame = frame;
@@ -114,18 +104,7 @@ export default class Level2Scene extends Phaser.Scene {
 
     clearLayer(this.frame.stage);
     const { band } = paintLessonStage(this, beat, this.phase, (next) => this.setPhase(next));
-    RENDERERS[beat.id]?.(this, band, { instant, phase: this.phase });
+    drawPageArt(this, band, beat, { phase: this.phase, instant });
     finishLessonStage(this, band);
   }
 }
-
-const RENDERERS = {
-  clip: drawClipExample,
-  seen: drawSeenExample,
-  shift: drawShiftExample,
-  blanks: drawBlankExample,
-  choices: drawChoiceExample,
-  desk: drawDeskExample,
-  surprise: drawScoreExample,
-  mean: drawMeanExample,
-};

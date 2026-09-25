@@ -115,7 +115,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   playPreview(v, plan) {
-    const sample = ["S", "e", "c", "o", "n", "d"];
+    const sample = ["A", "l", "l", ":"];
     const tile = plan.tile;
     const preview = plan.slots.preview;
     const captionH = 22;

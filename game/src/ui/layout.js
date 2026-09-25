@@ -12,7 +12,7 @@ export const STICKER_SHADOW_Y = 8;
 export const CHIP_GAP_X = 6;
 export const CHIP_GAP_Y = 10;
 
-/** Smallest 号码牌 that still fits a 12px number above the stripe. */
+/** Smallest number chip that still fits a 12px number above the stripe. */
 export const MIN_CHIP_W = 32;
 export const MIN_CHIP_H = 40;
 export const MIN_ID_FONT = 12;
@@ -27,7 +27,7 @@ export function lessonRhythm(v) {
   return clamp(Math.round(16 * (v?.uiScale || 1)), 12, 24);
 }
 
-/** DOM 伪代码 / 详细笔记 / 看不懂？ / mute sit in the lesson column. */
+/** DOM steps / notes / glossary / mute sit in the lesson column. */
 export function hudReservePx(v) {
   if (!v || !isWidePcTutor()) return 148;
   return 720;
@@ -275,7 +275,7 @@ export function flowPositions(count, { y, tileW, tileH, gapX, gapY, innerW, cx }
 
 /**
  * Pack `count` tiles into `width`×`maxHeight`, preferring wider tiles.
- * Callers that need 号码牌 should keep the default min size.
+ * Callers that need number chips should keep the default min size.
  */
 export function fitChipGrid(count, {
   left = 0,

@@ -76,11 +76,11 @@ export function renderTutorBook(beat) {
   root.innerHTML = "";
   const blocks = LESSON_PHASES.map((meta) => {
     let body = "";
-    if (meta.id === "goal") body = beat.goal || beat.purpose || "";
-    else if (meta.id === "why") body = beat.why || "";
-    else if (meta.id === "example") body = beat.example || "";
-    else if (meta.id === "myth") body = (beat.myths || []).map((line) => `· ${line}`).join("\n");
-    else if (meta.id === "remember") body = beat.remember || "";
+    if (meta.id === "aim") body = beat.goal || beat.purpose || "";
+    else if (meta.id === "look") body = beat.why || "";
+    else if (meta.id === "do") body = beat.example || "";
+    else if (meta.id === "box") body = (beat.myths || []).join("\n");
+    else if (meta.id === "check") body = beat.remember || "";
     return [meta.kicker, body, meta.id];
   });
   blocks.forEach(([title, body, id]) => {
@@ -93,7 +93,7 @@ export function renderTutorBook(beat) {
     const p = document.createElement("p");
     p.textContent = body;
     sec.append(h, p);
-    if (id === "remember" && beat.footnote) {
+    if (id === "box" && beat.footnote) {
       const foot = document.createElement("p");
       foot.className = "tutor-footnote";
       foot.textContent = beat.footnote;
@@ -165,12 +165,8 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
   const body = phaseText(beat, phase);
-  const maxH = phone
-    ? Math.min(stage.h * 0.3, 148)
-    : meta.id === "example"
-      ? stage.h * 0.34
-      : stage.h * 0.38;
-  let size = phone ? 14 : meta.id === "example" ? 14 : 15;
+  const maxH = phone ? Math.min(stage.h * 0.34, 156) : stage.h * 0.36;
+  let size = phone ? 14 : 15;
   let wrapped = wrapToWidth(scene, body, size, wrap, uiText);
   const title = scene.add.text(0, 0, meta.kicker, uiText(phone ? 12 : 13, { color: C.goldCss })).setOrigin(0, 0);
   const text = scene.add.text(0, 0, wrapped, uiText(size, { align: "left", lineSpacing: 4 })).setOrigin(0, 0);
@@ -180,9 +176,13 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
     text.setFontSize(size);
     text.setText(wrapped);
   }
+  while (text.height > maxH - 40 && wrapped.includes("\n")) {
+    wrapped = wrapped.split("\n").slice(0, -1).join("\n");
+    text.setText(wrapped);
+  }
   let extraH = 0;
   let footnote = null;
-  if (meta.id === "remember" && beat.footnote) {
+  if (meta.id === "box" && beat.footnote) {
     const foot = wrapToWidth(scene, beat.footnote, 12, wrap, uiText);
     footnote = scene.add.text(0, 0, foot, uiText(12, { color: C.muted })).setOrigin(0, 0);
     extraH = footnote.height + 8;
@@ -239,10 +239,10 @@ export function finishLessonStage(scene, band) {
 }
 
 function phaseAccent(id) {
-  if (id === "why") return C.teal;
-  if (id === "example") return C.coral;
-  if (id === "myth") return C.violet;
-  if (id === "remember") return C.gold;
+  if (id === "look") return C.teal;
+  if (id === "do") return C.coral;
+  if (id === "box") return C.gold;
+  if (id === "check") return C.violet;
   return C.blue;
 }
 

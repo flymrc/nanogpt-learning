@@ -7,10 +7,9 @@ function voiceLang() {
 
 export function narrateBeat(scene, raw) {
   if (!scene || !raw?.id) return;
-  const lang = getLang();
   cueNarration(scene, {
     text: speechFor(raw.id),
-    clip: lang === "zh" ? raw.vo || null : null,
+    clip: null,
     lang: voiceLang(),
     kind: "beat",
     id: raw.id,

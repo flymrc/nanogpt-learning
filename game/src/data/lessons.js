@@ -1,486 +1,58 @@
-import {
-  DATASET,
-  DEMO_NEXT_CHAR,
-  DEMO_SNIPPET,
-  MODEL,
-  REAL_BATCH,
-  REAL_BLOCK,
-  SAMPLE,
-  TOKENS_PER_ITER,
-  TRAIN,
-  VOCAB_SIZE,
-} from "./facts.js";
+import { PAGES, pagesFor } from "../i18n/skeleton.js";
 
-/** 每一课五个小块。一块只讲一个意思。句子短，先举眼前的例子。 */
+/** One textbook page, five short stops: aim, look, do, summary, check. */
 export const LESSON_PHASES = [
-  { id: "goal", label: "干什么", kicker: "干什么" },
-  { id: "why", label: "为什么", kicker: "为什么" },
-  { id: "example", label: "小例子", kicker: "完整小例子" },
-  { id: "myth", label: "误会", kicker: "常见误会" },
-  { id: "remember", label: "记住", kicker: "一句话记住" },
+  { id: "aim", label: "目标", kicker: "今天要懂" },
+  { id: "look", label: "看看", kicker: "看一看" },
+  { id: "do", label: "做做", kicker: "做一做" },
+  { id: "box", label: "小结", kicker: "小结" },
+  { id: "check", label: "试试", kicker: "试一试" },
 ];
 
 export const PHASE_COUNT = LESSON_PHASES.length;
 
-const L1 = [
-  {
-    id: "tape",
-    purpose: "把台词摊成一条纸带",
-    caption: "一个字，占一格",
-    mood: "point",
-    goal: "把一句台词摊开。一个字占一格。空格写成 ␣，换行写成 ↵。",
-    why: "人可以一眼看懂整句。电脑要一格一格看。所以先摊开。",
-    example: `「你好」是 2 格：你、好。英文一个字母一格。空格写成 ␣，换行写成 ↵，也各占一格。Second Citizen: 加换行，一共 ${DEMO_SNIPPET.length} 格。Citizen 是 7 个字母，不是一个词语。`,
-    myths: ["不是按词语切开。Citizen 是 7 个字母，7 格。", "空格和换行也算一个字，各占一格。"],
-    remember: "一个字占一格。空格和换行也算。",
-    footnote: "整部莎士比亚剧本，就是这样一条很长的纸带。",
-  },
-  {
-    id: "plates",
-    purpose: "每个字领一张号码牌",
-    caption: "一个字，一个号",
-    vo: "vo-level1",
-    mood: "talk",
-    note: "bpe",
-    goal: "每个字一张号码牌。上面是普通数字，比如 31。电脑只认这张牌。",
-    why: "字是给人看的。号码是给电脑排队用的。先换牌，后面才能剪开、对答案。",
-    example:
-      "看下面这一排。S 领 31。e 领 43。空格领 1。换行领 0。16 个字，就有 16 张牌。牌上的数字不是这个字的意思。",
-    myths: ["不是把一个词语切成小碎块。这一课一个字一张牌。", "31 不表示 S 更重要。31 只是普通数字。"],
-    remember: "一个字，一张号码牌。",
-    footnote: "把字换成号码，就是编号。像给每个字发学号。",
-  },
-  {
-    id: "seats",
-    purpose: "号码只是座位号",
-    caption: "43 不是脾气",
-    vo: "vo-map",
-    mood: "talk",
-    note: "plates",
-    goal: "号码只是座位号。它不是这个字的脾气，也不是谁更重要。",
-    why: "如果把 43 当成「更厉害」，后面排队和对答案就会乱。座位号只用来找这个字。",
-    example: "这句里有两个 e。Second 里的 e，Citizen 里的 e。两张牌都是 43。同一个字，同一张牌。它站在第几格，不改号码。",
-    myths: ["号码大，不代表更高级。64 号的 z，不比 0 号的换行重要。", "43 不是 e 的脾气。43 是 e 的座位。"],
-    remember: "号码是座位号，不是意思。",
-    footnote: "从号码找回字，把同一张表倒过来查。像用学号找回同学。",
-  },
-  {
-    id: "sixtyfive",
-    purpose: "这一课只有 65 张牌",
-    caption: "只数这套剧本",
-    vo: "vo-reuse",
-    mood: "talk",
-    goal: "不同的字，一共 65 张牌。名单要先定死。",
-    why: "后面每道「猜下一个」，都从这同一份名单里选。剧本里没出现过的字，不进名单。",
-    example: `换行 1 张，空格 1 张，标点 11 张，大写 26 张，小写 26 张。加起来是 ${VOCAB_SIZE}。没有汉字，也没有表情。`,
-    myths: ["不是全世界的字。没出现过的，牌里就没有。", "不是手机里能打出来的所有字。这一课只有这 65 张。"],
-    remember: "记住，只有 65 张牌。",
-    footnote: "记住，只有 65 张牌。",
-  },
-  {
-    id: "scrolls",
-    purpose: "纸带切成练习卷和验收卷",
-    caption: "验收卷用来抽查",
-    mood: "point",
-    note: "scrolls",
-    goal: "同一条纸带切开。九成是练习卷，用来学。一成是验收卷，用来抽查。",
-    why: "同一页又学又考，就像把答案抄在手上。留出一成，才知道是真会了。",
-    example: `整条纸带有 ${DATASET.chars.toLocaleString("zh-CN")} 个字。练习卷 ${DATASET.trainTokens.toLocaleString("zh-CN")}。验收卷 ${DATASET.valTokens.toLocaleString("zh-CN")}。验收卷上没有印着答案。`,
-    myths: ["验收卷不是答题纸。它是用来抽查的另一段纸带。", "不是两本书。是同一条纸带，大约按 9 比 1 切开。"],
-    remember: "九成用来学，一成用来抽查。",
-    footnote: "两卷里装的是号码，不是字的样子。",
-  },
-];
-
-const L2 = [
-  {
-    id: "clip",
-    purpose: "每次随手剪一小段",
-    caption: "不要总从开头读",
-    vo: "vo-level2",
-    mood: "point",
-    goal: "从长纸带的中间，随手剪一小段。不要每次都从第一行读起。",
-    why: "老从开头读，就像只背课文第一句。随手剪一段，才会看见中间的句子。",
-    example:
-      "前面还有很长，写成 …。剪到的是 Second Citizen:↵。这一小段是 16 格，短短的好数。以后可以剪得更长。",
-    myths: ["不是每次都从剧本第一行开始。", "16 格只是好数清楚。不是唯一的长度。"],
-    remember: "每次从纸带上随手剪一段。",
-    footnote: "先随便指一个起点，再按这个长度把纸带剪下来。",
-  },
-  {
-    id: "seen",
-    purpose: "手里的是线索牌",
-    caption: "还不是答案",
-    mood: "talk",
-    goal: "剪下来的这一小段，是手里的线索牌（大人叫 x）。",
-    why: "猜下一个字之前，要先说清手里有什么。没有线索，就是闭着眼猜。",
-    example: "手里的线索牌，是 Second Citizen:↵ 的 16 张。从 S（31）到换行（0）。它还不是答案。",
-    myths: ["线索牌不是答案。答案在右边那一格。", "线索牌不是整部剧本。只是剪下来的一小段。"],
-    remember: "手里的是线索牌，还不是答案。",
-    footnote: "手里的线索牌（大人叫 x），像你手里的卡片。",
-  },
-  {
-    id: "shift",
-    purpose: "答案往右挪一格",
-    caption: "看见这张，猜右边那张",
-    vo: "vo-shift",
-    mood: "point",
-    note: "shift",
-    goal: "答案整排往右挪一格。这一排是答案排（大人叫 y）。看见这张，猜右边那张。",
-    why: "只说「猜下一个」还不够清楚。整排一起往右挪，每一格的答案就对齐了。",
-    example: `上面一排是现在看见。下面一排是答案排。看见 S，猜 e。看见换行，猜 ${DEMO_NEXT_CHAR}。答案排就是右边那一排。`,
-    myths: ["答案排不是另一句无关的话。它就是手里的牌往右挪一格。", "不是打乱顺序，也不是换成另一句。"],
-    remember: "看见这张，猜右边那张。",
-    footnote: "答案排（大人叫 y）的每一格，都是现在看见的右边那一张。",
-  },
-  {
-    id: "blanks",
-    purpose: "每一格都在猜下一个",
-    caption: "16 格就是 16 道题",
-    vo: "vo-next",
-    mood: "talk",
-    goal: "这 16 格是 16 道填空。不是只猜最后一个字。",
-    why: "每一格都在问同一句话：下一个字是谁？后面记错题分，会把 16 道都算上。",
-    example: `第 1 空：看见 S，填 e。第 2 空：看见 e，填 c。第 16 空：看见换行，填 ${DEMO_NEXT_CHAR}。16 格，就是 16 题。`,
-    myths: ["不是只猜最后一个字。", "不是把整句翻译成另一句。是一格一格地猜下一个。"],
-    remember: "每个位置都在问：下一字是谁？",
-    footnote: "大人把这种题叫做猜下一个字。",
-  },
-  {
-    id: "choices",
-    purpose: "只能从 65 张里点",
-    caption: "真答案只有一张牌",
-    mood: "talk",
-    goal: "每道题只能从 65 张牌里点一张。真答案只有一张。",
-    why: "像手机输入法列出下一个字。名单是固定的，只能点其中一张。",
-    example: "猜 S 后面是谁。65 张都能点，只能点一张。真的只有 e。点到别的，这一题就不对。",
-    myths: ["不能写出名单以外的字。", "名单是 65 个字，不是一堆英文单词。"],
-    remember: "65 个候选，真答案只有一个。",
-    footnote: "候选的个数，就是这 65 张号码牌。",
-  },
-  {
-    id: "desk",
-    purpose: "答案只放老师桌上",
-    caption: "手里只留线索",
-    mood: "react",
-    note: "shift",
-    goal: "答案排只放在老师桌上，用来对分。手里只留线索。",
-    why: "答案只放老师桌对分。手里只留线索，否则能抄。",
-    example: "上面一排是现在看见的线索。下面一排是答案排。不要把答案再塞回手里。",
-    myths: ["不要把答案放进手里当线索。", "老师的桌子不是第二份要看的纸带。"],
-    remember: "答案只用来对分，不给抄。",
-    footnote: "答案排（大人叫 y）只在对分的时候拿出来。",
-  },
-  {
-    id: "surprise",
-    purpose: "把握决定错题分",
-    caption: "不是对错两档",
-    vo: "vo-loss",
-    mood: "point",
-    note: "penalty",
-    goal: "老师看你猜下一个字。对真的那一格把握越小，错题分越大。不是对了打勾、错了打叉。",
-    why: "这一课不给假的数字，只给这条规矩。真答案那格的把握越矮，猜错罚分越大。",
-    example: "第 1 空的真答案是 e。65 张里，只看对 e 的把握高不高。把握矮，错题分大。把握高，错题分小。",
-    myths: ["不是对了零分、错了扣一分。", "这一课不编分数，也不改猜字的规矩。"],
-    remember: "对真的下一个字把握越小，错题分越大。",
-    footnote: "我们口头只叫猜错罚分。大人的名字写在详细笔记里。",
-  },
-  {
-    id: "mean",
-    purpose: "整段只看平均罚分",
-    caption: "16 题加起来，再平均",
-    mood: "talk",
-    note: "penalty",
-    goal: "16 道空各记一笔猜错罚分。加起来，再除以 16。只看这一个平均。",
-    why: "只看一道题，可能刚好运气好。取个平均，才知道整段猜得稳不稳。",
-    example: "从第 1 空到第 16 空，每空记一笔。加总，再除以 16。这里不写出假的分数。",
-    myths: ["不是只看最后一个空。", "这章只讲怎么记错题分。还没开始改规矩。通关不等于会写剧本。"],
-    remember: "许多空一起算，只看平均罚分。",
-    footnote: "把每一格的罚分求平均。没有新的题目。",
-  },
-];
-
-const L3 = [
-  {
-    id: "look",
-    purpose: "每一格只看左边",
-    caption: "含自己，不含右边",
-    mood: "point",
-    note: "attn",
-    goal: "轮到某一格，先看它能看见谁：自己，和自己左边。右边看不见。",
-    why: "这一步只认人。谁能看谁，先定下来。右边的格子，这一格看不见。",
-    example: "纸带开头是 S、e、c、o。轮到 c，能看 S、e、c。不能看 o。轮到 S，只能看自己。",
-    myths: ["不是把整句一下读成一个意思。", "不是把右边的字从纸带上剪掉。字还在，只是这一格看不见。"],
-    remember: "每一格只看自己和左边。右边看不见。",
-    footnote: "一次最多看这么长；先记住不看右边。",
-  },
-  {
-    id: "qkv",
-    purpose: "同时做出三张卡",
-    caption: "提问卡、标签卡、内容卡",
-    mood: "talk",
-    note: "qkv",
-    goal: "每一格同时做出三张卡：提问卡、标签卡、内容卡。",
-    why: "提问卡像举手问「谁和我有关」。标签卡像书包上的名字。内容卡是书包里要搬的东西。三张一起做出来。",
-    example: "轮到 e。e 的提问卡去看 S 和 e 的标签卡。对得上，才从那格书包里搬一点。三张卡是一起做出来的。",
-    myths: ["提问卡不是一句人话。", "内容卡不是纸带上的那个字。字还在原来的格子里。"],
-    remember: "三张卡一起做：提问卡找标签卡，搬的是内容卡。",
-    footnote: "三张卡来自同一格。宽多少，写在详细笔记里。",
-  },
-  {
-    id: "mask",
-    purpose: "右边的格子盖住",
-    caption: "左下勾，右上叉",
-    mood: "point",
-    note: "mask",
-    goal: "比之前，先把右边盖住。左下打勾，右上打叉。",
-    why: "光说别看右边不够。表上右边要标成看不见。看不见的格子，后面分不到蛋糕。",
-    example: "三行是谁在问：S、e、c。四列是看谁：S、e、c、o。左下打勾，右上打叉。c 可以看 S、e、c，不能看 o。",
-    myths: ["盖住不是把右边的字从纸带上剪掉。字还在。", "不是等改规矩时才盖。一开始就盖住。"],
-    remember: "左下勾，右上叉。右边看不见。",
-    footnote: "盖住的格子写成一个很小的数，就是这一格看不见。这个数怎么写，在详细笔记里。",
-  },
-  {
-    id: "weights",
-    purpose: "能看的格子分一块蛋糕",
-    caption: "份加起来是一整块",
-    mood: "talk",
-    note: "softmax",
-    goal: "提问卡去比标签卡，看有多合得来。合得来的多分蛋糕。右边是 0。份加起来是一整块。",
-    why: "上一课只定了谁能看谁。现在定搬多少。一整块蛋糕分完：没有剩下，也没有多出来。",
-    example: "轮到 c。蛋糕只分给 S、e、c。三格加起来是一整块。o 是 0。这里不写假的小数。",
-    myths: ["蛋糕的份不是猜错罚分。罚分在老师桌上。", "不是每人一样多。合得来的可以多分。"],
-    remember: "能看的格子把一整块蛋糕分完。右边是 0。",
-    footnote: "怎么从「有多合得来」算成蛋糕的份，写在详细笔记里。",
-  },
-  {
-    id: "mix",
-    purpose: "按份从书包里搬",
-    caption: "o 什么也搬不来",
-    mood: "point",
-    goal: "蛋糕分好了。按每一份，从那格书包里搬一点。不是把字母乘一乘。",
-    why: "提问卡和标签卡只决定搬多少。真正搬的是书包里的东西。份是 0，就一点也不搬。",
-    example: "轮到 c。从 S 的书包按份搬一点，从 e 搬一点，从 c 自己也搬一点。o 的份是 0，什么也搬不来。",
-    myths: ["不是把字母乘一乘，也不是粘成一个新字。搬的是书包里的东西。", "不是只抄左边最近的一格。每一格按自己的份来搬。"],
-    remember: "按蛋糕的份从书包里搬。o 什么也搬不来。",
-    footnote: "搬多少，已经由蛋糕的份定好了。",
-  },
-  {
-    id: "writeback",
-    purpose: "加回原来的这一格",
-    caption: "不擦掉原来的",
-    mood: "react",
-    note: "attn",
-    goal: "搬回来的东西，加到原来这一格上。原来的不擦掉。",
-    why: "如果擦掉，这一格就忘了自己。加上去，既记得自己，也记得左边。",
-    example: "六双眼睛各看一遍同一条纸带。搬回来的加到原来的 c 上，不擦掉。还没猜下一个字，猜字的规矩也还没动。",
-    myths: ["不是擦掉原来的格子再写新的。", "不是六台电脑。是六双眼睛看同一条纸带。"],
-    remember: "加回原来的格子，不擦掉。还没猜下一个字，猜字的规矩也还没动。",
-    footnote: "怎么抹平、一共几层，写在详细笔记里。",
-  },
-];
-
-const L4 = [
-  {
-    id: "random",
-    purpose: "开始按错题分拧旋钮",
-    caption: "旋钮一开始是乱的",
-    mood: "point",
-    note: "train",
-    goal: "开训，就是开始按错题分拧旋钮。旋钮一开始是随手拧的，所以先乱猜。",
-    why: "号码是座位，不改。错题分只是指路。要拧的是猜字规矩的旋钮。不拧，它就一直乱猜。验收卷放在旁边看着。",
-    example: "同一条纸带：九成是练习卷，一成是验收卷。拧的是旋钮，不是把答案印上纸带。这一课不写假的罚分。",
-    myths: ["不是已经会写莎士比亚。旋钮还是乱的。", "不是只盯练习卷。验收卷在旁边看着，但不拿来拧旋钮。"],
-    remember: "开训就是开始按错题分拧旋钮。验收卷在旁边看着。",
-    footnote: "旋钮一开始是随手摆的，大多拧得很轻。不是从剧本里抄来的。",
-  },
-  {
-    id: "step",
-    purpose: "一步拧一次",
-    caption: "先做题，再指路",
-    mood: "talk",
-    note: "train",
-    goal: "1 剪几段做题。2 只看见错题分，旋钮不动。3 错题分从后往前指路。4 改分器拧一点。大人把改分器叫 AdamW。",
-    why: "做题的时候，只看见错题分，猜字的旋钮还不动。然后错题分从后往前指路。改分器顺着这条路，把旋钮拧一点。",
-    example: `这一课一次剪 ${REAL_BATCH} 段，每段 ${REAL_BLOCK} 格。这一步只拧一次。一个人算的时候，每步看 ${TOKENS_PER_ITER.toLocaleString("zh-CN")} 个字。大人把一次剪几段叫做一批。`,
-    myths: ["不是把整本剧本一次读完。一步只剪几段。", "不是手拧每一个旋钮。改分器按错题分来拧。"],
-    remember: "猜，记错题分，往回指，拧一点。",
-    footnote: "热身就是开头的步子小。步子后来怎么变，写在详细笔记里。",
-  },
-  {
-    id: "rewrite",
-    purpose: "拧的是猜字的旋钮",
-    caption: "右边的盖子不拧",
-    mood: "point",
-    goal: "要拧的有三样：只看左边的规矩，看完后再混一混的规矩，还有两张记号表。",
-    why: "一张表把字换成记号。一张表把第几格换成记号。错题分顺着这些旋钮往回指。右边的盖子是死规定，不进改分器。",
-    example: `一共 ${MODEL.nLayer} 块，像 ${MODEL.nLayer} 层抽屉。每一块先看左边，再把书包里的东西混一混，都加回原来的格子。字换成记号的表，和最后打分的表，是同一份。`,
-    myths: ["不是把纸带上的字改掉。座位号不改。", "不是把「只看左边」拧没了。右边的盖子一直盖着。"],
-    remember: "拧看左边的旋钮，和之后混一混的旋钮。右边的盖子不进改分器。",
-    footnote: "右边的盖子不进改分器。",
-  },
-  {
-    id: "holdout",
-    purpose: "验收卷从不拧旋钮",
-    caption: "不降，就是在背",
-    mood: "talk",
-    note: "scrolls",
-    goal: "隔一段步数，看一次练习卷和验收卷的错题分。验收卷从不拿来拧旋钮。",
-    why: "练习卷做熟了，可能只是把题背下来。验收卷的错题分不跟着降，就是在背。",
-    example: `每 ${TRAIN.evalInterval} 步看一次。每次每个卷子抽 ${TRAIN.evalIters} 次，再取平均。这套小剧本容易背下来，所以要常看。这里不写我们自己的罚分。`,
-    myths: ["验收卷不是第二本用来拧旋钮的卷子。", "看见错题分，不等于这一步已经把旋钮拧好。"],
-    remember: "练习卷熟了可能背题。验收错题分不降，就是在背。",
-    footnote: "看的时候先停住改分器。两卷都看完，再继续拧。",
-  },
-  {
-    id: "launch",
-    purpose: "要打的字在旁边",
-    caption: "记住的不是那一行",
-    mood: "point",
-    goal: "要在电脑上拧旋钮，先准备纸带，再把这一课的样子交过去。要打的字写在伪代码和详细笔记里。",
-    why: "那一行会换掉给另一课准备的样子。不看它，就会走成另一套。",
-    example: "准备纸带有一行要打的字。开始拧旋钮还有一行。结果放进一个文件夹。这台电脑还没跑过。这里不写假的罚分。",
-    myths: ["不是另一套更大的课。", "不是这台电脑已经跑出了罚分。"],
-    remember: "记住的是：准备纸带，再按这一课的样子拧旋钮。",
-    footnote: "只有普通电脑时，说明里另写了让这台电脑自己算，并且少放几层抽屉。本课没有再跑一遍。",
-  },
-  {
-    id: "enough",
-    purpose: "能把这一步讲出来",
-    caption: "验收更好才存档",
-    mood: "react",
-    goal: "这一章讲完，就是你能说出：猜，记错题分，往回指，拧一点。验收更好，才把进度存下来。",
-    why: `最多走 ${TRAIN.maxIters} 步。那是停下的步数，不是已经写得像莎士比亚。存档看的是验收错题分有没有更小。`,
-    example: "不是每次都存。验收错题分比之前更小，并且已经走过几步，才写下存档。文件名叫什么，写在详细笔记里。下一章才往后续字。这一章不写台词。",
-    myths: ["不是看见练习卷错题分变小就停。变小可能是在背。", "不是这一章已经会往纸带后面续字。"],
-    remember: "能说出：猜，记错题分，往回指，拧一点。验收更好才存档。",
-    footnote: "存档像游戏进度：里面有旋钮、改分器、走了多少步、最好的验收错题分。文件名写在详细笔记里。这里不写假的罚分。",
-  },
-];
-
-const L5 = [
-  {
-    id: "prompt",
-    purpose: "从开头往后续",
-    caption: "一格一格接下去",
-    mood: "point",
-    note: "sample",
-    goal: "从开头往后续，就是一格一格接下去。开头是空的一行，或你写的一小段。大人把这一步叫做采样。旋钮不再拧。",
-    why: "上一章验收更好才把进度存下来。新格子从那份存档接。不把练习卷抄下来。",
-    example: "空的一行就是一个换行，号码是 0。也可以换成你写的一小段。这里没有存档，也不展示编出来的莎士比亚。",
-    myths: ["不是把练习卷再抄一遍。", "不是验收卷上的错题分。"],
-    remember: "从开头往后续，一格一格接下去。这里没有编出来的台词。",
-    footnote: "存档的文件名写在详细笔记里。接之前先停住「练习时随机盖住一点」。我们这里没有这份存档。",
-  },
-  {
-    id: "loop",
-    purpose: "看，按把握抽，接上",
-    caption: "每次只接一格",
-    mood: "talk",
-    note: "sample",
-    goal: "看现在的纸带，按把握抽下一格，接到末尾，再看。",
-    why: "和猜下一个是同一件事：看见前面，想下一格。没有老师的答案，也不拧旋钮，只把抽到的字接上。把握高的字更常被抽到，但不是每次都抽最高的。",
-    example: `默认每一份接 ${SAMPLE.maxNewTokens} 格。纸带太长，就只看最后 ${MODEL.blockSize} 格。一次最多看这么长。连抽 ${SAMPLE.numSamples} 份时，每一份都从同一个开头重新开始。`,
-    myths: ["不是一次写出一整段。是一格一格接上去。", "不是每次都抽把握最高的那一格。"],
-    remember: "看，按把握抽，接上，再看。",
-    footnote: "纸带太长，就只看最后那一截。稳不稳，下一页的旋钮再管。",
-  },
-  {
-    id: "knobs",
-    purpose: "乱不乱的旋钮",
-    caption: "大人叫温度",
-    mood: "point",
-    note: "sample",
-    goal: "有一个旋钮管抽字乱不乱。拧得稳，更常抽到有把握的字。拧得乱，更爱冒险。大人叫它温度。",
-    why: "前几名，就是只从最可能的那几个字里抽。排在后面的先丢掉。",
-    example: "这一课只有 65 个字。所以说留前几名，其实一个也不丢掉。具体的数写在详细笔记里。",
-    myths: ["这不是拧猜字规矩的旋钮。续的时候，那些旋钮已经不拧了。", "不是这一课真的丢掉了很多字。65 个字全都留着。"],
-    remember: "乱不乱的旋钮，大人叫温度。这一课 65 个字，一个也不丢。",
-    footnote: "先用这个旋钮把把握收一收，或摊开。丢掉的格子当成看不见。再按把握抽一格。怎么拧，写在详细笔记里。",
-  },
-  {
-    id: "run",
-    purpose: "去读那份存档",
-    caption: "记住的不是那一行",
-    mood: "point",
-    note: "sample",
-    goal: "从开头往后续，要去读那份存档，再把号码翻回字。电脑上要打的字写在详细笔记里。",
-    why: "文件夹的名字必须和拧旋钮时一样。找不到对照表，号码就对不上。",
-    example: "先读存档，再用对照表把号码翻回字。这里没有这份存档，也不展示编出来的台词。",
-    myths: ["不是这台电脑已经印出了莎士比亚。", "记住的不是电脑上要打的那一行。"],
-    remember: "记住的是：去读存档，把号码翻回字。",
-    footnote: "对照表和要打的字，写在详细笔记里。这里没有跑出台词。",
-  },
-  {
-    id: "score",
-    purpose: "没有答案，就不算对错",
-    caption: "好看不等于过关",
-    mood: "talk",
-    note: "sample",
-    goal: "没有老师的答案，就算不出对了百分之几。",
-    why: "验收错题分是开训时的另一场考试。好看的句子，不等于那次考试过了。",
-    example: "这一步只是接新纸带。不拧旋钮，也不算正确率。",
-    myths: ["不是验收卷上的考试分数。", "好看不等于过关。"],
-    remember: "没有答案，就没有正确率。验收错题分是另一场考试。",
-    footnote: "接字不拿真答案，所以没有罚分。",
-  },
-  {
-    id: "wrap",
-    purpose: "五步都能讲给朋友",
-    caption: "纸带走到续字",
-    mood: "react",
-    note: "sample",
-    goal: "纸带、剪开猜下一个、只看左边、按罚分改一笔、从开头往后续。这五步，你已经能自己讲完。",
-    why: "讲完，是你会讲。不是这台电脑已经接出了台词。",
-    example: "以后还有别的路。这一课就走到从开头往后续。",
-    myths: ["不是电脑已经会写剧本。", "不是还差一个分数才算讲完。"],
-    remember: "纸带，猜下一个，只看左边，拧旋钮，从开头往后续。",
-    footnote: "以后还有别的路。这一课不走。",
-  },
-];
-
-export const LEVEL1_BEATS = L1;
-export const LEVEL2_BEATS = L2;
-export const LEVEL3_BEATS = L3;
-export const LEVEL4_BEATS = L4;
-export const LEVEL5_BEATS = L5;
+export const LEVEL1_BEATS = pagesFor(1);
+export const LEVEL2_BEATS = pagesFor(2);
+export const LEVEL3_BEATS = pagesFor(3);
+export const LEVEL4_BEATS = pagesFor(4);
+export const LEVEL5_BEATS = pagesFor(5);
 export const CHAPTER_COUNT = 5;
-export const SPINE_TOTAL = L1.length + L2.length + L3.length + L4.length + L5.length;
+export const SPINE_TOTAL = PAGES.length;
 
-export const TITLE_BEAT = {
-  id: "title",
-  purpose: "从一条长纸带讲起",
-  caption: "从一条长纸带讲起",
-  vo: "vo-title",
-  mood: "talk",
-  goal: "顺着看完：纸带和号码，剪开猜下一个，只看左边，按罚分改一笔，从开头往后续。",
-  why: "一句口号记不住。每一课分开讲：干什么、为什么、一个小例子、一句误会、一句记住。",
-  remember: "从一条长纸带讲起。",
-};
+function shellPage(id) {
+  return {
+    id,
+    chapter: 0,
+    kind: id,
+    visual: "none",
+    shared: {},
+    exampleSlots: null,
+    keys: {
+      bubble: `${id}.bubble`,
+      aim: `${id}.aim`,
+      look: `${id}.look`,
+      action: `${id}.action`,
+      summary: `${id}.summary`,
+      checkQ: `${id}.checkQ`,
+      checkA: `${id}.checkA`,
+      vo: `${id}.vo`,
+    },
+  };
+}
 
-export const END_BEAT = {
-  id: "end",
-  purpose: "五步都能讲给朋友听",
-  caption: "通关啦",
-  vo: "vo-clear",
-  mood: "react",
-  goal: "你现在能自己讲完：纸带怎么拉，答案怎么右移，罚分怎么看，每一格怎么只看左边，怎么按罚分改一笔，怎么从开头往后续。",
-  remember: "通关啦。这条课走到从开头往后续。这里没有编出来的台词。",
-};
+export const TITLE_BEAT = shellPage("title");
+export const END_BEAT = shellPage("end");
 
 export function phaseText(beat, phase = 0) {
-  const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
-  if (meta.id === "goal") return beat.goal || beat.purpose;
-  if (meta.id === "why") return beat.why || beat.caption;
-  if (meta.id === "example") return beat.example || beat.caption;
-  if (meta.id === "myth") return (beat.myths || []).join("\n");
-  if (meta.id === "remember") return beat.remember || beat.caption;
+  const id = LESSON_PHASES[phase]?.id;
+  if (id === "aim") return beat.goal || beat.purpose || "";
+  if (id === "look") return beat.why || "";
+  if (id === "do") return beat.example || "";
+  if (id === "box") return (beat.myths || []).join("\n");
+  if (id === "check") return beat.remember || "";
   return beat.caption || "";
 }
 
-export function lessonCaption(beat, phase = 0) {
-  const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
-  if (meta.id === "remember") return beat.remember || beat.caption;
-  if (meta.id === "goal") return beat.goal || beat.purpose;
-  return beat.caption;
+export function lessonCaption(beat) {
+  return beat?.caption || beat?.purpose || "";
 }

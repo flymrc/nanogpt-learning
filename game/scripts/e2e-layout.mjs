@@ -1,7 +1,7 @@
 /**
  * Visual E2E for mobile 390×844 and PC 1440×900.
- * Mobile walks ALL beats × ALL 5 tabs. First+last only is NOT enough.
- * Chapter 5 adds 6 sampling beats: 31 × 5 = 155 mobile, 31 PC.
+ * Mobile walks ALL pages × ALL 5 sections. First+last only is NOT enough.
+ * Intro + 9/9/7/7/7 pages + chapter summaries: 49 × 5 = 245 mobile, 49 PC.
  * Fails if any Phaser label/bar intersects the CTA.
  * Also fails on local sticker collisions: tile/chip vs caption, chip vs chip,
  * chips under the minimum size, and placeholder tiles stacked on the first chip.
@@ -23,7 +23,7 @@ const OUT = process.env.E2E_OUT || "/tmp/nanogpt-e2e";
 mkdirSync(OUT, { recursive: true });
 const BASE = process.env.E2E_URL || "http://127.0.0.1:4182/";
 
-const PHASE_NAMES = ["goal", "why", "example", "myth", "remember"];
+const PHASE_NAMES = ["aim", "look", "do", "box", "check"];
 const SNAP = /title|L1-b1-p2|L2-b0-p0|L2-b5-p0|L2-b2-p2|L1-b0-p0/;
 
 const chromium = await loadChromium();
@@ -174,11 +174,22 @@ async function assertLang(page, label) {
     throw new Error(`ja beat ${JSON.stringify({ overlaps: beatLayout?.overlaps, overflows: beatLayout?.overflows, locals: beatLayout?.locals })}`);
   }
   await page.screenshot({ path: `${OUT}/${label}-ja-voice.png` });
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 1, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().beat === 1);
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${OUT}/${label}-ja-c1-cells.png` });
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const pseudo = await page.evaluate(() => document.getElementById("pseudo-does")?.textContent || "");
   await page.click("#pseudo-close");
   if (!pseudo.includes("マス")) throw new Error(`ja pseudo ${pseudo}`);
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 2));
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${OUT}/${label}-ja-c1-intro.png` });
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 7, 2));
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level5" && window.__nanoGPTState?.().beat === 7);
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${OUT}/${label}-ja-c5-sign.png` });
   if (label === "mobile") {
     const spine = await page.evaluate(() => window.__nanoGPTSpine);
     const jobs = [
@@ -252,9 +263,19 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.screenshot({ path: `${OUT}/${label}-glossary.png` });
   await page.click("#notes-close");
 
-  const pseudoEncode = await openPseudoShot(page, "Level1", 1, 0, `${OUT}/${label}-pseudo-encode.png`);
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 2));
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${OUT}/${label}-zh-c1-intro.png` });
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 7, 2));
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${OUT}/${label}-zh-c1-encode.png` });
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 7, 2));
+  await page.waitForTimeout(350);
+  await page.screenshot({ path: `${OUT}/${label}-zh-c5-sign.png` });
+
+  const pseudoEncode = await openPseudoShot(page, "Level1", 7, 0, `${OUT}/${label}-pseudo-encode.png`);
   const pseudoShift = await openPseudoShot(page, "Level2", 2, 2, null);
-  const pseudoLoss = await openPseudoShot(page, "Level2", 6, 0, null);
+  const pseudoLoss = await openPseudoShot(page, "Level2", 7, 0, null);
   await page.evaluate(() => window.__nanoGPTJump("Level3", 2, 2));
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
   await page.waitForTimeout(450);
@@ -266,7 +287,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.screenshot({ path: `${OUT}/${label}-pseudo-attn.png` });
   await page.click("#pseudo-close");
 
-  await page.evaluate(() => window.__nanoGPTJump("Level4", 1, 2));
+  await page.evaluate(() => window.__nanoGPTJump("Level4", 4, 2));
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
   await page.waitForTimeout(450);
   await page.screenshot({ path: `${OUT}/${label}-train-step.png` });
@@ -277,7 +298,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.screenshot({ path: `${OUT}/${label}-pseudo-train.png` });
   await page.click("#pseudo-close");
 
-  await page.evaluate(() => window.__nanoGPTJump("Level5", 1, 2));
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 6, 2));
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
   await page.waitForTimeout(450);
   await page.screenshot({ path: `${OUT}/${label}-sample-loop.png` });
@@ -600,27 +621,26 @@ writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 const failed = [...mobile.reports, ...pc.reports].filter((r) => !r.ok);
 const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen;
 const spineOk =
-  mobile.spine.l1 === 5 &&
-  mobile.spine.l2 === 8 &&
-  mobile.spine.l3 === 6 &&
-  mobile.spine.l4 === 6 &&
-  mobile.spine.l5 === 6 &&
+  mobile.spine.l1 === 11 &&
+  mobile.spine.l2 === 11 &&
+  mobile.spine.l3 === 9 &&
+  mobile.spine.l4 === 9 &&
+  mobile.spine.l5 === 9 &&
   mobile.spine.phases === 5 &&
-  pc.spine.l3 === 6 &&
-  pc.spine.l4 === 6 &&
-  pc.spine.l5 === 6;
-const walkedAll = mobile.walked === 31 * 5 && pc.walked === 31;
+  pc.spine.l1 === 11 &&
+  pc.spine.l5 === 9;
+const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49;
 const pseudoOk =
-  tipOk(mobile.pseudoEncode, "号码") &&
-  tipOk(pc.pseudoEncode, "号码") &&
+  tipOk(mobile.pseudoEncode, "数字") &&
+  tipOk(pc.pseudoEncode, "数字") &&
   tipOk(mobile.pseudoShift, "右") &&
   tipOk(pc.pseudoShift, "右") &&
-  tipOk(mobile.pseudoLoss, "罚分") &&
-  tipOk(pc.pseudoLoss, "罚分") &&
-  tipOk(mobile.pseudoMask, "盖住") &&
-  tipOk(pc.pseudoMask, "盖住") &&
-  tipOk(mobile.pseudoTrain, "AdamW") &&
-  tipOk(pc.pseudoTrain, "AdamW") &&
+  tipOk(mobile.pseudoLoss, "扣分") &&
+  tipOk(pc.pseudoLoss, "扣分") &&
+  tipOk(mobile.pseudoMask, "前面") &&
+  tipOk(pc.pseudoMask, "前面") &&
+  tipOk(mobile.pseudoTrain, "一点点") &&
+  tipOk(pc.pseudoTrain, "一点点") &&
   tipOk(mobile.pseudoSample, "接") &&
   tipOk(pc.pseudoSample, "接");
 const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
