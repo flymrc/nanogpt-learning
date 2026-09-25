@@ -1,4 +1,5 @@
 import { cueNarration } from "./sound.js";
+import { voCacheKey } from "./vo-catalog.js";
 import { getLang, speechFor } from "../i18n/locale.js";
 
 function voiceLang() {
@@ -18,7 +19,7 @@ export function narrateBeat(scene, raw) {
   scene.registry?.set("spokenBeatId", raw.id);
   cueNarration(scene, {
     text,
-    clip: null,
+    clip: voCacheKey(getLang(), raw.id),
     lang: voiceLang(),
     kind: "beat",
     id: raw.id,
