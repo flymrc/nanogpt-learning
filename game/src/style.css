@@ -274,6 +274,15 @@ html.is-pc #pc-chrome:not([hidden]) {
   pointer-events: none;
 }
 
+html.is-pc #pc-chrome.is-stacked {
+  left: 16px;
+  right: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-content: flex-start;
+  row-gap: 8px;
+}
+
 html.is-mobile #pc-chrome {
   display: none !important;
 }
@@ -416,12 +425,16 @@ html.is-mobile #pc-chrome {
 #lesson-book-overlay {
   position: absolute;
   inset: 0;
-  z-index: 24;
+  z-index: 45;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 76px 16px 20px;
   background: rgba(59, 42, 46, 0.22);
+}
+
+html.is-pc #pc-chrome.is-stacked ~ #game-shell #lesson-book-overlay {
+  padding-top: 136px;
 }
 
 html.is-mobile #lesson-book-overlay {

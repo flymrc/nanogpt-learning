@@ -260,6 +260,28 @@ async function assertLang(page, label) {
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level5" && window.__nanoGPTState?.().beat === 7);
   await page.waitForTimeout(350);
   await page.screenshot({ path: `${OUT}/${label}-ja-c5-sign.png` });
+  if (label === "pc" || label === "pc1024") {
+    await waitTutor(page);
+    const spine = await page.evaluate(() => window.__nanoGPTSpine);
+    const jobs = [
+      ...Array.from({ length: spine.l1 }, (_, beat) => ["Level1", beat]),
+      ...Array.from({ length: spine.l2 }, (_, beat) => ["Level2", beat]),
+      ...Array.from({ length: spine.l3 }, (_, beat) => ["Level3", beat]),
+      ...Array.from({ length: spine.l4 }, (_, beat) => ["Level4", beat]),
+      ...Array.from({ length: spine.l5 }, (_, beat) => ["Level5", beat]),
+    ];
+    for (const [key, beat] of jobs) {
+      await page.evaluate(([k, b]) => window.__nanoGPTJump(k, b, 2), [key, beat]);
+      await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+      await page.waitForTimeout(280);
+      const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+      if (!result?.ok) {
+        throw new Error(
+          `ja ${label} ${key} b${beat} ${JSON.stringify({ overlaps: result?.overlaps, locals: result?.locals, overflows: result?.overflows })}`,
+        );
+      }
+    }
+  }
   if (label === "mobile") {
     const spine = await page.evaluate(() => window.__nanoGPTSpine);
     const jobs = [

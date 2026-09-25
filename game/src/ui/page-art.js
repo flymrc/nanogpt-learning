@@ -15,30 +15,55 @@ function ceilingOf(scene, stage) {
   return Math.min(stage.bottom - 2, ctaCeiling(scene.frame) - 4);
 }
 
-function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46, maxH = 46, onTap } = {}) {
+function packSingleRow(count, { left, top, width, maxW, maxH, gapX, maxHeight }) {
+  const gaps = Math.max(0, count - 1) * gapX;
+  let tile = (width - gaps) / Math.max(1, count);
+  tile = Math.min(maxW, maxH, Math.max(1, maxHeight), tile);
+  tile = Math.max(1, tile);
+  const rowW = count * tile + gaps;
+  const start = left + Math.max(0, (width - rowW) / 2) + tile / 2;
+  const positions = Array.from({ length: count }, (_, index) => ({
+    x: start + index * (tile + gapX),
+    y: top + tile / 2,
+  }));
+  return { tileW: tile, tileH: tile, positions, height: tile };
+}
+
+function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46, maxH = 46, onTap, singleRow = false, patternRow = null } = {}) {
   if (!glyphs?.length) return null;
   const ceiling = ceilingOf(scene, stage);
   const maxHeight = ceiling - top - 4;
-  if (maxHeight < minH) return null;
-  const grid = fitChipGrid(glyphs.length, {
-    left: stage.left,
-    top,
-    width: stage.w,
-    maxHeight,
-    maxW,
-    maxH,
-    minW,
-    minH,
-    gapX: CHIP_GAP_X,
-    gapY: CHIP_GAP_Y,
-  });
-  if (grid.height > maxHeight + 1) return null;
+  if (maxHeight < (singleRow ? 12 : minH)) return null;
+  const grid = singleRow
+    ? packSingleRow(glyphs.length, {
+      left: stage.left,
+      top,
+      width: stage.w,
+      maxW,
+      maxH,
+      gapX: CHIP_GAP_X,
+      maxHeight,
+    })
+    : fitChipGrid(glyphs.length, {
+      left: stage.left,
+      top,
+      width: stage.w,
+      maxHeight,
+      maxW,
+      maxH,
+      minW,
+      minH,
+      gapX: CHIP_GAP_X,
+      gapY: CHIP_GAP_Y,
+    });
+  if (!singleRow && grid.height > maxHeight + 1) return null;
   const nodes = glyphs.map((glyph, index) => {
     const node = makeCharTile(scene, grid.positions[index].x, grid.positions[index].y, String(glyph), {
       width: grid.tileW,
       height: grid.tileH,
       seed: `${glyph}-${index}`,
     });
+    if (patternRow != null) node.setData("patternRow", patternRow);
     scene.frame.stage.add(node);
     if (onTap) {
       node.setInteractive(
@@ -277,6 +302,8 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
         return glyph;
       });
       const drawn = drawTiles(scene, stage, glyphs, top, {
+        singleRow: visual === "pattern",
+        patternRow: visual === "pattern" ? rowIndex : null,
         onTap: (node, glyph) => {
           if (glyph !== "＿") return;
           const next = visual === "pattern" ? shared.reveal?.[rowIndex] : visual === "fix" ? shared.right : "■";
@@ -292,7 +319,10 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     }
     if (slot?.glyphs?.length) {
       const localGlyphs = slot.glyphs.map((glyph) => (showResult && glyph === "＿" ? slot.reveal || glyph : glyph));
-      drawTiles(scene, stage, localGlyphs, top);
+      drawTiles(scene, stage, localGlyphs, top, {
+        singleRow: visual === "pattern",
+        patternRow: visual === "pattern" ? "local" : null,
+      });
     }
     return;
   }

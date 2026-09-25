@@ -9,6 +9,7 @@ import {
   addMuteToggle,
   createButton,
   drawSticker,
+  clearPcHudStack,
   paintBackdrop,
   showTooltip,
   spawnConfetti,
@@ -27,6 +28,7 @@ export default class EndScene extends Phaser.Scene {
 
   create() {
     const phone = !isWidePcTutor();
+    clearPcHudStack();
     const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
     const v = shell.v;
     this.shell = shell;

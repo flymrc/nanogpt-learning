@@ -169,6 +169,16 @@ export function drawPhaseTabs(scene, stage, phase, onPick) {
 }
 
 const BOOK_RE = /[A-Za-z][A-Za-z0-9_]*(?:[ :][A-Za-z0-9_][A-Za-z0-9_]*)*:?/g;
+const CJK_NEAR = /[\u3040-\u30ff\u3400-\u9fff]/;
+
+/** A single Latin letter glued to 小G / ジー is the name, not a code token. */
+function strayNameToken(row, match) {
+  const token = String(match[0] || "").replace(/:$/, "");
+  if (token.length !== 1) return false;
+  const prev = match.index > 0 ? row[match.index - 1] : "";
+  const next = row[match.index + match[0].length] || "";
+  return CJK_NEAR.test(prev) || CJK_NEAR.test(next);
+}
 
 function cardStyle(size, extra = {}) {
   return uiText(size, {
@@ -231,7 +241,7 @@ function paintBookMarks(scene, parent, source, size, originX, originY, lineH) {
   const probe = scene.add.text(0, 0, "", cardStyle(size)).setVisible(false);
   source.split("\n").forEach((row, index) => {
     for (const match of row.matchAll(BOOK_RE)) {
-      if (!match[0]) continue;
+      if (!match[0] || strayNameToken(row, match)) continue;
       probe.setText(row.slice(0, match.index));
       const x = probe.width;
       probe.setText(match[0]);

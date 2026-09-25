@@ -6,7 +6,7 @@ import { consumePendingSheet, pickChapter } from "../ui/catalog.js";
 import { syncPseudo } from "../ui/pseudo.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addFooterCta, addMuteToggle, bindAdvance, createButton, makeCharTile, markCaption, paintBackdrop } from "../ui/components.js";
+import { addFooterCta, addMuteToggle, bindAdvance, clearPcHudStack, createButton, makeCharTile, markCaption, paintBackdrop } from "../ui/components.js";
 import { CAPTION_CLEAR, STICKER_SHADOW_Y, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { installLayoutProbe } from "../ui/e2e.js";
 import { maybeShowGuide } from "../ui/guide.js";
@@ -25,6 +25,7 @@ export default class TitleScene extends Phaser.Scene {
     }
 
     const phone = !isWidePcTutor();
+    clearPcHudStack();
     const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
     const v = shell.v;
     paintBackdrop(this);

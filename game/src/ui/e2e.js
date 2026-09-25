@@ -139,7 +139,11 @@ function assertLessonLayout(scene) {
   if (!phone) {
     const tutorHits = collectTutorTextHits(scene, origin);
     for (const hit of tutorHits) overlaps.push(hit);
+    const titleHits = collectTitleHudHits(scene, origin);
+    for (const hit of titleHits) overlaps.push(hit);
   }
+  const patternHits = collectPatternRowHits(scene, origin);
+  for (const hit of patternHits) overlaps.push(hit);
 
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
@@ -341,6 +345,63 @@ function collectTutorTextHits(scene, origin) {
     const box = { x: r.x, y: r.y, w: r.width, h: r.height };
     if (strictHit(box, tutor)) hits.push(["dom-text", "live2d", text.slice(0, 24)]);
   });
+  return hits;
+}
+
+/** Chapter title must stay fully on the canvas and clear of every HUD button. */
+function collectTitleHudHits(scene, origin) {
+  let title = null;
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    if (obj.getData?.("kind") === "chapter-title" || obj.name === "chapter-title") title = obj;
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  if (!title || title.visible === false) return [];
+  const b = title.getBounds?.();
+  if (!b || b.width < 2 || b.height < 2) return [["chapter-title", "missing"]];
+  const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+  const hits = [];
+  const canvas = scene.game?.canvas?.getBoundingClientRect?.();
+  if (canvas && (box.x < canvas.left - 1 || box.x + box.w > canvas.right + 1 || box.y < canvas.top - 1 || box.y + box.h > canvas.bottom + 1)) {
+    hits.push(["chapter-title", "clipped"]);
+  }
+  const chrome = document.getElementById("pc-chrome");
+  if (!chrome || chrome.hidden) return hits;
+  for (const btn of chrome.querySelectorAll("button")) {
+    const r = btn.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    if (strictHit(box, { x: r.x, y: r.y, w: r.width, h: r.height })) {
+      hits.push(["chapter-title", btn.id || "hud"]);
+    }
+  }
+  return hits;
+}
+
+/** A pattern row is one sequence. Wrapping it into two rows breaks ●▲■●▲■●＿. */
+function collectPatternRowHits(scene, origin) {
+  const groups = new Map();
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    const row = obj.getData?.("patternRow");
+    if (row != null) {
+      const box = pieceBox(obj, origin);
+      if (box) {
+        const list = groups.get(row) || [];
+        list.push(box);
+        groups.set(row, list);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const hits = [];
+  for (const [row, list] of groups) {
+    if (list.length < 2) continue;
+    const centers = list.map((box) => box.y + box.h / 2);
+    const spread = Math.max(...centers) - Math.min(...centers);
+    if (spread > 8) hits.push(["pattern-row", String(row)]);
+  }
   return hits;
 }
 
