@@ -268,14 +268,15 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const available = stage.bottom - cardTop - rhythm;
   const yielded = available - Math.max(0, reserve);
   const maxH = Math.min(preferred, Math.max(48, yielded));
-  const maxTextH = Math.max(16, maxH - 46);
+  const chrome = 40;
+  const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
   const shownFit = fitPlain(scene, copy.shown, startSize, 13, wrap, maxTextH);
   const revealFit = copy.reveal ? fitPlain(scene, copy.reveal, startSize, 13, wrap, maxTextH) : null;
   const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);
   const textH = Math.max(shownFit.height, revealFit?.height || 0);
-  const floor = Math.min(phone ? 78 : 86, maxH);
-  const height = Math.min(maxH, Math.max(floor, Math.min(maxH, 36 + textH + 12)));
+  const contentH = chrome + textH;
+  const height = Math.min(maxH, Math.max(48, contentH));
   const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, phone ? 14 : 18, C.surface);
