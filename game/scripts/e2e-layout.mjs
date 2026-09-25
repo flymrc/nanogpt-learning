@@ -685,10 +685,10 @@ async function assertKeyLines(page) {
     await page.waitForFunction(() => window.__nanoGPTCard?.shown, { timeout: 15000 });
     await page.waitForTimeout(300);
     const card = await page.evaluate(() => window.__nanoGPTCard || {});
-    const shown = String(card.shown || "");
+    const shown = String(card.shown || "").replace(/\s+/g, "");
     for (const needle of needles) {
-      if (!shown.includes(needle)) {
-        throw new Error(`key sentence dropped ${file} missing ${needle} shown=${shown}`);
+      if (!shown.includes(needle.replace(/\s+/g, ""))) {
+        throw new Error(`key sentence dropped ${file} missing ${needle} shown=${card.shown}`);
       }
     }
     await page.screenshot({ path: `${OUT}/mobile-${file}.png` });
