@@ -136,9 +136,13 @@ function assertLessonLayout(scene) {
   for (const hit of locals) overlaps.push(hit);
 
   const phone = !isWidePcTutor();
-  if (!phone) {
+  const tutorState = document.documentElement.dataset.tutor || "";
+  const tutorConcealed = !phone && tutorState === "hidden";
+  if (!phone && !tutorConcealed) {
     const tutorHits = collectTutorTextHits(scene, origin);
     for (const hit of tutorHits) overlaps.push(hit);
+  }
+  if (!phone) {
     const titleHits = collectTitleHudHits(scene, origin);
     for (const hit of titleHits) overlaps.push(hit);
   }
@@ -169,21 +173,26 @@ function assertLessonLayout(scene) {
     Math.abs(shellRect.left - stageRect.left) < 2;
   // main, before the Live2D height fit: reserve stayed 334px.
   const lessonFloor = Math.min(1160, window.innerWidth - 334);
+  const lessonFull = Math.min(1160, window.innerWidth);
   const lessonWidth = shellRect?.width || 0;
   const lessonWidthOk = phone || lessonWidth + 2 >= lessonFloor;
-  const overlayOk =
-    phone ||
-    (live2dOn &&
-      dockTransparent &&
-      dockStyle.position === "fixed" &&
-      dockStyle.pointerEvents === "none" &&
-      chromeZ > dockZ &&
-      dock.offsetWidth > 120 &&
-      dock.offsetWidth < window.innerWidth * 0.5 &&
-      dockRect &&
-      Math.abs(dockRect.right - window.innerWidth) < 3 &&
-      lessonFillsStage &&
-      !stage?.contains(dock));
+  const reserveRaw = getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve").trim();
+  const reserve = reserveRaw ? Number.parseFloat(reserveRaw) : null;
+  const lessonFullOk = Math.abs(lessonWidth - lessonFull) <= 4 && (reserve == null || reserve <= 0.5);
+  const shownOverlayOk =
+    live2dOn &&
+    dockTransparent &&
+    dockStyle.position === "fixed" &&
+    dockStyle.pointerEvents === "none" &&
+    chromeZ > dockZ &&
+    dock.offsetWidth > 120 &&
+    dock.offsetWidth < window.innerWidth * 0.5 &&
+    dockRect &&
+    Math.abs(dockRect.right - window.innerWidth) < 3 &&
+    lessonFillsStage &&
+    !stage?.contains(dock);
+  const hiddenOverlayOk = tutorConcealed && !live2dOn && lessonFullOk && lessonFillsStage && !stage?.contains(dock);
+  const overlayOk = phone || (tutorConcealed ? hiddenOverlayOk : shownOverlayOk);
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
   const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
@@ -195,7 +204,7 @@ function assertLessonLayout(scene) {
       hudOk &&
       overlayOk &&
       lessonWidthOk &&
-      (phone ? !live2dOn : live2dOn),
+      (phone ? !live2dOn : tutorConcealed ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
     labels: labels.length,
@@ -209,7 +218,10 @@ function assertLessonLayout(scene) {
     layout: document.documentElement.dataset.layout,
     lessonWidth,
     lessonFloor,
+    lessonFull,
     lessonWidthOk,
+    lessonFullOk,
+    tutorConcealed,
   };
 }
 
@@ -380,6 +392,7 @@ function strictHit(a, b) {
 
 /** PC: lesson text must not intersect the fitted Live2D canvas. */
 function collectTutorTextHits(scene, origin) {
+  if (document.documentElement.dataset.tutor === "hidden") return [];
   const canvas = document.getElementById("tutor-canvas");
   if (!canvas || canvas.dataset.fitted !== "1") return [["live2d", "not-fitted"]];
   const rect = canvas.getBoundingClientRect();

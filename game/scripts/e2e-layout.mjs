@@ -792,19 +792,46 @@ async function assertLive2dPanel(browser) {
     window.__nanoGPTReadLive2dFit = () => {
       const stageEl = document.getElementById("tutor-stage");
       const canvas = document.getElementById("tutor-canvas");
+      const dock = document.getElementById("tutor-dock");
       const shell = document.getElementById("game-shell")?.getBoundingClientRect();
+      const lessonFloor = Math.min(1160, window.innerWidth - 334);
+      const lessonFull = Math.min(1160, window.innerWidth);
+      const lessonWidth = shell?.width || 0;
+      const lessonOk = lessonWidth + 2 >= lessonFloor;
+      const fullWidth = Math.abs(lessonWidth - lessonFull) <= 4;
+      const reserveRaw = getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve").trim();
+      const reserve = reserveRaw ? Number.parseFloat(reserveRaw) : null;
+      const purposeAlpha = typeof window.__nanoGPTPurposeAlpha === "function" ? window.__nanoGPTPurposeAlpha() : null;
+      const pageId = window.__nanoGPTState?.().pageId || "";
+      const concealed = document.documentElement.dataset.tutor === "hidden";
+      if (concealed) {
+        const dockHidden = Boolean(dock?.hidden);
+        const reserveClear = reserve != null && reserve <= 0.5;
+        return {
+          ready: dockHidden && reserveClear,
+          hidden: true,
+          ok: dockHidden && reserveClear && fullWidth && lessonOk,
+          fullWidth,
+          lessonOk,
+          lessonWidth,
+          lessonFloor,
+          lessonFull,
+          reserve,
+          ratio: null,
+          purposeAlpha,
+          pageId,
+        };
+      }
       const stage = stageEl?.getBoundingClientRect();
       const crect = canvas?.getBoundingClientRect();
       const place = window.__nanoGPTTutorHiDPI?.()?.place;
       const bounds = place?.bounds;
-      if (!stage || !crect || !bounds || canvas.dataset.fitted !== "1") return { ready: false };
+      if (!stage || !crect || !bounds || canvas.dataset.fitted !== "1" || dock?.hidden) return { ready: false, hidden: false };
       const box = { x: crect.x + bounds.x, y: crect.y + bounds.y, w: bounds.w, h: bounds.h };
       const bottomGap = stage.bottom - (box.y + box.h);
       const centerDelta = box.x + box.w / 2 - (crect.x + crect.width / 2);
       const ratio = stage.height > 0 ? box.h / stage.height : 0;
-      const tall = stage.height >= 1000;
-      const widthLimited = place?.widthLimited === true || canvas.dataset.widthLimited === "1";
-      const heightOk = tall ? ratio >= 0.84 && ratio <= 0.96 : ratio >= 0.8 || widthLimited;
+      const heightOk = ratio >= 0.88 && ratio <= 0.92;
       const bottomOk = bottomGap >= -2 && bottomGap <= 12;
       const centered = Math.abs(centerDelta) <= 10;
       const inside =
@@ -816,34 +843,34 @@ async function assertLive2dPanel(browser) {
         box.y >= stage.y - 1 &&
         box.x + box.w <= stage.right + 1 &&
         box.y + box.h <= stage.bottom + 1;
-      const lessonFloor = Math.min(1160, window.innerWidth - 334);
-      const lessonWidth = shell?.width || 0;
-      const lessonOk = lessonWidth + 2 >= lessonFloor;
       return {
         ready: true,
+        hidden: false,
         ok: heightOk && bottomOk && centered && inside && lessonOk,
         heightOk,
         bottomOk,
         centered,
         inside,
         lessonOk,
-        widthLimited,
+        fullWidth,
         bottomGap,
         centerDelta,
         ratio,
         box,
         lessonWidth,
         lessonFloor,
+        lessonFull,
+        reserve,
         meshAspect: place?.meshAspect ?? null,
-        purposeAlpha: typeof window.__nanoGPTPurposeAlpha === "function" ? window.__nanoGPTPurposeAlpha() : null,
+        purposeAlpha,
         panel: { x: stage.x, y: stage.y, w: stage.width, h: stage.height },
         canvas: { x: crect.x, y: crect.y, w: crect.width, h: crect.height },
-        pageId: window.__nanoGPTState?.().pageId || "",
+        pageId,
       };
     };
   });
   await ready(page);
-  await page.waitForFunction(() => document.getElementById("tutor-canvas")?.dataset.fitted === "1", { timeout: 30000 });
+  await page.waitForFunction(() => window.__nanoGPTReadLive2dFit?.()?.ready === true, { timeout: 30000 });
   const shotSizes = new Set(["1024x522", "1280x640", "1920x1080", "2560x1080"]);
   const results = [];
   let pages = 0;
@@ -853,15 +880,12 @@ async function assertLive2dPanel(browser) {
     await page.setViewportSize({ width: w, height: h });
     await page.waitForFunction(
       ({ width, height }) => {
-        const canvas = document.getElementById("tutor-canvas");
+        if (Math.abs(window.innerWidth - width) > 2 || Math.abs(window.innerHeight - height) > 2) return false;
+        const fit = window.__nanoGPTReadLive2dFit?.();
+        if (!fit?.ready) return false;
+        if (fit.hidden) return true;
         const stage = document.getElementById("tutor-stage")?.getBoundingClientRect();
-        return Boolean(
-          canvas?.dataset.fitted === "1" &&
-            Math.abs(window.innerWidth - width) < 2 &&
-            Math.abs(window.innerHeight - height) < 2 &&
-            stage &&
-            Math.abs(stage.height - height) < 8,
-        );
+        return Boolean(stage && Math.abs(stage.height - height) < 8);
       },
       { width: w, height: h },
       { timeout: 15000 },
@@ -895,12 +919,15 @@ async function assertLive2dPanel(browser) {
               lessonFloor: layout.lessonFloor,
               lessonWidthOk: layout.lessonWidthOk,
               fitOk: fit.ok,
+              hidden: fit.hidden,
+              fullWidth: fit.fullWidth,
               ratio: fit.ratio,
               bottomGap: fit.bottomGap,
               centerDelta: fit.centerDelta,
-              widthLimited: fit.widthLimited,
               heightOk: fit.heightOk,
               lessonOk: fit.lessonOk,
+              lessonFull: fit.lessonFull,
+              reserve: fit.reserve,
               meshAspect: fit.meshAspect,
               purposeAlpha: fit.purposeAlpha,
               box: fit.box,
@@ -927,15 +954,133 @@ async function assertLive2dPanel(browser) {
       }
       const sample = await page.evaluate(() => window.__nanoGPTReadLive2dFit());
       results.push({ name, lang, sample });
-      console.log(
-        `ok live2d ${lang} ${name} ratio=${Number(sample.ratio).toFixed(2)} aspect=${Number(sample.meshAspect).toFixed(2)} lesson=${Math.round(sample.lessonWidth)}/${Math.round(sample.lessonFloor)} bottom=${Number(sample.bottomGap).toFixed(1)} limited=${sample.widthLimited} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
-      );
+      if (sample.hidden) {
+        console.log(
+          `ok live2d ${lang} ${name} hidden lesson=${Math.round(sample.lessonWidth)} full=${Math.round(sample.lessonFull)} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
+        );
+      } else {
+        console.log(
+          `ok live2d ${lang} ${name} ratio=${Number(sample.ratio).toFixed(2)} aspect=${Number(sample.meshAspect).toFixed(2)} lesson=${Math.round(sample.lessonWidth)}/${Math.round(sample.lessonFloor)} bottom=${Number(sample.bottomGap).toFixed(1)} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
+        );
+      }
     }
   }
   if (C3_P3_BEAT < 0) throw new Error("c3-p3 missing from spine");
+  const threshold = await assertTutorThreshold(page, shotDir);
   await page.close();
-  console.log(`LIVE2D_FIT_OK sizes=${LIVE2D_FIT_SIZES.length} pages=${pages}`);
-  return { ok: true, sizes: LIVE2D_FIT_SIZES.length, pages };
+  console.log(`LIVE2D_FIT_OK sizes=${LIVE2D_FIT_SIZES.length} pages=${pages} threshold=${threshold.above}x1080/${threshold.below}x1080`);
+  return { ok: true, sizes: LIVE2D_FIT_SIZES.length, pages, threshold };
+}
+
+async function waitTutorState(page, expect) {
+  try {
+    await page.waitForFunction(
+      (expect) => {
+        if (Math.abs(window.innerWidth - expect.width) > 2 || Math.abs(window.innerHeight - expect.height) > 2) return false;
+        const scenes = window.__nanoGPTGame?.scene?.getScenes?.(true) || [];
+        const idle = scenes.length > 0 && scenes.every((scene) => (scene.tweens?.getTweens?.() || []).length === 0);
+        if (!idle || window.__nanoGPTBannerSettled !== true) return false;
+        const alpha = window.__nanoGPTPurposeAlpha?.();
+        if (alpha != null && alpha < 0.98) return false;
+        const fit = window.__nanoGPTReadLive2dFit?.();
+        const layout = window.__nanoGPTAssertLayout?.();
+        if (!fit?.ready || !fit.ok || !layout?.ok) return false;
+        if (Boolean(fit.hidden) !== Boolean(expect.hidden)) return false;
+        if (!expect.hidden && !(fit.ratio >= 0.88 && fit.ratio <= 0.92)) return false;
+        if (expect.hidden && !fit.fullWidth) return false;
+        return true;
+      },
+      expect,
+      { timeout: 20000 },
+    );
+  } catch (err) {
+    const snap = await page.evaluate(() => ({
+      gate: window.__nanoGPTTutorGate?.(),
+      fit: window.__nanoGPTReadLive2dFit?.(),
+      layout: window.__nanoGPTAssertLayout?.(),
+    }));
+    await page.screenshot({ path: `${OUT}/live2d-threshold-fail.png` });
+    throw new Error(`tutor threshold ${JSON.stringify(expect)} ${JSON.stringify(snap)} ${err.message}`);
+  }
+}
+
+/** Resize across the hide cutoff in both directions, including the slack band. */
+async function assertTutorThreshold(page, shotDir) {
+  await page.evaluate(() => window.__nanoGPTSetLang("ja"));
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
+  await page.setViewportSize({ width: 1800, height: 1080 });
+  await waitTutorState(page, { width: 1800, height: 1080, hidden: false });
+  const plan = await page.evaluate(() => {
+    const gate = window.__nanoGPTTutorGate();
+    const budget = (vw) => vw - Math.min(1160, vw - 334);
+    const needed = gate.neededReserve;
+    const floor = gate.showFloor ?? 0;
+    const slack = gate.slack;
+    let above = null;
+    for (let vw = 1081; vw <= 2600; vw += 1) {
+      if (budget(vw) - needed >= 0) {
+        above = vw;
+        break;
+      }
+    }
+    let below = null;
+    if (above) {
+      for (let vw = above - 1; vw >= 1081; vw -= 1) {
+        if (budget(vw) - needed < floor) {
+          below = vw;
+          break;
+        }
+      }
+    }
+    let mid = null;
+    let reshow = null;
+    for (let vw = (above || 1081) + 1; vw <= 2600; vw += 1) {
+      const spare = budget(vw) - needed;
+      if (mid == null && spare >= 16 && spare < slack) mid = vw;
+      if (reshow == null && spare >= slack) reshow = vw;
+      if (mid && reshow) break;
+    }
+    return {
+      above,
+      below,
+      mid,
+      reshow,
+      needed,
+      slack,
+      floor,
+      aspect: gate.aspect,
+      spareAbove: above == null ? null : budget(above) - needed,
+      spareBelow: below == null ? null : budget(below) - needed,
+      spareMid: mid == null ? null : budget(mid) - needed,
+      spareReshow: reshow == null ? null : budget(reshow) - needed,
+    };
+  });
+  if (!plan.above || !plan.below || !plan.mid || !plan.reshow || plan.below <= 1080 || plan.above <= 1080) {
+    throw new Error(`threshold plan unusable ${JSON.stringify(plan)}`);
+  }
+  console.log(`live2d threshold plan ${JSON.stringify(plan)}`);
+
+  await page.setViewportSize({ width: plan.above, height: 1080 });
+  await waitTutorState(page, { width: plan.above, height: 1080, hidden: false });
+  await page.screenshot({ path: `${shotDir}/threshold-above-${plan.above}x1080.png` });
+
+  await page.setViewportSize({ width: plan.below, height: 1080 });
+  await waitTutorState(page, { width: plan.below, height: 1080, hidden: true });
+  await page.screenshot({ path: `${shotDir}/threshold-below-${plan.below}x1080.png` });
+
+  await page.setViewportSize({ width: plan.mid, height: 1080 });
+  await waitTutorState(page, { width: plan.mid, height: 1080, hidden: true });
+
+  await page.setViewportSize({ width: plan.reshow, height: 1080 });
+  await waitTutorState(page, { width: plan.reshow, height: 1080, hidden: false });
+
+  await page.setViewportSize({ width: plan.mid, height: 1080 });
+  await waitTutorState(page, { width: plan.mid, height: 1080, hidden: false });
+
+  await page.setViewportSize({ width: plan.below, height: 1080 });
+  await waitTutorState(page, { width: plan.below, height: 1080, hidden: true });
+
+  return plan;
 }
 
 const mobile = await runViewport(

@@ -52,8 +52,9 @@ html.is-pc #app-layout.is-wide #pc-stage {
   flex: 0 0 auto;
   flex-direction: column;
   align-items: stretch;
-  /* Reserve stays on the stage, not as flex space taken by the dock,
-     so hiding the character does not move the lesson. */
+  /* Reserve stays on the stage, not as flex space taken by the dock.
+     Concealing the tutor sets --tutor-reserve to 0 so the lesson
+     uses the full min(1160px, 100%). */
   width: min(1160px, calc(100% - var(--tutor-reserve, 320px)));
   max-width: 1160px;
   height: 100%;
