@@ -23,7 +23,33 @@ let lookHook = null;
 const lookTarget = { x: 0, y: 0 };
 const lookCurrent = { x: 0, y: 0 };
 let lookLastMs = 0;
-let reservePosts = 0;
+let reserveLock = false;
+let dprWatch = null;
+
+const FIT_PAD_X = 8;
+const FIT_PAD_TOP = 8;
+const FIT_PAD_BOTTOM = 6;
+const FIT_RIGHT_GAP = 6;
+const RESERVE_EXTRA = 16;
+/**
+ * On main, before this fit, the tutor canvas was width-capped near 300px
+ * and `--tutor-reserve` stayed 334. The lesson column was
+ * min(1160, viewport − 334). Never go narrower than that.
+ */
+const MAIN_TUTOR_RESERVE = 334;
+/** Visible mesh height is always this fraction of the side panel. */
+const HEIGHT_RATIO = 0.9;
+/**
+ * Extra pixels in the hide check so ceil() cannot slip the lesson
+ * under its minimum. The girl is not scaled down to absorb it.
+ */
+const RESERVE_FUDGE = 2;
+/** Once hidden, stay hidden until the spare reserve grows by this much. */
+const SHOW_SLACK = 32;
+/** Shown stays shown while spare reserve is at least this (px). */
+const SHOW_FLOOR = 0;
+/** True while the girl is on screen. Hysteresis reads this, not the DOM. */
+let tutorOpen = true;
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
@@ -84,7 +110,6 @@ function ensureTutorCanvas() {
     canvas.id = "tutor-canvas";
     stage.appendChild(canvas);
   }
-  canvas.hidden = false;
   return canvas;
 }
 
@@ -95,6 +120,13 @@ export function mountTutorHost() {
       window.clearTimeout(window.__nanoGPTTutorResize);
       window.__nanoGPTTutorResize = window.setTimeout(syncTutorLayout, 160);
     });
+    window.addEventListener("orientationchange", () => syncTutorLayout());
+    window.visualViewport?.addEventListener("resize", () => {
+      window.clearTimeout(window.__nanoGPTTutorResize);
+      window.__nanoGPTTutorResize = window.setTimeout(syncTutorLayout, 160);
+    });
+    globalThis.screen?.orientation?.addEventListener?.("change", () => syncTutorLayout());
+    watchDevicePixelRatio();
     window.addEventListener("nanogpt-voice", (event) => {
       setTalking(Boolean(event.detail?.playing));
     });
@@ -117,22 +149,24 @@ function syncTutorLayout() {
   if (!layout || !dock) return;
 
   const eligible = isWidePcTutor();
-  const wasHidden = dock.hidden;
   layout.classList.toggle("is-wide", eligible);
-  dock.hidden = !eligible;
-  if (eligible && wasHidden) reservePosts = 0;
 
   if (!eligible) {
+    dock.hidden = true;
+    tutorOpen = true;
+    delete document.documentElement.dataset.tutor;
+    setTutorReserve(0);
     teardownLive2d();
     return;
   }
 
   fillBubble(currentTutor());
-  if (pixiApp) {
-    resizePixi();
-  } else {
+  if (!pixiApp || !model) {
+    dock.hidden = false;
     ensureLive2d();
+    return;
   }
+  placeModel();
 }
 
 function ensureLive2d() {
@@ -243,7 +277,7 @@ async function bootLive2d() {
   resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(() => resizePixi());
   resizeObserver.observe(stage);
-  if (!model.__naturalW) {
+  if (!model.__mesh) {
     requestAnimationFrame(() => placeModel());
   }
   applyBeat(currentTutor());
@@ -289,74 +323,245 @@ function resizePixi() {
   placeModel();
 }
 
-function naturalSize(host) {
-  if (host.__naturalW && host.__naturalH) {
-    return { w: host.__naturalW, h: host.__naturalH };
+function lessonFloorPx(viewportW) {
+  return Math.min(1160, viewportW - MAIN_TUTOR_RESERVE);
+}
+
+function lessonFullPx(viewportW) {
+  return Math.min(1160, viewportW);
+}
+
+/** Reserve the 90% panel needs: mesh width + pads + gap + lesson margin. */
+function neededReservePx(aspect, panelH) {
+  const meshW = HEIGHT_RATIO * panelH * aspect;
+  const canvasW = Math.ceil(meshW + FIT_PAD_X * 2);
+  return canvasW + FIT_RIGHT_GAP + RESERVE_EXTRA + RESERVE_FUDGE;
+}
+
+function decideShow(open, spare) {
+  if (open) return spare >= SHOW_FLOOR;
+  return spare >= SHOW_SLACK;
+}
+
+function computeTutorGate(aspect) {
+  const vw = window.innerWidth;
+  const panelH = window.innerHeight;
+  const lessonMin = lessonFloorPx(vw);
+  const lessonFull = lessonFullPx(vw);
+  const maxReserve = Math.max(0, vw - lessonMin);
+  const neededReserve = aspect > 0 ? neededReservePx(aspect, panelH) : 0;
+  const spare = maxReserve - neededReserve;
+  const known = aspect > 0;
+  return {
+    open: tutorOpen,
+    aspect: known ? aspect : 0,
+    neededReserve,
+    maxReserve,
+    spare,
+    heightRatio: HEIGHT_RATIO,
+    slack: SHOW_SLACK,
+    showFloor: SHOW_FLOOR,
+    lessonMin,
+    lessonFull,
+    panelH,
+    show: known ? decideShow(tutorOpen, spare) : tutorOpen,
+  };
+}
+
+function readTutorReserve() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve").trim();
+  if (!raw) return null;
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+function setTutorReserve(reserve) {
+  if (reserveLock) return;
+  const next = Math.max(0, Math.round(reserve));
+  const prev = readTutorReserve();
+  const tol = next === 0 ? 0.5 : 8;
+  if (prev != null && Math.abs(next - prev) < tol) return;
+  reserveLock = true;
+  try {
+    document.documentElement.style.setProperty("--tutor-reserve", `${next}px`);
+    window.dispatchEvent(new Event("resize"));
+  } finally {
+    reserveLock = false;
   }
-  const sx = host.scale?.x || 1;
-  const sy = host.scale?.y || 1;
-  const w = host.width / sx;
-  const h = host.height / sy;
-  if (!(w > 8) || !(h > 8)) return null;
-  host.__naturalW = w;
-  host.__naturalH = h;
-  return { w, h };
+}
+
+function concealTutor() {
+  const dock = document.getElementById("tutor-dock");
+  const canvas = document.getElementById("tutor-canvas");
+  if (dock) dock.hidden = true;
+  if (canvas) {
+    canvas.hidden = true;
+    canvas.dataset.fitted = "";
+  }
+  document.documentElement.dataset.tutor = "hidden";
+  setTutorReserve(0);
+}
+
+function revealTutorDock() {
+  const dock = document.getElementById("tutor-dock");
+  const canvas = document.getElementById("tutor-canvas");
+  if (dock) dock.hidden = false;
+  if (canvas) canvas.hidden = false;
+  document.documentElement.dataset.tutor = "shown";
+}
+
+function drawableName(id) {
+  if (id == null) return "";
+  if (typeof id === "string") return id;
+  return String(id.s || id.id || id._id || "");
+}
+
+/**
+ * Tight box of visible drawables, in the model's canvas pixels.
+ * getBounds() is the texture box (wide transparent padding). Hiyori's
+ * drawn mesh is much narrower than that box.
+ */
+function measureVisibleMesh(host) {
+  if (host.__mesh) return host.__mesh;
+  const im = host.internalModel;
+  const core = im?.coreModel;
+  if (!core?.getDrawableCount || !im.getDrawableVertices) return null;
+  const canvasW = im.width || 0;
+  const canvasH = im.height || 0;
+  const count = core.getDrawableCount();
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let used = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (typeof core.getDrawableDynamicFlagIsVisible === "function" && !core.getDrawableDynamicFlagIsVisible(index)) continue;
+    const opacity = typeof core.getDrawableOpacity === "function" ? core.getDrawableOpacity(index) : 1;
+    if (!(opacity > 0.05)) continue;
+    const name = drawableName(core.getDrawableId?.(index));
+    if (/hit/i.test(name)) continue;
+    let verts;
+    try {
+      verts = im.getDrawableVertices(index);
+    } catch {
+      continue;
+    }
+    if (!verts || verts.length < 4) continue;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < verts.length; k += 2) {
+      const x = verts[k];
+      const y = verts[k + 1];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+    if (!(x1 > x0) || !(y1 > y0)) continue;
+    if (canvasW > 32 && canvasH > 32 && x1 - x0 > canvasW * 0.92 && y1 - y0 > canvasH * 0.92) continue;
+    if (x0 < minX) minX = x0;
+    if (y0 < minY) minY = y0;
+    if (x1 > maxX) maxX = x1;
+    if (y1 > maxY) maxY = y1;
+    used += 1;
+  }
+  if (used < 4 || !(maxX > minX + 8) || !(maxY > minY + 8)) return null;
+  const mesh = { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, used };
+  if (canvasW > 32 && mesh.w > canvasW * 1.02) return null;
+  if (canvasH > 32 && mesh.h > canvasH * 1.02) return null;
+  host.__mesh = mesh;
+  return mesh;
+}
+
+function watchDevicePixelRatio() {
+  dprWatch?.removeEventListener?.("change", onDprChange);
+  const raw = Number(window.devicePixelRatio);
+  const dpr = Number.isFinite(raw) && raw > 0 ? raw : 1;
+  dprWatch = window.matchMedia(`(resolution: ${dpr}dppx)`);
+  dprWatch.addEventListener?.("change", onDprChange);
+}
+
+function onDprChange() {
+  watchDevicePixelRatio();
+  syncTutorLayout();
 }
 
 function publishTutorReserve() {
   const canvas = document.getElementById("tutor-canvas");
-  if (!canvas || canvas.dataset.fitted !== "1") return;
+  if (!canvas || canvas.hidden || canvas.dataset.fitted !== "1") return;
   const rect = canvas.getBoundingClientRect();
-  if (rect.width < 8 || rect.left < 8) return;
-  const reserve = Math.ceil(window.innerWidth - rect.left + 16);
-  if (reserve < 120 || reserve > window.innerWidth * 0.55) return;
-  const prev = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve")) || 0;
-  if (Math.abs(reserve - prev) < 8) return;
-  if (reservePosts >= 2) return;
-  reservePosts += 1;
-  document.documentElement.style.setProperty("--tutor-reserve", `${reserve}px`);
-  window.dispatchEvent(new Event("resize"));
+  if (rect.width < 8 || rect.height < 8) return;
+  const reserve = Math.ceil(window.innerWidth - rect.left + RESERVE_EXTRA);
+  if (reserve < 48 || reserve > window.innerWidth * 0.72) return;
+  setTutorReserve(reserve);
 }
 
+/**
+ * Visible mesh is always 90% of the side panel, feet near the bottom,
+ * centered in a canvas that is only as wide as that mesh. If that canvas
+ * would push the lesson under its main-era minimum, hide the panel
+ * instead of scaling the girl down.
+ */
 function placeModel() {
-  if (!pixiApp || !model) return;
-  const dock = stageBox();
-  if (dock.w < 40 || dock.h < 40) return;
-  const natural = naturalSize(model);
-  if (!natural) return;
+  if (!pixiApp || !model || !isWidePcTutor()) return;
   const canvas = ensureTutorCanvas();
   if (!canvas) return;
-  canvas.dataset.fitted = "";
 
-  const maxH = Math.max(160, dock.h - 12);
-  const maxW = Math.min(300, Math.max(120, dock.w - 16));
-  const scale = Math.min(maxH / natural.h, maxW / natural.w);
-  model.anchor.set(0.5, 0);
+  const mesh = measureVisibleMesh(model);
+  if (!mesh) {
+    model.__fitTries = (model.__fitTries || 0) + 1;
+    if (model.__fitTries < 40) requestAnimationFrame(() => placeModel());
+    return;
+  }
+
+  const aspect = mesh.w / mesh.h;
+  const gate = computeTutorGate(aspect);
+  if (!decideShow(tutorOpen, gate.spare)) {
+    tutorOpen = false;
+    concealTutor();
+    return;
+  }
+
+  tutorOpen = true;
+  revealTutorDock();
+  const dockEl = document.getElementById("tutor-dock");
+  const dockRect = dockEl?.getBoundingClientRect();
+  if (!dockRect || dockRect.width < 40 || dockRect.height < 40) {
+    requestAnimationFrame(() => placeModel());
+    return;
+  }
+
+  const panelH = dockRect.height;
+  const scale = (HEIGHT_RATIO * panelH) / mesh.h;
+  const meshW = mesh.w * scale;
+  const meshH = mesh.h * scale;
+  const canvasW = Math.max(48, Math.ceil(meshW + FIT_PAD_X * 2));
+  const canvasH = Math.max(48, Math.ceil(meshH + FIT_PAD_TOP + FIT_PAD_BOTTOM));
+  const left = Math.round(dockRect.width - FIT_RIGHT_GAP - canvasW);
+  const top = Math.round(panelH - FIT_PAD_BOTTOM - meshH - FIT_PAD_TOP);
+  const dpr = displayDpr();
+
+  model.anchor.set(0, 0);
   model.scale.set(scale);
+  model.x = Math.round(FIT_PAD_X - mesh.minX * scale);
+  model.y = Math.round(FIT_PAD_TOP - mesh.minY * scale);
 
-  applyCanvasPixels(pixiApp, canvas, dock);
-  canvas.style.left = "0px";
-  canvas.style.top = "0px";
-  const bodyW = natural.w * scale;
-  model.x = Math.round(dock.w - 12 - bodyW / 2);
-  model.y = 6;
-  const bounds = model.getBounds?.();
-  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
-
-  const pad = 6;
-  const left = Math.max(0, Math.floor(bounds.x - pad));
-  const top = Math.max(0, Math.floor(bounds.y - pad));
-  const width = Math.min(dock.w - left, Math.ceil(bounds.width + pad * 2));
-  const height = Math.min(dock.h - top, Math.ceil(bounds.height + pad * 2));
-  if (width < 40 || height < 40) return;
-
-  model.x = Math.round(model.x - left);
-  model.y = Math.round(model.y - top);
-  lastBufferKey = `fit-${width}x${height}@${dock.dpr}`;
-  applyCanvasPixels(pixiApp, canvas, { w: width, h: height, dpr: dock.dpr });
+  lastBufferKey = `fit-${canvasW}x${canvasH}@${dpr}`;
+  applyCanvasPixels(pixiApp, canvas, { w: canvasW, h: canvasH, dpr });
   canvas.style.left = `${left}px`;
   canvas.style.top = `${top}px`;
   canvas.dataset.fitted = "1";
+  canvas.dataset.widthLimited = "0";
+  model.__visible = {
+    x: FIT_PAD_X,
+    y: FIT_PAD_TOP,
+    w: meshW,
+    h: meshH,
+    aspect,
+  };
   publishTutorReserve();
 }
 
@@ -505,6 +710,15 @@ function tutorContainsClient(x, y) {
 
 if (typeof window !== "undefined") {
   window.__nanoGPTTutorContains = tutorContainsClient;
+  window.__nanoGPTTutorGate = () => {
+    const mesh = model?.__mesh;
+    const aspect = mesh && mesh.h > 0 ? mesh.w / mesh.h : 0;
+    return {
+      ...computeTutorGate(aspect),
+      reserve: readTutorReserve(),
+      tutor: document.documentElement.dataset.tutor || "",
+    };
+  };
 }
 
 function attachLookHook(host) {
@@ -596,10 +810,11 @@ function installDebugProbe() {
             x: model.x,
             y: model.y,
             scale: model.scale?.x,
-            bounds: (() => {
-              const b = model.getBounds?.();
-              return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null;
-            })(),
+            bounds: model.__visible
+              ? { x: model.__visible.x, y: model.__visible.y, w: model.__visible.w, h: model.__visible.h }
+              : null,
+            meshAspect: model.__visible?.aspect ?? null,
+            widthLimited: false,
             slot: { w: box.w, h: box.h },
           }
         : null,

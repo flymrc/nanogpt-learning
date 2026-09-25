@@ -10,7 +10,9 @@ A later `E2E_OK` still **missed** local sticker collisions, because the probe on
 ## Layout modes (hard switch)
 
 - **Mobile:** `width < 1024` or portrait or mobile UA. Shell: `#mobile-chrome` (in-flow) + `#game-shell`. No Live2D. No desktop absolute HUD. No `挪一格` / window-frame overlays on the tape.
-- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. `#pc-stage` is the lesson only (centered). `#tutor-dock` is a `position: fixed; right: 0` overlay and does not take flex width, so hiding it does not move the lesson. Transparent, no sidebar fill. Forehead and hair stay clear of notes and mute. `#mobile-chrome` hidden.
+- **PC wide:** `width ≥ 1024` and landscape and not a phone UA. `#pc-stage` is the lesson only (centered). `#tutor-dock` is a `position: fixed; right: 0` overlay and does not take flex width. Transparent, no sidebar fill. Forehead and hair stay clear of notes and mute. `#mobile-chrome` hidden. While the tutor is visible the lesson stays at least `min(1160, viewport − 334)` — the width it had on main. If a panel wide enough for the girl at 90% of the viewport height would push the lesson under that width, hide the dock and the canvas and set `--tutor-reserve: 0` so the lesson uses the full `min(1160, viewport)` and is centered in the viewport (`|left gap − right gap| ≤ 2`). The page background matches the lesson sky (`#f6efe4` → `#ead6c4`) so those gaps are not a flat leftover strip.
+
+Live2D (wide PC only): the visible mesh is always **90%** of her side panel, centered in that panel, feet about 6px above the bottom. No intermediate scale. Panel width is the mesh width at that height plus 16px, then a 6px right gap and 16px before the lesson (`reserve ≈ 0.90 × height × mesh aspect + 38px`; the measured aspect is about 0.32). She hides when that reserve exceeds `viewport − min(1160, viewport − 334)`. At 1080px tall the reserve is about 350px, so she hides below about **1510px** wide. She is shown again only after the spare reserve grows by **32px** (about **1542px** wide at 1080px tall) so the dock does not flicker on the boundary. `document.documentElement.dataset.tutor` is `shown` or `hidden`. When it is `hidden`, the lesson column is centered and neither the dock nor a differently tinted strip remains. A resize from shown to hidden and back must not leave a stale offset.
 
 Do not share absolute coordinates, 360px dock widths, or 1080px drawers across modes.
 
@@ -31,7 +33,7 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 | Viewport | What must be true |
 | --- | --- |
 | **390×844 mobile** | Walk **all 49 pages × all 5 sections** (目标 / 看看 / 做做 / 小结 / 试试, Japanese めあて / 見て / やって / まとめ / 確認). Counts: each chapter is an intro, then 9 / 9 / 7 / 7 / 7 pages, then a summary, so chapter 1 = 11, chapter 2 = 11, chapter 3 = 9, chapter 4 = 9, chapter 5 = 9, **245** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 49 pages** at least once (做一做 section is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
+| **1440×900 PC** | Smoke **all 49 pages** at least once (做一做 section is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar. The girl is 90% of the panel height and the lesson stays at least `min(1160, viewport − 334)`. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 
@@ -63,7 +65,7 @@ npx vite preview --host 127.0.0.1 --port 4182
 E2E_URL=http://127.0.0.1:4182/ E2E_OUT=/tmp/nanogpt-e2e npm run e2e
 ```
 
-Helper script: `game/scripts/e2e-layout.mjs`. It must walk 245 mobile steps (49×5) and 49 PC pages, and open the steps panel on encode / shift / loss / attention / train / sample.
+Helper script: `game/scripts/e2e-layout.mjs`. It must walk 245 mobile steps (49×5) and 49 PC pages, and open the steps panel on encode / shift / loss / attention / train / sample. The Live2D fit walk covers 8 viewports × both locales × all 49 pages. At each size the girl is either visible at 88–92% of the panel height with the lesson at least `min(1160, viewport − 334)`, or hidden with the lesson at the full `min(1160, viewport)`. The same run resizes across the hide threshold in both directions, including the 32px slack band.
 
 ## i18n
 

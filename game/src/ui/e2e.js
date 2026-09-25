@@ -136,9 +136,13 @@ function assertLessonLayout(scene) {
   for (const hit of locals) overlaps.push(hit);
 
   const phone = !isWidePcTutor();
-  if (!phone) {
+  const tutorState = document.documentElement.dataset.tutor || "";
+  const tutorConcealed = !phone && tutorState === "hidden";
+  if (!phone && !tutorConcealed) {
     const tutorHits = collectTutorTextHits(scene, origin);
     for (const hit of tutorHits) overlaps.push(hit);
+  }
+  if (!phone) {
     const titleHits = collectTitleHudHits(scene, origin);
     for (const hit of titleHits) overlaps.push(hit);
   }
@@ -146,6 +150,8 @@ function assertLessonLayout(scene) {
   for (const hit of patternHits) overlaps.push(hit);
   const artHits = collectArtHits(scene, origin);
   for (const hit of artHits) overlaps.push(hit);
+  const readHits = collectReadabilityHits(scene, origin);
+  for (const hit of readHits) overlaps.push(hit);
 
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
@@ -165,19 +171,57 @@ function assertLessonLayout(scene) {
     shellRect &&
     Math.abs(shellRect.width - stageRect.width) < 2 &&
     Math.abs(shellRect.left - stageRect.left) < 2;
-  const overlayOk =
-    phone ||
-    (live2dOn &&
-      dockTransparent &&
-      dockStyle.position === "fixed" &&
-      dockStyle.pointerEvents === "none" &&
-      chromeZ > dockZ &&
-      dock.offsetWidth > 120 &&
-      dock.offsetWidth < window.innerWidth * 0.5 &&
-      dockRect &&
-      Math.abs(dockRect.right - window.innerWidth) < 3 &&
-      lessonFillsStage &&
-      !stage?.contains(dock));
+  // main, before the Live2D height fit: reserve stayed 334px.
+  const lessonFloor = Math.min(1160, window.innerWidth - 334);
+  const lessonFull = Math.min(1160, window.innerWidth);
+  const lessonWidth = shellRect?.width || 0;
+  const lessonWidthOk = phone || lessonWidth + 2 >= lessonFloor;
+  const reserveRaw = getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve").trim();
+  const reserve = reserveRaw ? Number.parseFloat(reserveRaw) : null;
+  const lessonFullOk = Math.abs(lessonWidth - lessonFull) <= 4 && (reserve == null || reserve <= 0.5);
+  const leftGap = shellRect ? shellRect.left : 0;
+  const rightGap = shellRect ? window.innerWidth - shellRect.right : 0;
+  const lessonCentered = Math.abs(leftGap - rightGap) <= 2;
+  const layoutBg = getComputedStyle(document.getElementById("app-layout") || document.body).backgroundImage || "";
+  const skyBackdrop = /linear-gradient/i.test(layoutBg) && /246,\s*239,\s*228/.test(layoutBg) && /234,\s*214,\s*196/.test(layoutBg);
+  const dockBox = dockRect && dockRect.width > 1 && dockRect.height > 1 && dockStyle?.display !== "none";
+  const panelGone = !live2dOn && !dockBox;
+  const gapClear = (() => {
+    if (!shellRect) return false;
+    const ys = [0.22, 0.5, 0.78].map((t) => Math.round(window.innerHeight * t));
+    const xs = [];
+    if (leftGap > 6) xs.push(leftGap / 2);
+    if (rightGap > 6) xs.push(window.innerWidth - rightGap / 2);
+    for (const x of xs) {
+      for (const y of ys) {
+        const el = document.elementFromPoint(Math.round(x), y);
+        if (!el || el.closest("#tutor-dock, #tutor-stage, #tutor-canvas, #pc-stage, #game-shell")) return false;
+      }
+    }
+    return true;
+  })();
+  const shownOverlayOk =
+    live2dOn &&
+    dockTransparent &&
+    dockStyle.position === "fixed" &&
+    dockStyle.pointerEvents === "none" &&
+    chromeZ > dockZ &&
+    dock.offsetWidth > 120 &&
+    dock.offsetWidth < window.innerWidth * 0.5 &&
+    dockRect &&
+    Math.abs(dockRect.right - window.innerWidth) < 3 &&
+    lessonFillsStage &&
+    !stage?.contains(dock);
+  const hiddenOverlayOk =
+    tutorConcealed &&
+    panelGone &&
+    lessonFullOk &&
+    lessonCentered &&
+    skyBackdrop &&
+    gapClear &&
+    lessonFillsStage &&
+    !stage?.contains(dock);
+  const overlayOk = phone || (tutorConcealed ? hiddenOverlayOk : shownOverlayOk);
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
   const hudOk = phone ? hudParent === "mobile-actions" : hudParent === "pc-chrome";
@@ -188,7 +232,8 @@ function assertLessonLayout(scene) {
       orphans.length === 0 &&
       hudOk &&
       overlayOk &&
-      (phone ? !live2dOn : live2dOn),
+      lessonWidthOk &&
+      (phone ? !live2dOn : tutorConcealed ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
     labels: labels.length,
@@ -200,6 +245,17 @@ function assertLessonLayout(scene) {
     overlayOk,
     hudParent,
     layout: document.documentElement.dataset.layout,
+    lessonWidth,
+    lessonFloor,
+    lessonFull,
+    lessonWidthOk,
+    lessonFullOk,
+    tutorConcealed,
+    leftGap,
+    rightGap,
+    lessonCentered,
+    skyBackdrop,
+    gapClear,
   };
 }
 
@@ -283,6 +339,14 @@ function collectLocalHits(scene, origin, cta, shell) {
     }
   }
   const chips = pieces.filter((box) => box.kind === "chip");
+  if (isWidePcTutor()) {
+    for (const tile of pieces) {
+      if (tile.kind !== "tile") continue;
+      if (tile.rawW < 28 - 0.5 || tile.rawH < 28 - 0.5) {
+        hits.push(["tile-size", `${Math.round(tile.rawW)}x${Math.round(tile.rawH)}`]);
+      }
+    }
+  }
   for (const chip of chips) {
     if (chip.rawW < MIN_CHIP_W - 0.5 || chip.rawH < MIN_CHIP_H - 0.5 || chip.idFont < MIN_ID_FONT) {
       hits.push(["chip-size", `${Math.round(chip.rawW)}x${Math.round(chip.rawH)}@${chip.idFont}`]);
@@ -311,12 +375,58 @@ function collectLocalHits(scene, origin, cta, shell) {
   return hits;
 }
 
+/** Banner sentence vs page counter, and phase-card copy must stay inside the card. */
+function collectReadabilityHits(scene, origin) {
+  let card = null;
+  const texts = [];
+  let step = null;
+  const banners = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false) return;
+    const kind = obj.getData?.("kind");
+    if (kind === "phase-card") card = pieceBox(obj, origin);
+    if ((kind === "phase-card-text" || kind === "phase-card-title") && obj.alpha > 0.2) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        texts.push({ x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height });
+      }
+    }
+    if ((kind === "banner-step" || kind === "banner-kicker" || kind === "banner-purpose") && obj.alpha > 0.2) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        const box = { kind, x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+        if (kind === "banner-step") step = box;
+        else banners.push(box);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const hits = [];
+  if (card) {
+    const right = card.x + (card.rawW || card.w);
+    const bottom = card.y + (card.rawH || card.h);
+    for (const text of texts) {
+      if (text.x < card.x - 2 || text.y < card.y - 2 || text.x + text.w > right + 2 || text.y + text.h > bottom + 2) {
+        hits.push(["card-text", "outside"]);
+      }
+    }
+  }
+  if (step) {
+    for (const banner of banners) {
+      if (boxesOverlap(banner, step)) hits.push([banner.kind, "counter"]);
+    }
+  }
+  return hits;
+}
+
 function strictHit(a, b) {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 /** PC: lesson text must not intersect the fitted Live2D canvas. */
 function collectTutorTextHits(scene, origin) {
+  if (document.documentElement.dataset.tutor === "hidden") return [];
   const canvas = document.getElementById("tutor-canvas");
   if (!canvas || canvas.dataset.fitted !== "1") return [["live2d", "not-fitted"]];
   const rect = canvas.getBoundingClientRect();

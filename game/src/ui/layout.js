@@ -138,9 +138,10 @@ export function makeShell(scene, opts = {}) {
       : (opts.headerH ??
         clamp(Math.round((twoRow ? 92 : v.portrait ? 72 : 58) * v.uiScale), twoRow ? 80 : 52, twoRow ? 104 : 80));
   const wantFooter = opts.footer !== false;
+  const footerMin = !v.portrait && v.h < 560 ? 72 : 84;
   const footerH = wantFooter
     ? (opts.footerH ??
-      clamp(Math.round((v.portrait ? 112 : v.short ? 88 : 100) * v.uiScale), 84, 128))
+      clamp(Math.round((v.portrait ? 112 : v.short ? 88 : 100) * v.uiScale), footerMin, 128))
     : 0;
   const gap = opts.gap ?? lessonRhythm(v);
   const hudReserve = opts.hudReserve ?? hudReservePx(v);
