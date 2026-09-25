@@ -141,7 +141,7 @@ function drawScheme(scene, stage, top, caption, paint) {
   const card = scene.add.container(stage.cx, top + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, 16, C.surface);
-  paint(g, width, height);
+  const layout = paint(g, width, height) || null;
   card.add(g);
   card.setSize(width, height);
   card.setData("kind", "card");
@@ -156,15 +156,14 @@ function drawScheme(scene, stage, top, caption, paint) {
     );
     scene.frame.stage.add(note);
   }
-  return { bottom: capY + 18 };
+  return { bottom: capY + 18, card, width, height, layout };
 }
 
-function paintBars(g, width, height, { highlight = -1, short = false } = {}) {
-  const count = 8;
+function paintBars(g, width, height, { highlight = -1, short = false, count = 8, labelRoom = false } = {}) {
   const gap = 6;
-  const barW = Math.min(18, (width - 40 - gap * (count - 1)) / count);
-  const base = height / 2 - 16;
-  const tall = height - 36;
+  const barW = Math.min(22, (width - 40 - gap * (count - 1)) / count);
+  const base = height / 2 - (labelRoom ? 22 : 16);
+  const tall = labelRoom ? height - 48 : height - 36;
   for (let index = 0; index < count; index += 1) {
     const h = short && index === highlight ? tall * 0.28 : tall * (0.35 + ((index * 37) % 50) / 100);
     const x = -width / 2 + 20 + index * (barW + gap);
@@ -172,6 +171,7 @@ function paintBars(g, width, height, { highlight = -1, short = false } = {}) {
     g.fillStyle(color, index === highlight ? 1 : 0.85);
     g.fillRoundedRect(x, base - h, barW, h, 4);
   }
+  return { barW, gap, base, count };
 }
 
 function paintWheel(g, width, height, grown = false) {
@@ -342,13 +342,29 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
 
   if (visual === "batch") {
     drawStats(scene, stage, [
-      { value: "64×256", label: "16,384", accent: C.blue },
+      { value: "64", label: t("art.manyQuestions"), accent: C.blue },
     ], top);
     return;
   }
 
   if (visual === "bars" || visual === "truebar") {
-    drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, { highlight: visual === "truebar" ? 2 : -1 }));
+    const labels = visual === "truebar" ? ["F", "i", "r", "s", "t"] : null;
+    const highlight = visual === "truebar" ? 4 : -1;
+    const drawn = drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
+      highlight,
+      count: labels ? labels.length : 8,
+      labelRoom: Boolean(labels),
+    }));
+    if (labels && drawn?.card && drawn.layout) {
+      const { barW, gap, base } = drawn.layout;
+      labels.forEach((label, index) => {
+        const x = -drawn.width / 2 + 20 + index * (barW + gap) + barW / 2;
+        const text = scene.add.text(x, base + 2, label, uiText(12, {
+          color: index === highlight ? C.coralCss : C.text,
+        })).setOrigin(0.5, 0);
+        drawn.card.add(text);
+      });
+    }
     return;
   }
 

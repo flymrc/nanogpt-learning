@@ -9,10 +9,16 @@ export function pseudoFor(beat) {
     return value === key ? "" : value;
   };
   const lines = [1, 2, 3, 4].map(line).filter(Boolean);
+  let myth = t(`pseudo.${id}.myth`);
+  if (/^(答案|こたえ)\s*[:：]/.test(myth)) {
+    const aside = typeof beat?.footnote === "string" ? beat.footnote : "";
+    myth = aside || beat?.purpose || t(`${id}.aim`);
+    if (!myth || myth === `${id}.aim` || /^(答案|こたえ)/.test(myth)) myth = t(`${id}.summary`);
+  }
   return {
     does: t(`pseudo.${id}.does`),
     metaphor: t(`pseudo.${id}.metaphor`),
-    myth: t(`pseudo.${id}.myth`),
+    myth,
     lines: lines.length ? lines : [t(`pseudo.${id}.does`)],
   };
 }

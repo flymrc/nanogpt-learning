@@ -45,6 +45,15 @@ async function jumpAndAssert(page, key, beat, phase, name) {
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
   await page.waitForTimeout(600);
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (name.startsWith("mobile")) {
+    const card = await page.evaluate(() => window.__nanoGPTCard || null);
+    if (card?.truncated) {
+      const shown = card.shown || "";
+      if (!shown.includes("点整页") && !shown.includes("ページで全部")) {
+        throw new Error(`card truncated without ellipsis ${name}`);
+      }
+    }
+  }
   if (SNAP.test(name) || result.overlaps?.length || result.overflows?.length || !result.ok) {
     await page.screenshot({ path: `${OUT}/${name}.png` });
   }
@@ -272,6 +281,25 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.evaluate(() => window.__nanoGPTJump("Level5", 7, 2));
   await page.waitForTimeout(350);
   await page.screenshot({ path: `${OUT}/${label}-zh-c5-sign.png` });
+  if (label === "mobile") {
+    const shots = [
+      ["Level1", 5, 1, "zh-c1-p5"],
+      ["Level2", 5, 1, "zh-c2-p5"],
+      ["Level3", 3, 1, "zh-c3-p3"],
+      ["Level4", 3, 1, "zh-c4-p3"],
+      ["Level5", 0, 0, "zh-c5-intro"],
+    ];
+    for (const [key, beat, phase, file] of shots) {
+      await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
+      await page.waitForTimeout(350);
+      await page.screenshot({ path: `${OUT}/${label}-${file}.png` });
+    }
+  }
+  if (label === "pc") {
+    await page.evaluate(() => window.__nanoGPTJump("Level3", 3, 1));
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: `${OUT}/${label}-zh-c3-p3.png` });
+  }
 
   const pseudoEncode = await openPseudoShot(page, "Level1", 7, 0, `${OUT}/${label}-pseudo-encode.png`);
   const pseudoShift = await openPseudoShot(page, "Level2", 2, 2, null);
@@ -631,8 +659,8 @@ const spineOk =
   pc.spine.l5 === 9;
 const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49;
 const pseudoOk =
-  tipOk(mobile.pseudoEncode, "数字") &&
-  tipOk(pc.pseudoEncode, "数字") &&
+  tipOk(mobile.pseudoEncode, "号码") &&
+  tipOk(pc.pseudoEncode, "号码") &&
   tipOk(mobile.pseudoShift, "右") &&
   tipOk(pc.pseudoShift, "右") &&
   tipOk(mobile.pseudoLoss, "扣分") &&

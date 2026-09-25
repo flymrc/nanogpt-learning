@@ -84,6 +84,25 @@ for (const token of ["65", "256", "384", "5000", "0.8"]) {
 if (!ZH["c5-sign"].includes("不放") || !JA["c5-sign"].includes("のせません")) {
   fail("chapter 5 must say fake text is not shown");
 }
+if (!ZH["c5-intro.aim"].includes("一个接一个，接得越来越长")) fail("c5 intro aim still has a script marker");
+if (!JA["c5-intro.aim"].includes("一つずつ")) fail("ja c5 intro aim still has a script marker");
+if (!ZH["c3-sum.summary"].includes("像不像") || !ZH["c3-sum.summary"].includes("块")) {
+  fail("chapter 3 summary must say how looking back works");
+}
+if (ZH["c1-p4.checkQ"].includes("假名")) fail("zh c1-p4 must not say 假名");
+for (const [key, value] of Object.entries(ZH)) {
+  if (value.includes("`") || value.includes("【") || value.includes("】")) fail(`zh marker ${key}`);
+  if (value.includes("\n\n---") || value.includes("。。")) fail(`zh voice junk ${key}`);
+  if (key.endsWith(".myth") && /^答案[:：]/.test(value)) fail(`zh myth spoils ${key}`);
+}
+for (const [key, value] of Object.entries(JA)) {
+  if (value.includes("`") || value.includes("【") || value.includes("】")) fail(`ja marker ${key}`);
+  if (value.includes("\n\n---")) fail(`ja voice junk ${key}`);
+  if (key.endsWith(".myth") && /^こたえ[:：]/.test(value)) fail(`ja myth spoils ${key}`);
+}
+for (const word of ["分数", "份数", "九成", "平均", "拖动", "按住", "运行", "ckpt", "旋钮", "信心", "墙上"]) {
+  if (Object.values(ZH).some((value) => value.includes(word))) fail(`zh still says ${word}`);
+}
 
 if (errors.length) {
   console.error("I18N_FAIL");

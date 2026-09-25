@@ -37,17 +37,33 @@ export function writeSeenGuide() {
   }
 }
 
+/** Drop parser junk and backticks so they never reach the screen or the voice. */
+export function present(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/`/g, "")
+    .replace(/\s*\n+---\s*$/g, "")
+    .replace(/。。+/g, "。")
+    .trim();
+}
+
 export function t(key) {
   if (!key) return "";
   const pack = PACKS[lang] || ZH;
   const value = pack[key];
-  if (typeof value === "string" && value.length) return value;
+  if (typeof value === "string" && value.length) return present(value);
   const fallback = ZH[key];
-  return typeof fallback === "string" ? fallback : key;
+  return typeof fallback === "string" ? present(fallback) : key;
 }
 
 export function L(zh, ja) {
   return lang === "ja" ? ja : zh;
+}
+
+function ownedLine(id, suffix) {
+  const key = `${id}.${suffix}`;
+  const value = t(key);
+  return value && value !== key ? value : "";
 }
 
 export function resolveBeat(page) {
@@ -59,7 +75,15 @@ export function resolveBeat(page) {
   const look = [t(keys.look), local].filter(Boolean).join("\n");
   const summary = t(keys.summary);
   const aside = keys.aside ? t(keys.aside) : "";
-  const check = [t(keys.checkQ), t(keys.checkA)].filter(Boolean).join("\n");
+  const checkQ = t(keys.checkQ);
+  const checkA = t(keys.checkA);
+  const stars = [1, 2, 3].map((n) => ownedLine(page.id, `star${n}`)).filter(Boolean);
+  const detail = ownedLine(page.id, "detail");
+  const isSum = String(page.id || "").endsWith("-sum");
+  const remember =
+    isSum && stars.length
+      ? stars.map((line) => `⭐ ${line}`).join("\n")
+      : [checkQ, checkA].filter(Boolean).join("\n");
   return {
     ...page,
     purpose: aim,
@@ -68,8 +92,12 @@ export function resolveBeat(page) {
     why: look,
     example: t(keys.action),
     myths: [summary],
-    remember: check,
+    remember,
     footnote: aside,
+    checkQ,
+    checkA,
+    stars,
+    detail,
   };
 }
 

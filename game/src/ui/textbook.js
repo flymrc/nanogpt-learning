@@ -101,6 +101,17 @@ export function renderTutorBook(beat) {
     }
     root.appendChild(sec);
   });
+  if (beat.detail) {
+    const sec = document.createElement("section");
+    sec.className = "tutor-block";
+    sec.dataset.phase = "detail";
+    const h = document.createElement("h3");
+    h.textContent = t("adultHeading");
+    const p = document.createElement("p");
+    p.textContent = beat.detail;
+    sec.append(h, p);
+    root.appendChild(sec);
+  }
 }
 
 export function teachLesson(scene, frame, beat, { index, total, phase = 0, instant = false }) {
@@ -157,6 +168,83 @@ export function drawPhaseTabs(scene, stage, phase, onPick) {
   return { bottom: stage.top + h, height: h };
 }
 
+const BOOK_RE = /[A-Za-z][A-Za-z0-9_]*(?:[ :][A-Za-z0-9_][A-Za-z0-9_]*)*:?/g;
+
+function cardStyle(size, extra = {}) {
+  return uiText(size, {
+    align: "left",
+    lineSpacing: 4,
+    fontFamily: '"Fredoka", "Noto Sans SC", "Noto Sans JP", "PingFang SC", sans-serif',
+    ...extra,
+  });
+}
+
+function cardCopy(beat, phase) {
+  const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
+  const sum = String(beat?.id || "").endsWith("-sum");
+  if (meta.id === "check" && sum && beat.stars?.length) {
+    return { shown: beat.stars.map((line) => `⭐ ${line}`).join("\n"), reveal: null };
+  }
+  if (meta.id === "check" && beat.checkQ) {
+    const hidden = `${beat.checkQ}\n${t("tapAnswer")}`;
+    const open = [beat.checkQ, beat.checkA].filter(Boolean).join("\n");
+    return { shown: hidden, reveal: open };
+  }
+  let body = phaseText(beat, phase);
+  if (meta.id === "box" && beat.footnote) body = `${body}\n${t("asideLabel")}${beat.footnote}`;
+  return { shown: body, reveal: null };
+}
+
+function fitPlain(scene, body, size, minSize, wrap, maxTextH) {
+  let font = size;
+  let wrapped = wrapToWidth(scene, body, font, wrap, cardStyle);
+  const probe = scene.add.text(0, 0, wrapped, cardStyle(font)).setVisible(false);
+  while (probe.height > maxTextH && font > minSize) {
+    font -= 1;
+    wrapped = wrapToWidth(scene, body, font, wrap, cardStyle);
+    probe.setFontSize(font);
+    probe.setText(wrapped);
+  }
+  let truncated = false;
+  while (probe.height > maxTextH && wrapped.includes("\n")) {
+    truncated = true;
+    wrapped = wrapped.split("\n").slice(0, -1).join("\n");
+    probe.setText(wrapped);
+  }
+  if (truncated) {
+    const more = t("cardMore");
+    let withMore = wrapped ? `${wrapped}\n${more}` : more;
+    probe.setText(withMore);
+    while (probe.height > maxTextH && wrapped.includes("\n")) {
+      wrapped = wrapped.split("\n").slice(0, -1).join("\n");
+      withMore = wrapped ? `${wrapped}\n${more}` : more;
+      probe.setText(withMore);
+    }
+    wrapped = probe.text;
+  }
+  const height = probe.height;
+  probe.destroy();
+  return { wrapped, font, height, truncated };
+}
+
+function paintBookMarks(scene, parent, source, size, originX, originY, lineH) {
+  const probe = scene.add.text(0, 0, "", cardStyle(size)).setVisible(false);
+  source.split("\n").forEach((row, index) => {
+    for (const match of row.matchAll(BOOK_RE)) {
+      if (!match[0]) continue;
+      probe.setText(row.slice(0, match.index));
+      const x = probe.width;
+      probe.setText(match[0]);
+      const w = Math.max(8, probe.width);
+      const g = scene.add.graphics();
+      g.fillStyle(C.surface2, 1);
+      g.fillRoundedRect(originX + x - 2, originY + index * lineH, w + 4, Math.max(size + 2, lineH - 2), 4);
+      parent.add(g);
+    }
+  });
+  probe.destroy();
+}
+
 export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
@@ -164,46 +252,56 @@ export function drawPhaseCard(scene, stage, beat, phase, { top } = {}) {
   const cardTop = (top ?? stage.top) + rhythm;
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
-  const body = phaseText(beat, phase);
-  const maxH = phone ? Math.min(stage.h * 0.34, 156) : stage.h * 0.36;
-  let size = phone ? 14 : 15;
-  let wrapped = wrapToWidth(scene, body, size, wrap, uiText);
-  const title = scene.add.text(0, 0, meta.kicker, uiText(phone ? 12 : 13, { color: C.goldCss })).setOrigin(0, 0);
-  const text = scene.add.text(0, 0, wrapped, uiText(size, { align: "left", lineSpacing: 4 })).setOrigin(0, 0);
-  while (text.height > maxH - 48 && size > 12) {
-    size -= 1;
-    wrapped = wrapToWidth(scene, body, size, wrap, uiText);
-    text.setFontSize(size);
-    text.setText(wrapped);
-  }
-  while (text.height > maxH - 40 && wrapped.includes("\n")) {
-    wrapped = wrapped.split("\n").slice(0, -1).join("\n");
-    text.setText(wrapped);
-  }
-  let extraH = 0;
-  let footnote = null;
-  if (meta.id === "box" && beat.footnote) {
-    const foot = wrapToWidth(scene, beat.footnote, 12, wrap, uiText);
-    footnote = scene.add.text(0, 0, foot, uiText(12, { color: C.muted })).setOrigin(0, 0);
-    extraH = footnote.height + 8;
-  }
-  const height = Math.min(maxH, Math.max(phone ? 78 : 86, 36 + text.height + extraH + 16));
+  const copy = cardCopy(beat, phase);
+  const maxH = phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
+  const maxTextH = maxH - 46;
+  const startSize = phone ? 15 : 16;
+  const shownFit = fitPlain(scene, copy.shown, startSize, 13, wrap, maxTextH);
+  const revealFit = copy.reveal ? fitPlain(scene, copy.reveal, startSize, 13, wrap, maxTextH) : null;
+  const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);
+  const textH = Math.max(shownFit.height, revealFit?.height || 0);
+  const height = Math.min(maxH, Math.max(phone ? 78 : 86, 36 + textH + 12));
   const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
   drawSticker(g, -width / 2, -height / 2, width, height, phone ? 14 : 18, C.surface);
   const stripe = scene.add.graphics();
   stripe.fillStyle(phaseAccent(meta.id), 1);
   stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 8, height - 16, 5);
+  const title = scene.add.text(-width / 2 + 22, -height / 2 + 8, meta.kicker, uiText(phone ? 13 : 14, { color: C.goldCss })).setOrigin(0, 0);
   const textX = -width / 2 + 22;
-  title.setPosition(textX, -height / 2 + 10);
-  text.setPosition(textX, -height / 2 + 28);
-  box.add([g, stripe, title, text]);
-  if (footnote) {
-    footnote.setPosition(textX, -height / 2 + 28 + text.height + 8);
-    box.add(footnote);
+  const textY = -height / 2 + 28;
+  const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
+  box.add([g, stripe, title]);
+  const lineCount = Math.max(1, shownFit.wrapped.split("\n").length);
+  paintBookMarks(scene, box, shownFit.wrapped, font, textX, textY, text.height / lineCount);
+  box.add(text);
+  const paint = (source) => {
+    text.setText(source);
+  };
+  paint(shownFit.wrapped);
+  if (copy.reveal) {
+    box.setSize(width, height);
+    box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+    box.on("pointerdown", (pointer, _x, _y, event) => {
+      event?.stopPropagation?.();
+      paint(revealFit.wrapped);
+      window.__nanoGPTCard = {
+        ...(window.__nanoGPTCard || {}),
+        shown: revealFit.wrapped,
+        revealed: true,
+      };
+    });
   }
   box.setSize(width, height);
   scene.frame.stage.add(box);
+  window.__nanoGPTCard = {
+    id: beat?.id || "",
+    phase,
+    full: copy.shown,
+    shown: shownFit.wrapped,
+    truncated: shownFit.truncated || Boolean(revealFit?.truncated),
+    revealed: false,
+  };
   return { bottom: cardTop + height, height };
 }
 
