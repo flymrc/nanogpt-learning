@@ -9,6 +9,7 @@
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
 import { ZH } from "../src/i18n/zh.js";
@@ -807,12 +808,47 @@ async function assertLive2dPanel(browser) {
       if (concealed) {
         const dockHidden = Boolean(dock?.hidden);
         const reserveClear = reserve != null && reserve <= 0.5;
+        const lessonRect = shell;
+        const leftGap = lessonRect ? lessonRect.left : 0;
+        const rightGap = lessonRect ? window.innerWidth - lessonRect.right : 0;
+        const gapDelta = Math.abs(leftGap - rightGap);
+        const centeredLesson = gapDelta <= 2;
+        const dockStyle = dock ? getComputedStyle(dock) : null;
+        const dockRect = dock?.getBoundingClientRect();
+        const panelVisible = Boolean(
+          dock && !dock.hidden && dockStyle?.display !== "none" && dockRect && dockRect.width > 1 && dockRect.height > 1,
+        );
+        const layoutBg = getComputedStyle(document.getElementById("app-layout")).backgroundImage || "";
+        const skyBackdrop =
+          /linear-gradient/i.test(layoutBg) && /246,\s*239,\s*228/.test(layoutBg) && /234,\s*214,\s*196/.test(layoutBg);
+        const gapClear = (() => {
+          const ys = [0.22, 0.5, 0.78].map((t) => Math.round(window.innerHeight * t));
+          const xs = [];
+          if (leftGap > 6) xs.push(leftGap / 2);
+          if (rightGap > 6) xs.push(window.innerWidth - rightGap / 2);
+          for (const x of xs) {
+            for (const y of ys) {
+              const el = document.elementFromPoint(Math.round(x), y);
+              if (!el || el.closest("#tutor-dock, #tutor-stage, #tutor-canvas, #pc-stage, #game-shell")) return false;
+            }
+          }
+          return true;
+        })();
+        const uniform = !panelVisible && skyBackdrop && gapClear;
         return {
           ready: dockHidden && reserveClear,
           hidden: true,
-          ok: dockHidden && reserveClear && fullWidth && lessonOk,
+          ok: dockHidden && reserveClear && fullWidth && lessonOk && centeredLesson && uniform,
           fullWidth,
           lessonOk,
+          centeredLesson,
+          uniform,
+          panelVisible,
+          skyBackdrop,
+          gapClear,
+          leftGap,
+          rightGap,
+          gapDelta,
           lessonWidth,
           lessonFloor,
           lessonFull,
@@ -927,6 +963,14 @@ async function assertLive2dPanel(browser) {
               heightOk: fit.heightOk,
               lessonOk: fit.lessonOk,
               lessonFull: fit.lessonFull,
+              centeredLesson: fit.centeredLesson,
+              gapDelta: fit.gapDelta,
+              leftGap: fit.leftGap,
+              rightGap: fit.rightGap,
+              uniform: fit.uniform,
+              panelVisible: fit.panelVisible,
+              skyBackdrop: fit.skyBackdrop,
+              gapClear: fit.gapClear,
               reserve: fit.reserve,
               meshAspect: fit.meshAspect,
               purposeAlpha: fit.purposeAlpha,
@@ -955,8 +999,9 @@ async function assertLive2dPanel(browser) {
       const sample = await page.evaluate(() => window.__nanoGPTReadLive2dFit());
       results.push({ name, lang, sample });
       if (sample.hidden) {
+        if (lang === "ja") await assertHiddenBackdrop(page);
         console.log(
-          `ok live2d ${lang} ${name} hidden lesson=${Math.round(sample.lessonWidth)} full=${Math.round(sample.lessonFull)} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
+          `ok live2d ${lang} ${name} hidden lesson=${Math.round(sample.lessonWidth)} full=${Math.round(sample.lessonFull)} gap=${Number(sample.gapDelta).toFixed(2)} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
         );
       } else {
         console.log(
@@ -988,6 +1033,8 @@ async function waitTutorState(page, expect) {
         if (Boolean(fit.hidden) !== Boolean(expect.hidden)) return false;
         if (!expect.hidden && !(fit.ratio >= 0.88 && fit.ratio <= 0.92)) return false;
         if (expect.hidden && !fit.fullWidth) return false;
+        if (expect.hidden && !(Math.abs((fit.leftGap ?? 0) - (fit.rightGap ?? 0)) <= 2)) return false;
+        if (expect.hidden && fit.uniform !== true) return false;
         return true;
       },
       expect,
@@ -1066,10 +1113,12 @@ async function assertTutorThreshold(page, shotDir) {
 
   await page.setViewportSize({ width: plan.below, height: 1080 });
   await waitTutorState(page, { width: plan.below, height: 1080, hidden: true });
+  await assertHiddenBackdrop(page);
   await page.screenshot({ path: `${shotDir}/threshold-below-${plan.below}x1080.png` });
 
   await page.setViewportSize({ width: plan.mid, height: 1080 });
   await waitTutorState(page, { width: plan.mid, height: 1080, hidden: true });
+  await assertHiddenBackdrop(page);
 
   await page.setViewportSize({ width: plan.reshow, height: 1080 });
   await waitTutorState(page, { width: plan.reshow, height: 1080, hidden: false });
@@ -1079,8 +1128,168 @@ async function assertTutorThreshold(page, shotDir) {
 
   await page.setViewportSize({ width: plan.below, height: 1080 });
   await waitTutorState(page, { width: plan.below, height: 1080, hidden: true });
+  await assertHiddenBackdrop(page);
 
   return plan;
+}
+
+function decodePng(buffer) {
+  const buf = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer);
+  if (buf.length < 8 || buf.readUInt32BE(0) !== 0x89504e47) throw new Error("not a png");
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlace = 0;
+  const idat = [];
+  while (offset + 8 <= buf.length) {
+    const length = buf.readUInt32BE(offset);
+    const type = buf.toString("ascii", offset + 4, offset + 8);
+    const data = buf.subarray(offset + 8, offset + 8 + length);
+    offset += 12 + length;
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      bitDepth = data[8];
+      colorType = data[9];
+      interlace = data[12];
+    } else if (type === "IDAT") {
+      idat.push(data);
+    } else if (type === "IEND") {
+      break;
+    }
+  }
+  if (bitDepth !== 8 || interlace !== 0 || (colorType !== 2 && colorType !== 6)) {
+    throw new Error(`unsupported png depth=${bitDepth} color=${colorType} interlace=${interlace}`);
+  }
+  const channels = colorType === 6 ? 4 : 3;
+  const stride = width * channels;
+  const raw = inflateSync(Buffer.concat(idat));
+  const out = Buffer.alloc(width * height * 4);
+  let src = 0;
+  const prior = Buffer.alloc(stride);
+  const scan = Buffer.alloc(stride);
+  const paeth = (a, b, c) => {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    if (pa <= pb && pa <= pc) return a;
+    if (pb <= pc) return b;
+    return c;
+  };
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[src];
+    src += 1;
+    for (let i = 0; i < stride; i += 1) {
+      const x = raw[src + i];
+      const left = i >= channels ? scan[i - channels] : 0;
+      const up = prior[i];
+      const ul = i >= channels ? prior[i - channels] : 0;
+      let value = x;
+      if (filter === 1) value = (x + left) & 255;
+      else if (filter === 2) value = (x + up) & 255;
+      else if (filter === 3) value = (x + Math.floor((left + up) / 2)) & 255;
+      else if (filter === 4) value = (x + paeth(left, up, ul)) & 255;
+      else if (filter !== 0) throw new Error(`bad png filter ${filter}`);
+      scan[i] = value;
+    }
+    src += stride;
+    for (let x = 0; x < width; x += 1) {
+      const s = x * channels;
+      const d = (y * width + x) * 4;
+      out[d] = scan[s];
+      out[d + 1] = scan[s + 1];
+      out[d + 2] = scan[s + 2];
+      out[d + 3] = channels === 4 ? scan[s + 3] : 255;
+    }
+    scan.copy(prior);
+  }
+  return { width, height, data: out };
+}
+
+function skyAt(y, height) {
+  const t = height <= 1 ? 0 : y / (height - 1);
+  return [
+    Math.round(0xf6 + (0xea - 0xf6) * t),
+    Math.round(0xef + (0xd6 - 0xef) * t),
+    Math.round(0xe4 + (0xc4 - 0xe4) * t),
+  ];
+}
+
+function maxChannelDelta(a, b) {
+  return Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2]));
+}
+
+function readPx(img, x, y) {
+  const cx = Math.max(0, Math.min(img.width - 1, Math.round(x)));
+  const cy = Math.max(0, Math.min(img.height - 1, Math.round(y)));
+  const i = (cy * img.width + cx) * 4;
+  return [img.data[i], img.data[i + 1], img.data[i + 2]];
+}
+
+/** Hidden tutor: equal side gaps, no dock, and the gaps match the lesson sky. */
+async function assertHiddenBackdrop(page) {
+  const frame = await page.evaluate(() => {
+    const shell = document.getElementById("game-shell")?.getBoundingClientRect();
+    const dock = document.getElementById("tutor-dock");
+    const style = dock ? getComputedStyle(dock) : null;
+    const rect = dock?.getBoundingClientRect();
+    const bg = getComputedStyle(document.getElementById("app-layout")).backgroundImage || "";
+    return {
+      left: shell?.left ?? 0,
+      right: shell?.right ?? 0,
+      vw: window.innerWidth,
+      vh: window.innerHeight,
+      dockHidden: Boolean(dock?.hidden),
+      dockDisplay: style?.display || "",
+      dockW: rect?.width ?? 0,
+      bg,
+    };
+  });
+  const leftGap = frame.left;
+  const rightGap = frame.vw - frame.right;
+  const gapDelta = Math.abs(leftGap - rightGap);
+  if (gapDelta > 2) throw new Error(`lesson not centered left=${leftGap.toFixed(2)} right=${rightGap.toFixed(2)}`);
+  if (!frame.dockHidden || frame.dockDisplay !== "none" || frame.dockW > 1) {
+    throw new Error(`leftover panel ${JSON.stringify(frame)}`);
+  }
+  if (!/linear-gradient/i.test(frame.bg) || !/246,\s*239,\s*228/.test(frame.bg) || !/234,\s*214,\s*196/.test(frame.bg)) {
+    throw new Error(`backdrop strip ${frame.bg}`);
+  }
+  const png = decodePng(await page.screenshot({ scale: "css" }));
+  if (Math.abs(png.width - frame.vw) > 2 || Math.abs(png.height - frame.vh) > 2) {
+    throw new Error(`screenshot scale ${png.width}x${png.height} vs ${frame.vw}x${frame.vh}`);
+  }
+  const ys = [12, Math.round(frame.vh * 0.42), Math.round(frame.vh * 0.72), frame.vh - 20];
+  let lessonMatches = 0;
+  for (const y of ys) {
+    const expect = skyAt(y, frame.vh);
+    const gapX = leftGap > 10 ? leftGap / 2 : frame.left + 8;
+    const gap = readPx(png, gapX, y);
+    if (leftGap > 10) {
+      const right = readPx(png, frame.vw - rightGap / 2, y);
+      if (maxChannelDelta(gap, right) > 2) {
+        throw new Error(`gap tint y=${y} left=${gap.join(",")} right=${right.join(",")}`);
+      }
+      if (maxChannelDelta(gap, expect) > 8) {
+        throw new Error(`gap not sky y=${y} px=${gap.join(",")} expect=${expect.join(",")}`);
+      }
+    }
+    const x0 = Math.round(frame.left + 4);
+    const x1 = Math.round(Math.min(frame.right - 4, frame.left + 56));
+    for (let x = x0; x <= x1; x += 4) {
+      const px = readPx(png, x, y);
+      if (maxChannelDelta(px, gap) <= 12 && maxChannelDelta(px, expect) <= 12) {
+        lessonMatches += 1;
+        break;
+      }
+    }
+  }
+  if (lessonMatches < 2) {
+    throw new Error(`lesson backdrop does not match the side gaps matches=${lessonMatches}/${ys.length}`);
+  }
 }
 
 const mobile = await runViewport(

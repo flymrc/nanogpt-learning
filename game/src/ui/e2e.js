@@ -179,6 +179,27 @@ function assertLessonLayout(scene) {
   const reserveRaw = getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve").trim();
   const reserve = reserveRaw ? Number.parseFloat(reserveRaw) : null;
   const lessonFullOk = Math.abs(lessonWidth - lessonFull) <= 4 && (reserve == null || reserve <= 0.5);
+  const leftGap = shellRect ? shellRect.left : 0;
+  const rightGap = shellRect ? window.innerWidth - shellRect.right : 0;
+  const lessonCentered = Math.abs(leftGap - rightGap) <= 2;
+  const layoutBg = getComputedStyle(document.getElementById("app-layout") || document.body).backgroundImage || "";
+  const skyBackdrop = /linear-gradient/i.test(layoutBg) && /246,\s*239,\s*228/.test(layoutBg) && /234,\s*214,\s*196/.test(layoutBg);
+  const dockBox = dockRect && dockRect.width > 1 && dockRect.height > 1 && dockStyle?.display !== "none";
+  const panelGone = !live2dOn && !dockBox;
+  const gapClear = (() => {
+    if (!shellRect) return false;
+    const ys = [0.22, 0.5, 0.78].map((t) => Math.round(window.innerHeight * t));
+    const xs = [];
+    if (leftGap > 6) xs.push(leftGap / 2);
+    if (rightGap > 6) xs.push(window.innerWidth - rightGap / 2);
+    for (const x of xs) {
+      for (const y of ys) {
+        const el = document.elementFromPoint(Math.round(x), y);
+        if (!el || el.closest("#tutor-dock, #tutor-stage, #tutor-canvas, #pc-stage, #game-shell")) return false;
+      }
+    }
+    return true;
+  })();
   const shownOverlayOk =
     live2dOn &&
     dockTransparent &&
@@ -191,7 +212,15 @@ function assertLessonLayout(scene) {
     Math.abs(dockRect.right - window.innerWidth) < 3 &&
     lessonFillsStage &&
     !stage?.contains(dock);
-  const hiddenOverlayOk = tutorConcealed && !live2dOn && lessonFullOk && lessonFillsStage && !stage?.contains(dock);
+  const hiddenOverlayOk =
+    tutorConcealed &&
+    panelGone &&
+    lessonFullOk &&
+    lessonCentered &&
+    skyBackdrop &&
+    gapClear &&
+    lessonFillsStage &&
+    !stage?.contains(dock);
   const overlayOk = phone || (tutorConcealed ? hiddenOverlayOk : shownOverlayOk);
   const orphans = collectOrphanOverlays(scene);
   const hudParent = document.getElementById("mute-toggle")?.parentElement?.id || null;
@@ -222,6 +251,11 @@ function assertLessonLayout(scene) {
     lessonWidthOk,
     lessonFullOk,
     tutorConcealed,
+    leftGap,
+    rightGap,
+    lessonCentered,
+    skyBackdrop,
+    gapClear,
   };
 }
 

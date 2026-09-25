@@ -53,13 +53,32 @@ html.is-pc #app-layout.is-wide #pc-stage {
   flex-direction: column;
   align-items: stretch;
   /* Reserve stays on the stage, not as flex space taken by the dock.
-     Concealing the tutor sets --tutor-reserve to 0 so the lesson
-     uses the full min(1160px, 100%). */
+     While the tutor is visible, the right margin is that reserve so the
+     lesson sits just left of the girl. */
   width: min(1160px, calc(100% - var(--tutor-reserve, 320px)));
   max-width: 1160px;
   height: 100%;
   margin-left: auto;
   margin-right: var(--tutor-reserve, 320px);
+}
+
+/* Hidden tutor: reserve is 0, but margin-right: 0 would pin the column
+   to the right and leave a flat strip on the left. Center it, and paint
+   the same sky the lesson canvas uses (theme.js C.skyTop → C.skyBot) so
+   the side gaps are not a leftover panel. */
+html.is-pc[data-tutor="hidden"],
+html.is-pc[data-tutor="hidden"] body,
+html.is-pc[data-tutor="hidden"] #app-layout {
+  background: linear-gradient(180deg, #f6efe4 0%, #ead6c4 100%);
+}
+
+html.is-pc[data-tutor="hidden"] #app-layout.is-wide #pc-stage {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+html.is-pc[data-tutor="hidden"] #game-shell {
+  background: transparent;
 }
 
 #game-shell {
