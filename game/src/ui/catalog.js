@@ -129,6 +129,7 @@ export function mountCatalog() {
       scene: scene?.sys?.settings?.key || null,
       beat: Number.isFinite(scene?.beat) ? scene.beat : null,
       phase: Number.isFinite(scene?.phase) ? scene.phase : null,
+      pageId: scene?.pageId || null,
       lang: document.documentElement.lang,
     };
   };

@@ -1,4 +1,4 @@
-import { narrateLine } from "../audio/narrate.js";
+import { narrateBeat, narrateLine } from "../audio/narrate.js";
 import { unlockAudio } from "../audio/sound.js";
 import { pseudoFor } from "../data/pseudo.js";
 import { t } from "../i18n/locale.js";
@@ -70,6 +70,8 @@ export function closePseudo() {
   if (!overlay) return;
   overlay.hidden = true;
   btn?.setAttribute("aria-expanded", "false");
+  const scene = window.__nanoGPTGame?.scene?.getScenes?.(true)?.[0];
+  if (scene?.pageId) narrateBeat(scene, { id: scene.pageId });
 }
 
 function renderPseudo(beat) {

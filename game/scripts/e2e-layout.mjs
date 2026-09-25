@@ -9,6 +9,28 @@
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { present } from "../src/i18n/locale.js";
+import { JA } from "../src/i18n/ja.js";
+import { ZH } from "../src/i18n/zh.js";
+import { pagesFor } from "../src/i18n/skeleton.js";
+
+const LEVEL_PAGES = {
+  Level1: pagesFor(1),
+  Level2: pagesFor(2),
+  Level3: pagesFor(3),
+  Level4: pagesFor(4),
+  Level5: pagesFor(5),
+};
+
+function expectedVo(lang, key, beat) {
+  const pack = lang === "ja" ? JA : ZH;
+  const id = key === "Title" ? "title" : LEVEL_PAGES[key][beat].id;
+  return {
+    id,
+    prefix: pack.voiceBeat,
+    text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
+  };
+}
 
 async function loadChromium() {
   try {
@@ -40,10 +62,48 @@ async function ready(page) {
   await page.waitForTimeout(600);
 }
 
+async function assertVo(page, key, beat) {
+  const lang = await page.evaluate(() => (document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh");
+  const want = expectedVo(lang, key, beat);
+  try {
+    await page.waitForFunction((expected) => {
+      const line = String(document.getElementById("voice-line")?.textContent || "").replace(/\s+/g, " ").trim();
+      const utter = String(window.__nanoGPTUtterance?.text || "").replace(/\s+/g, " ").trim();
+      const narr = window.__nanoGPTNarration?.() || {};
+      const narrText = String(narr.text || "").replace(/\s+/g, " ").trim();
+      const pageId = window.__nanoGPTState?.().pageId || "";
+      const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
+      return pageId === expected.id
+        && narr.id === expected.id
+        && body === expected.text
+        && utter === expected.text
+        && narrText === expected.text;
+    }, want, { timeout: 4000 });
+  } catch {
+    const got = await page.evaluate(() => ({
+      line: document.getElementById("voice-line")?.textContent || "",
+      utter: window.__nanoGPTUtterance?.text || "",
+      narr: window.__nanoGPTNarration?.() || {},
+      pageId: window.__nanoGPTState?.().pageId || "",
+      expected: window.__nanoGPTExpectedVo?.() || null,
+    }));
+    throw new Error(`vo mismatch ${key} b${beat} want=${JSON.stringify(want)} got=${JSON.stringify(got)}`);
+  }
+}
+
+async function waitTutor(page) {
+  const wide = await page.evaluate(() => window.innerWidth >= 1024 && window.innerWidth > window.innerHeight);
+  if (!wide) return;
+  await page.waitForFunction(() => document.getElementById("tutor-canvas")?.dataset.fitted === "1", { timeout: 30000 });
+  await page.waitForTimeout(900);
+  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+}
+
 async function jumpAndAssert(page, key, beat, phase, name) {
   await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(450);
+  await assertVo(page, key, beat);
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (name.startsWith("mobile")) {
     const card = await page.evaluate(() => window.__nanoGPTCard || null);
@@ -169,6 +229,7 @@ async function assertLang(page, label) {
   await page.evaluate(() => window.__nanoGPTHome());
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Title" && typeof window.__nanoGPTAssertLayout === "function");
   await page.waitForTimeout(500);
+  await assertVo(page, "Title", 0);
   const titleLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (!titleLayout?.ok) throw new Error(`ja title ${JSON.stringify(titleLayout?.overlaps || titleLayout)}`);
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
@@ -213,6 +274,7 @@ async function assertLang(page, label) {
         await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
         await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
         await page.waitForTimeout(350);
+        await assertVo(page, key, beat);
         const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
         if (!result?.ok) {
           throw new Error(
@@ -231,7 +293,18 @@ async function assertLang(page, label) {
 async function runViewport(label, pageOpts, { allPhases }) {
   const page = await browser.newPage(pageOpts);
   await ready(page);
+  await page.evaluate(() => {
+    localStorage.setItem("nanogpt-lang", "zh");
+    localStorage.setItem("nanogpt-game-muted", "0");
+    localStorage.removeItem("nanogpt-seen-guide");
+  });
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
+  await page.evaluate(() => document.fonts?.ready);
+  await page.waitForTimeout(300);
   const guideShown = await dismissGuide(page, label);
+  await waitTutor(page);
+  await assertVo(page, "Title", 0);
   const spine = await page.evaluate(() => window.__nanoGPTSpine);
   if (!spine?.l1 || !spine?.l2 || !spine?.l3 || !spine?.l4 || !spine?.l5 || !spine?.phases) {
     throw new Error("missing __nanoGPTSpine");
@@ -286,18 +359,22 @@ async function runViewport(label, pageOpts, { allPhases }) {
       ["Level1", 5, 1, "zh-c1-p5"],
       ["Level2", 5, 1, "zh-c2-p5"],
       ["Level3", 3, 1, "zh-c3-p3"],
+      ["Level3", 4, 1, "zh-c3-p4"],
+      ["Level3", 5, 1, "zh-c3-p5"],
       ["Level4", 3, 1, "zh-c4-p3"],
       ["Level5", 0, 0, "zh-c5-intro"],
     ];
     for (const [key, beat, phase, file] of shots) {
       await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
       await page.waitForTimeout(350);
+      await assertVo(page, key, beat);
       await page.screenshot({ path: `${OUT}/${label}-${file}.png` });
     }
   }
   if (label === "pc") {
     await page.evaluate(() => window.__nanoGPTJump("Level3", 3, 1));
     await page.waitForTimeout(350);
+    await assertVo(page, "Level3", 3);
     await page.screenshot({ path: `${OUT}/${label}-zh-c3-p3.png` });
   }
 
@@ -569,15 +646,17 @@ async function pageWithoutJaVoice(browser, label) {
   await page.waitForFunction(() => {
     const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak");
     const note = document.getElementById("voice-note");
-    const text = note?.textContent || "";
+    const tip = note?.getAttribute("aria-label") || note?.title || "";
+    const line = document.getElementById("voice-line")?.textContent || "";
     return Boolean(
       hit &&
         hit.lang === "ja-JP" &&
         !hit.voice &&
         note?.dataset.missing === "1" &&
-        text.includes("Chrome") &&
-        text.includes("日本語") &&
-        text.includes("安装"),
+        tip.includes("Chrome") &&
+        tip.includes("日本語") &&
+        tip.includes("安装") &&
+        line.includes("音声"),
     );
   });
   const row = await page.evaluate(() => window.__nanoGPTNarration?.() || {});
@@ -641,13 +720,22 @@ const pc = await runViewport(
   { allPhases: false },
 );
 
+const pc1024 = await runViewport(
+  "pc1024",
+  {
+    viewport: { width: 1024, height: 640 },
+    deviceScaleFactor: 2,
+  },
+  { allPhases: false },
+);
+
 await browser.close();
 
-const summary = { mobile, pc, speech };
+const summary = { mobile, pc, pc1024, speech };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
-const failed = [...mobile.reports, ...pc.reports].filter((r) => !r.ok);
-const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen;
+const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
+const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && pc1024.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen && pc1024.notesOpen;
 const spineOk =
   mobile.spine.l1 === 11 &&
   mobile.spine.l2 === 11 &&
@@ -657,7 +745,7 @@ const spineOk =
   mobile.spine.phases === 5 &&
   pc.spine.l1 === 11 &&
   pc.spine.l5 === 9;
-const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49;
+const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49 && pc1024.walked === 49;
 const pseudoOk =
   tipOk(mobile.pseudoEncode, "号码") &&
   tipOk(pc.pseudoEncode, "号码") &&
@@ -675,13 +763,14 @@ const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
 const trainOk = mobile.trainLayout?.ok && pc.trainLayout?.ok;
 const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
 const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
-const flowOk = mobile.guideShown && pc.guideShown;
+const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
 if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
     pcWalked: pc.walked,
+    pc1024Walked: pc1024.walked,
     overlays,
     spineOk,
     pseudoOk,
@@ -696,4 +785,4 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
   });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} jaSpeech=1`);
+console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} jaSpeech=1`);

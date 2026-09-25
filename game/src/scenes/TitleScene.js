@@ -69,6 +69,7 @@ export default class TitleScene extends Phaser.Scene {
     bindAdvance(this, () => this.advance());
 
     const titleBeat = localizeBeat(TITLE_BEAT);
+    this.pageId = TITLE_BEAT.id;
     narrateBeat(this, TITLE_BEAT);
     emitTutor(titleBeat);
     syncPseudo(titleBeat);

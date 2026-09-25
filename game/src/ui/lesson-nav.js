@@ -1,12 +1,17 @@
-import { narrateBeat } from "../audio/narrate.js";
+import { narrateBeat, publishExpectedVo } from "../audio/narrate.js";
 import { PHASE_COUNT } from "../data/beats.js";
 import { localizeBeat, t } from "../i18n/locale.js";
 
 export function presentBeat(scene, raw, { speak } = {}) {
   const beat = localizeBeat(raw);
+  scene.pageId = raw.id;
   const force = Boolean(scene.registry.get("forceSpeak"));
   if (force) scene.registry.set("forceSpeak", false);
-  if (force || (scene.phase === 0 && speak !== false)) narrateBeat(scene, raw);
+  const pageChanged = (scene.registry.get("spokenBeatId") || "") !== raw.id;
+  // Same-page tab taps pass speak:false and keep the current line.
+  // A jump onto any phase (including phase 2) speaks that page's .vo.
+  if (speak === false && !pageChanged && !force) publishExpectedVo(raw.id);
+  else narrateBeat(scene, raw);
   return beat;
 }
 

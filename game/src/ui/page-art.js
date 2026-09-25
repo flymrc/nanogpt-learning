@@ -159,19 +159,44 @@ function drawScheme(scene, stage, top, caption, paint) {
   return { bottom: capY + 18, card, width, height, layout };
 }
 
-function paintBars(g, width, height, { highlight = -1, short = false, count = 8, labelRoom = false } = {}) {
+function paintBars(g, width, height, { highlight = -1, short = false, count = 8, labelRoom = false, zeroFrom = count } = {}) {
   const gap = 6;
-  const barW = Math.min(22, (width - 40 - gap * (count - 1)) / count);
+  const barW = count === 1
+    ? Math.min(84, width - 48)
+    : Math.min(28, (width - 36 - gap * Math.max(0, count - 1)) / count);
+  const total = count * barW + Math.max(0, count - 1) * gap;
+  const x0 = -total / 2;
   const base = height / 2 - (labelRoom ? 22 : 16);
   const tall = labelRoom ? height - 48 : height - 36;
   for (let index = 0; index < count; index += 1) {
-    const h = short && index === highlight ? tall * 0.28 : tall * (0.35 + ((index * 37) % 50) / 100);
-    const x = -width / 2 + 20 + index * (barW + gap);
-    const color = index === highlight ? C.coral : C.teal;
-    g.fillStyle(color, index === highlight ? 1 : 0.85);
+    const zero = index >= zeroFrom;
+    const h = zero ? 6 : short && index === highlight ? tall * 0.28 : tall * (0.35 + ((index * 37) % 50) / 100);
+    const x = x0 + index * (barW + gap);
+    const color = zero ? 0xc4b8ae : index === highlight ? C.coral : C.teal;
+    g.fillStyle(color, zero ? 0.55 : index === highlight ? 1 : 0.85);
     g.fillRoundedRect(x, base - h, barW, h, 4);
   }
-  return { barW, gap, base, count };
+  return { barW, gap, base, count, x0 };
+}
+
+function labelBars(scene, drawn, labels, { highlight = -1, zeroFrom = labels.length } = {}) {
+  if (!drawn?.card || !drawn.layout || !labels?.length) return;
+  const { barW, gap, base, x0 } = drawn.layout;
+  labels.forEach((label, index) => {
+    const zero = index >= zeroFrom;
+    const x = x0 + index * (barW + gap) + barW / 2;
+    const text = scene.add.text(x, base + 2, zero ? "0" : label, uiText(12, {
+      color: zero ? C.muted : index === highlight ? C.coralCss : C.text,
+    })).setOrigin(0.5, 0);
+    drawn.card.add(text);
+  });
+}
+
+function focusIndex(shared) {
+  if (Number.isFinite(shared?.focus)) return shared.focus;
+  const glyphs = shared?.glyphs || [];
+  const at = glyphs.indexOf(String(shared?.focus ?? ""));
+  return at >= 0 ? at : 0;
 }
 
 function paintWheel(g, width, height, grown = false) {
@@ -286,8 +311,16 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     return;
   }
 
-  if (visual === "cells" || visual === "spaces" || visual === "clip" || visual === "causal" || visual === "append") {
+  if (visual === "cells" || visual === "spaces" || visual === "clip" || visual === "append") {
     drawTiles(scene, stage, shared.glyphs, top);
+    return;
+  }
+
+  if (visual === "causal") {
+    const row = drawTiles(scene, stage, shared.glyphs, top);
+    row?.nodes?.forEach((node, index) => {
+      if (index > 2) node.setAlpha(0.35);
+    });
     return;
   }
 
@@ -347,29 +380,33 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     return;
   }
 
-  if (visual === "bars" || visual === "truebar") {
-    const labels = visual === "truebar" ? ["F", "i", "r", "s", "t"] : null;
-    const highlight = visual === "truebar" ? 4 : -1;
+  if (visual === "bars") {
     const drawn = drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
-      highlight,
-      count: labels ? labels.length : 8,
-      labelRoom: Boolean(labels),
+      highlight: 0,
+      count: 1,
+      labelRoom: true,
     }));
-    if (labels && drawn?.card && drawn.layout) {
-      const { barW, gap, base } = drawn.layout;
-      labels.forEach((label, index) => {
-        const x = -drawn.width / 2 + 20 + index * (barW + gap) + barW / 2;
-        const text = scene.add.text(x, base + 2, label, uiText(12, {
-          color: index === highlight ? C.coralCss : C.text,
-        })).setOrigin(0.5, 0);
-        drawn.card.add(text);
-      });
-    }
+    labelBars(scene, drawn, ["65"], { highlight: 0 });
+    return;
+  }
+
+  if (visual === "truebar") {
+    const labels = ["F", "i", "r", "s", "t"];
+    const drawn = drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
+      highlight: 4,
+      count: labels.length,
+      labelRoom: true,
+    }));
+    labelBars(scene, drawn, labels, { highlight: 4 });
     return;
   }
 
   if (visual === "penalty") {
-    drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, { highlight: 3, short: true }));
+    drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
+      highlight: 0,
+      short: true,
+      count: 1,
+    }));
     return;
   }
 
@@ -413,16 +450,29 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     return;
   }
   if (visual === "compare" || visual === "shares" || visual === "mix") {
-    if (shared.glyphs) {
-      const row = drawTiles(scene, stage, shared.glyphs, top, { maxW: 40, maxH: 40 });
+    const glyphs = shared.glyphs || [];
+    const focus = focusIndex(shared);
+    const zeroFrom = visual === "mix" ? glyphs.length : focus + 1;
+    if (glyphs.length) {
+      const row = drawTiles(scene, stage, glyphs, top, { maxW: 40, maxH: 40 });
+      row?.nodes?.forEach((node, index) => {
+        if (index >= zeroFrom) node.setAlpha(0.35);
+      });
       if (row) top = row.bottom + 6;
     }
-    drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, { highlight: Number.isFinite(shared.focus) ? shared.focus : 0 }));
+    const drawn = drawScheme(scene, stage, top, scheme, (g, w, h) => paintBars(g, w, h, {
+      highlight: focus,
+      count: glyphs.length || 3,
+      labelRoom: true,
+      zeroFrom,
+    }));
+    labelBars(scene, drawn, glyphs, { highlight: focus, zeroFrom });
     return;
   }
 
   if (visual === "wheel" || visual === "temp") {
-    drawScheme(scene, stage, top, `${scheme}  ${shared.value || "a b c"}`.trim(), (g, w, h) => paintWheel(g, w, h, visual === "temp" && showResult));
+    const real = shared.realSlots ? ` · ${shared.realSlots}` : "";
+    drawScheme(scene, stage, top, `${scheme}${real}  ${shared.value || "a b c"}`.trim(), (g, w, h) => paintWheel(g, w, h, visual === "temp" && showResult));
     return;
   }
 

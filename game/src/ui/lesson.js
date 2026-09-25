@@ -158,7 +158,7 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     const wrapped = wrapToWidth(scene, text, size, maxW, displayText);
     purpose.setFontSize(size);
     purpose.setText(wrapped);
-    while (purpose.height > rect.h * 0.58 && size > 13) {
+    while ((purpose.height > rect.h * 0.58 || purpose.width > maxW + 1) && size > 13) {
       size -= 1;
       purpose.setFontSize(size);
       purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));

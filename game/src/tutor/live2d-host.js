@@ -23,6 +23,7 @@ let lookHook = null;
 const lookTarget = { x: 0, y: 0 };
 const lookCurrent = { x: 0, y: 0 };
 let lookLastMs = 0;
+let reservePosts = 0;
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
@@ -116,8 +117,10 @@ function syncTutorLayout() {
   if (!layout || !dock) return;
 
   const eligible = isWidePcTutor();
+  const wasHidden = dock.hidden;
   layout.classList.toggle("is-wide", eligible);
   dock.hidden = !eligible;
+  if (eligible && wasHidden) reservePosts = 0;
 
   if (!eligible) {
     teardownLive2d();
@@ -282,14 +285,7 @@ function modelUrl() {
 
 function resizePixi() {
   if (!pixiApp) return;
-  const canvas = ensureTutorCanvas();
-  if (!canvas) return;
-  const box = stageBox();
-  const key = `${box.w}x${box.h}@${box.dpr}`;
-  if (key !== lastBufferKey) {
-    lastBufferKey = key;
-    applyCanvasPixels(pixiApp, canvas, box);
-  }
+  if (!ensureTutorCanvas()) return;
   placeModel();
 }
 
@@ -307,23 +303,61 @@ function naturalSize(host) {
   return { w, h };
 }
 
+function publishTutorReserve() {
+  const canvas = document.getElementById("tutor-canvas");
+  if (!canvas || canvas.dataset.fitted !== "1") return;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 8 || rect.left < 8) return;
+  const reserve = Math.ceil(window.innerWidth - rect.left + 16);
+  if (reserve < 120 || reserve > window.innerWidth * 0.55) return;
+  const prev = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve")) || 0;
+  if (Math.abs(reserve - prev) < 8) return;
+  if (reservePosts >= 2) return;
+  reservePosts += 1;
+  document.documentElement.style.setProperty("--tutor-reserve", `${reserve}px`);
+  window.dispatchEvent(new Event("resize"));
+}
+
 function placeModel() {
   if (!pixiApp || !model) return;
-  const { w, h } = stageBox();
-  if (w < 40 || h < 40) return;
+  const dock = stageBox();
+  if (dock.w < 40 || dock.h < 40) return;
   const natural = naturalSize(model);
   if (!natural) return;
-  const maxH = Math.max(120, h - 8);
-  // The dock stays position:fixed; right:0 and does not take lesson width.
-  // Idle swings the sleeve past the viewport. 78px leaves that pose about 20px in.
-  const scale = maxH / natural.h;
+  const canvas = ensureTutorCanvas();
+  if (!canvas) return;
+  canvas.dataset.fitted = "";
+
+  const maxH = Math.max(160, dock.h - 12);
+  const maxW = Math.min(300, Math.max(120, dock.w - 16));
+  const scale = Math.min(maxH / natural.h, maxW / natural.w);
   model.anchor.set(0.5, 0);
   model.scale.set(scale);
-  const drawnH = natural.h * scale;
-  const bodyHalf = 78;
-  const RIGHT_INSET = 78;
-  model.x = Math.round(w - RIGHT_INSET - bodyHalf);
-  model.y = Math.max(4, (h - drawnH) * 0.02);
+
+  applyCanvasPixels(pixiApp, canvas, dock);
+  canvas.style.left = "0px";
+  canvas.style.top = "0px";
+  const bodyW = natural.w * scale;
+  model.x = Math.round(dock.w - 12 - bodyW / 2);
+  model.y = 6;
+  const bounds = model.getBounds?.();
+  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
+
+  const pad = 6;
+  const left = Math.max(0, Math.floor(bounds.x - pad));
+  const top = Math.max(0, Math.floor(bounds.y - pad));
+  const width = Math.min(dock.w - left, Math.ceil(bounds.width + pad * 2));
+  const height = Math.min(dock.h - top, Math.ceil(bounds.height + pad * 2));
+  if (width < 40 || height < 40) return;
+
+  model.x = Math.round(model.x - left);
+  model.y = Math.round(model.y - top);
+  lastBufferKey = `fit-${width}x${height}@${dock.dpr}`;
+  applyCanvasPixels(pixiApp, canvas, { w: width, h: height, dpr: dock.dpr });
+  canvas.style.left = `${left}px`;
+  canvas.style.top = `${top}px`;
+  canvas.dataset.fitted = "1";
+  publishTutorReserve();
 }
 
 function teardownLive2d() {

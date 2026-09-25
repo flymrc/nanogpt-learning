@@ -134,6 +134,10 @@ function assertLessonLayout(scene) {
 
   const locals = collectLocalHits(scene, origin, cta, shell);
   for (const hit of locals) overlaps.push(hit);
+  if (!phone) {
+    const tutorHits = collectTutorTextHits(scene, origin);
+    for (const hit of tutorHits) overlaps.push(hit);
+  }
 
   const phone = !isWidePcTutor();
   const dock = document.getElementById("tutor-dock");
@@ -297,6 +301,45 @@ function collectLocalHits(scene, origin, cta, shell) {
       if (boxesOverlap(placeholder, first)) hits.push(["placeholder", "first-chip"]);
     }
   }
+  return hits;
+}
+
+function strictHit(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/** PC: lesson text must not intersect the fitted Live2D canvas. */
+function collectTutorTextHits(scene, origin) {
+  const canvas = document.getElementById("tutor-canvas");
+  if (!canvas || canvas.dataset.fitted !== "1") return [["live2d", "not-fitted"]];
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 8 || rect.height < 8) return [["live2d", "not-fitted"]];
+  const tutor = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+  const hits = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    if (obj.type === "Text" && obj.visible !== false && obj.alpha > 0.05) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+        if (strictHit(box, tutor)) hits.push(["phaser-text", "live2d", String(obj.text || "").slice(0, 24)]);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const stage = document.getElementById("pc-stage");
+  stage?.querySelectorAll("button, a, p, h1, h2, h3, li, label").forEach((el) => {
+    if (el.closest("#tutor-dock, [hidden]")) return;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return;
+    const text = String(el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const box = { x: r.x, y: r.y, w: r.width, h: r.height };
+    if (strictHit(box, tutor)) hits.push(["dom-text", "live2d", text.slice(0, 24)]);
+  });
   return hits;
 }
 
