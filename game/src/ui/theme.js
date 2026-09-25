@@ -72,6 +72,22 @@ export function stickerColor(seed) {
   return STICKERS[Math.abs(n) % STICKERS.length];
 }
 
+/** No line may start with closing punctuation (禁则). */
+const KINSOKU_HEAD = "。，、！？）」』】》〉";
+
+function applyKinsoku(lines) {
+  const out = [];
+  for (const line of lines) {
+    let rest = line;
+    while (out.length && out[out.length - 1] !== "" && rest && KINSOKU_HEAD.includes(rest[0])) {
+      out[out.length - 1] += rest[0];
+      rest = rest.slice(1);
+    }
+    if (rest || line === "") out.push(rest);
+  }
+  return out;
+}
+
 /** Phaser wordWrap ignores CJK (no spaces). Split on glyphs to a pixel width. */
 export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
   const probe = scene.add.text(-4000, -4000, "", styleFn(size)).setVisible(false);
@@ -93,5 +109,5 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
       if (index < String(raw || "").split("\n").length - 1) lines.push("");
     });
   probe.destroy();
-  return lines.join("\n");
+  return applyKinsoku(lines).join("\n");
 }

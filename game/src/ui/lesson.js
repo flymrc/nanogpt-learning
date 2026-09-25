@@ -2,14 +2,16 @@ import { t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
-import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop } from "./components.js";
+import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop, planLessonHeader } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
 import { C, displayText, uiText, wrapToWidth } from "./theme.js";
 
 export function makeLessonFrame(scene, { level, total, title, startLabel } = {}) {
   const phone = !isWidePcTutor();
-  const shell = makeShell(scene, phone ? { header: false, footerH: 84 } : {});
+  const headerPlan = phone ? null : planLessonHeader(scene, title);
+  const shell = makeShell(scene, phone ? { header: false, footerH: 84 } : { headerH: headerPlan.headerH });
+  if (headerPlan) shell.headerPlan = headerPlan;
   const v = shell.v;
   paintBackdrop(scene);
   if (phone) syncMobileChrome({ level, total, title });
@@ -107,6 +109,8 @@ export function keepStageAboveCta(scene, band, ceiling) {
     const dy = ceiling - bottom;
     if (top + dy >= (band?.top || 0) + 2) {
       child.y += dy;
+    } else if (child.getData?.("artPart")) {
+      // Lesson pictures stay on the page. Callers shrink them into the band.
     } else {
       scene.tweens?.killTweensOf(child);
       child.destroy();
@@ -158,7 +162,7 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     const wrapped = wrapToWidth(scene, text, size, maxW, displayText);
     purpose.setFontSize(size);
     purpose.setText(wrapped);
-    while (purpose.height > rect.h * 0.58 && size > 13) {
+    while ((purpose.height > rect.h * 0.58 || purpose.width > maxW + 1) && size > 13) {
       size -= 1;
       purpose.setFontSize(size);
       purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));

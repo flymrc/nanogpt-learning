@@ -33,14 +33,125 @@ export function paintBackdrop(scene) {
   }
 }
 
+const TITLE_HUD_GAP = 12;
+const TITLE_INLINE_MIN = 24;
+
+export function clearPcHudStack() {
+  const chrome = document.getElementById("pc-chrome");
+  if (!chrome) return;
+  chrome.classList.remove("is-stacked");
+  chrome.style.top = "";
+  delete chrome.dataset.stackScene;
+}
+
+function measurePcButtonRow() {
+  const chrome = document.getElementById("pc-chrome");
+  if (!chrome || chrome.hidden) return null;
+  const buttons = [...chrome.querySelectorAll("button")];
+  if (!buttons.length) return null;
+  const gap = Number.parseFloat(getComputedStyle(chrome).columnGap) || 8;
+  let width = 0;
+  let height = 0;
+  buttons.forEach((btn, index) => {
+    width += btn.offsetWidth;
+    if (index) width += gap;
+    height = Math.max(height, btn.offsetHeight);
+  });
+  return { width, height, gap };
+}
+
+function fitDisplayTitle(scene, title, maxWidth, preferred, min) {
+  const probe = scene.add.text(0, 0, title || "", displayText(preferred)).setVisible(false);
+  let size = preferred;
+  probe.setFontSize(size);
+  let guard = 0;
+  while (probe.width > maxWidth && size > min && guard < 40) {
+    size -= 1;
+    probe.setFontSize(size);
+    guard += 1;
+  }
+  const width = probe.width;
+  const fits = width <= maxWidth + 0.5;
+  probe.destroy();
+  return { size, width, fits };
+}
+
+function placeStackedHud(scene, canvasY) {
+  const chrome = document.getElementById("pc-chrome");
+  if (!chrome) return;
+  const canvas = scene.game?.canvas?.getBoundingClientRect?.();
+  const stage = document.getElementById("pc-stage")?.getBoundingClientRect?.();
+  const origin = canvas && stage ? canvas.top - stage.top : 0;
+  chrome.classList.add("is-stacked");
+  chrome.dataset.stackScene = scene.sys?.settings?.key || "";
+  chrome.style.top = `${Math.round(origin + canvasY)}px`;
+}
+
+/**
+ * PC chapter title stays on one line, at least 24px, and ends before the HUD.
+ * When that budget is too small, the buttons drop to a second row.
+ */
+export function planLessonHeader(scene, title) {
+  clearPcHudStack();
+  const v = getView(scene);
+  const buttons = measurePcButtonRow();
+  const badgeW = clamp(Math.round(64 * v.uiScale), 56, 70);
+  const badgeH = clamp(Math.round(44 * v.uiScale), 38, 48);
+  const titleLeft = v.left + badgeW + 10;
+  const preferred = v.compact ? 22 : 32;
+  const buttonW = buttons?.width || 0;
+  const buttonH = buttons?.height || 52;
+  const buttonLeft = v.w - 16 - buttonW;
+  const inlineMax = buttonLeft - TITLE_HUD_GAP - titleLeft;
+  const inline = fitDisplayTitle(scene, title, Math.max(48, inlineMax), Math.max(preferred, TITLE_INLINE_MIN), TITLE_INLINE_MIN);
+  if (inline.fits && inlineMax >= 48) {
+    return {
+      stacked: false,
+      headerH: clamp(Math.round(58 * v.uiScale), 52, 80),
+      fontSize: inline.size,
+      titleLeft,
+      titleMax: inlineMax,
+      badgeW,
+      badgeH,
+      buttonLeft,
+      titleRowH: 0,
+    };
+  }
+  const titleMax = Math.max(80, v.right - TITLE_HUD_GAP - titleLeft);
+  const stackedFit = fitDisplayTitle(scene, title, titleMax, Math.max(preferred, TITLE_INLINE_MIN), 20);
+  const titleRowH = Math.max(badgeH + 10, stackedFit.size + 22);
+  const inner = Math.max(80, v.w - 32);
+  const buttonRows = Math.max(1, Math.ceil((buttonW || inner) / inner));
+  const buttonsBlock = buttonRows * buttonH + Math.max(0, buttonRows - 1) * 8;
+  const buttonTop = v.top + titleRowH + 10;
+  placeStackedHud(scene, buttonTop);
+  scene.time.delayedCall(0, () => {
+    if (!scene.sys?.isActive()) return;
+    placeStackedHud(scene, buttonTop);
+  });
+  return {
+    stacked: true,
+    headerH: titleRowH + 10 + buttonsBlock + 14,
+    fontSize: stackedFit.size,
+    titleLeft,
+    titleMax,
+    badgeW,
+    badgeH,
+    buttonLeft: v.right,
+    titleRowH,
+  };
+}
+
 export function addHeader(scene, { level, total, title, shell }) {
   const page = shell ?? makeShell(scene);
   const { v, header, twoRow } = page;
+  const plan = page.headerPlan;
   const muteSize = page.hudReserve ?? hudReservePx(v);
-  const badgeW = clamp(Math.round(64 * v.uiScale), 56, 70);
-  const badgeH = clamp(Math.round(44 * v.uiScale), 38, 48);
-  const row1Y = twoRow ? header.top + badgeH / 2 + 4 : header.cy;
-  const row2Y = twoRow ? header.bottom - 22 : header.cy;
+  const badgeW = plan?.badgeW ?? clamp(Math.round(64 * v.uiScale), 56, 70);
+  const badgeH = plan?.badgeH ?? clamp(Math.round(44 * v.uiScale), 38, 48);
+  const titleRowY = plan?.stacked ? header.top + (plan.titleRowH || badgeH) / 2 : null;
+  const row1Y = titleRowY ?? (twoRow ? header.top + badgeH / 2 + 4 : header.cy);
+  const row2Y = titleRowY ?? (twoRow ? header.bottom - 22 : header.cy);
 
   const badge = scene.add.container(header.left + badgeW / 2, row1Y);
   const g = scene.add.graphics();
@@ -48,17 +159,25 @@ export function addHeader(scene, { level, total, title, shell }) {
   badge.add(g);
   badge.add(scene.add.text(0, -2, `${level}/${total}`, displayText(twoRow ? 18 : 20)).setOrigin(0.5));
 
-  const titleLeft = twoRow ? header.left : header.left + badgeW + 10;
-  const titleMax = header.right - muteSize - 16 - titleLeft;
-  const titleSize = fitFontSize(title, titleMax, v.compact ? 22 : 32, 16);
+  const titleLeft = plan?.titleLeft ?? (twoRow ? header.left : header.left + badgeW + 10);
+  const titleMax = plan?.titleMax ?? header.right - muteSize - 16 - titleLeft;
+  let titleSize = plan?.fontSize ?? fitFontSize(title, titleMax, v.compact ? 22 : 32, 16);
   const titleText = scene.add
     .text(titleLeft, row2Y, title, displayText(titleSize))
     .setOrigin(0, 0.5);
+  let guard = 0;
+  while (titleText.width > titleMax && titleSize > 16 && guard < 40) {
+    titleSize -= 1;
+    titleText.setFontSize(titleSize);
+    guard += 1;
+  }
+  titleText.setData("kind", "chapter-title");
+  titleText.setName("chapter-title");
 
   const starGap = twoRow ? 22 : 26;
   const starsW = Math.max(0, total - 1) * starGap + 16;
   let dotsX = titleLeft + titleText.width + 26;
-  const muteLeft = header.right - muteSize;
+  const muteLeft = plan?.buttonLeft ?? header.right - muteSize;
   let dotsY = row2Y;
   if (dotsX + starsW > muteLeft - 8) {
     if (twoRow) {

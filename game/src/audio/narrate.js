@@ -5,12 +5,20 @@ function voiceLang() {
   return getLang() === "ja" ? "ja-JP" : "zh-CN";
 }
 
+export function publishExpectedVo(id) {
+  if (!id || typeof window === "undefined") return "";
+  const text = speechFor(id);
+  window.__nanoGPTExpectedVo = () => ({ id, text });
+  return text;
+}
+
 export function narrateBeat(scene, raw) {
   if (!scene || !raw?.id) return;
-  const lang = getLang();
+  const text = publishExpectedVo(raw.id);
+  scene.registry?.set("spokenBeatId", raw.id);
   cueNarration(scene, {
-    text: speechFor(raw.id),
-    clip: lang === "zh" ? raw.vo || null : null,
+    text,
+    clip: null,
     lang: voiceLang(),
     kind: "beat",
     id: raw.id,

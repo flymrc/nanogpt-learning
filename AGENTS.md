@@ -30,8 +30,8 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 
 | Viewport | What must be true |
 | --- | --- |
-| **390×844 mobile** | Walk **all 31 beats × all 5 tabs** (这一步 / 为什么 / 例子 / 误会 / 记住). Counts: chapter 1 = 5, chapter 2 = 8, chapter 3 attention = 6, chapter 4 train = 6, chapter 5 sample = 6, so **155** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
-| **1440×900 PC** | Smoke **all 31 beats** at least once (example tab is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
+| **390×844 mobile** | Walk **all 49 pages × all 5 sections** (目标 / 看看 / 做做 / 小结 / 试试, Japanese めあて / 見て / やって / まとめ / 確認). Counts: each chapter is an intro, then 9 / 9 / 7 / 7 / 7 pages, then a summary, so chapter 1 = 11, chapter 2 = 11, chapter 3 = 9, chapter 4 = 9, chapter 5 = 9, **245** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
+| **1440×900 PC** | Smoke **all 49 pages** at least once (做一做 section is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar, and does not change the lesson width. |
 
 ### Overlap rule (zero intersecting interactive boxes)
 
@@ -45,11 +45,11 @@ Also required:
   - any two of those pieces intersect, including chip-vs-chip and placeholder-vs-placeholder;
   - a placeholder intersects the first real chip (ellipsis tiles piled on S);
   - a 号码牌 is under 32×40, its number font is under 12px, or the number intersects the glyph or the bottom stripe.
-- Also assert the title scene. The 155-step mobile walk (31×5) and the 31 PC beats stay required; the title check is extra, not a substitute.
+- Also assert the title scene. The 245-step mobile walk (49×5) and the 49 PC pages stay required; the title check is extra, not a substitute.
 - Open and close **详细笔记** and **看不懂？**
 - **导读** shows once on a fresh profile (`nanogpt-seen-guide` unset), stays hidden after dismiss + reload, and reopens from **目录**.
-- **目录** lists 5 chapters (纸带和号码 / 剪开猜下一个 / 只看左边 / 按罚分改一笔 / 从开头往后续). Short buttons stay 纸带 / 猜下一个 / 看左边 / 改一改 / 往后写. In-lesson headers use those same chapter titles. Every chapter starts at beat 0 and can be revisited. **返回** steps to the previous phase, then the previous beat, then the previous chapter.
-- **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core beat lines and 伪代码 open are narrated (existing Chinese clips when `zh` and a clip exists; Web Speech otherwise, including all Japanese).
+- **目录** lists 5 chapters (把字变成数字 / 猜下一个字，看猜错多少 / 只能看前面的字 / 一次改一点点 / 小G 自己往下写). Short buttons stay 变数字 / 猜下一个 / 看前面 / 改一点 / 往下写 (Japanese 数字に / 次を当てる / 前だけ / 少し直す / 続きを書く). In-lesson headers use the same chapter titles as the kid script. Every chapter starts at page 0 and can be revisited. **返回** steps to the previous section, then the previous page, then the previous chapter.
+- **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core page lines and the steps panel are narrated with Web Speech in both `zh` and `ja` (no pre-recorded lesson mp3s).
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
 - Mobile chips/tags must stay inside the game shell (no horizontal overflow).
@@ -63,8 +63,17 @@ npx vite preview --host 127.0.0.1 --port 4182
 E2E_URL=http://127.0.0.1:4182/ E2E_OUT=/tmp/nanogpt-e2e npm run e2e
 ```
 
-Helper script: `game/scripts/e2e-layout.mjs`. It must walk 155 mobile steps (31×5) and 31 PC beats, and open 伪代码 on encode / shift / loss / attention / train / sample.
+Helper script: `game/scripts/e2e-layout.mjs`. It must walk 245 mobile steps (49×5) and 49 PC pages, and open the steps panel on encode / shift / loss / attention / train / sample.
+
+## i18n
+
+Lesson copy is not inline in the scenes.
+
+- `game/src/i18n/skeleton.js` is the locale-independent page list: page id, visual type, real numbers, real English book text such as `First Citizen:`, and the key for every visible string. Per-locale example slots (the script’s 【本地化图：zh】 / 【ローカライズ画像：ja】) live on the page as `exampleSlots.zh` and `exampleSlots.ja`.
+- `game/src/i18n/zh.js` and `game/src/i18n/ja.js` hold every visible string and every voice line, under the same keys. Japanese is the kid-script text, not a translation of the Chinese file. The Chinese chapter-1 intro example is 「床前明月＿」→ 光, and the 🍎🍌 row stays. Japanese keeps its own calendar example.
+- `game/scripts/i18n-parity.mjs` fails if a key is missing on either side, a value is empty, or a skeleton page points at a key that does not exist. `npm run e2e` runs this check first.
+- The language switch swaps text, the example slot, and Web Speech. New lines are spoken with Web Speech in both zh and ja. Do not point voice lines at the old Chinese mp3 clips.
 
 ## Game facts (do not invent)
 
-shakespeare_char / nanoGPT only: vocab 65, `train.bin`/`val.bin` integer streams, `y = x` shifted by 1, speak loss as 猜错罚分. Chinese UI. One idea per beat. Custom cursor is desktop-only.
+shakespeare_char / nanoGPT only: vocab 65, `train.bin`/`val.bin` integer streams, `y = x` shifted by 1, speak the penalty as 扣分 (Japanese てんすう). UI follows `zh` or `ja`. One idea per page. Custom cursor is desktop-only. Confidence and penalty charts are labelled 示意 / イメージ図 and do not invent loss numbers or generated samples.

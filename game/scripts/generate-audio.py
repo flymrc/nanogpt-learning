@@ -26,17 +26,9 @@ OUT = ROOT / "public" / "audio"
 TMP = OUT / "_tmp"
 
 VOICE = "zh-CN-XiaoxiaoNeural"
-VO_LINES = {
-    "vo-title": "从一条长纸带讲起。",
-    "vo-level1": "每个字符领一张号码牌。",
-    "vo-map": "号码只是座位号。",
-    "vo-reuse": "本局只有六十五张字符牌。",
-    "vo-level2": "每次随手剪一段来看。",
-    "vo-shift": "答案往右挪一格。",
-    "vo-next": "每个位置都在问下一字。",
-    "vo-loss": "押得越少，错题分越大。",
-    "vo-clear": "通关啦！",
-}
+# Lesson narration is Web Speech for both zh and ja.
+# Do not point the game at these old clips; they do not match the kid script.
+VO_LINES = {}
 
 
 def write_wav(path: Path, samples: np.ndarray) -> None:

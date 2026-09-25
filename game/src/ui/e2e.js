@@ -136,6 +136,17 @@ function assertLessonLayout(scene) {
   for (const hit of locals) overlaps.push(hit);
 
   const phone = !isWidePcTutor();
+  if (!phone) {
+    const tutorHits = collectTutorTextHits(scene, origin);
+    for (const hit of tutorHits) overlaps.push(hit);
+    const titleHits = collectTitleHudHits(scene, origin);
+    for (const hit of titleHits) overlaps.push(hit);
+  }
+  const patternHits = collectPatternRowHits(scene, origin);
+  for (const hit of patternHits) overlaps.push(hit);
+  const artHits = collectArtHits(scene, origin);
+  for (const hit of artHits) overlaps.push(hit);
+
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
   const live2dOn = dock && !dock.hidden && dockStyle.display !== "none";
@@ -295,6 +306,146 @@ function collectLocalHits(scene, origin, cta, shell) {
     const first = chips.reduce((best, chip) => (chip.y < best.y - 1 || (Math.abs(chip.y - best.y) <= 1 && chip.x < best.x) ? chip : best));
     for (const placeholder of placeholders) {
       if (boxesOverlap(placeholder, first)) hits.push(["placeholder", "first-chip"]);
+    }
+  }
+  return hits;
+}
+
+function strictHit(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/** PC: lesson text must not intersect the fitted Live2D canvas. */
+function collectTutorTextHits(scene, origin) {
+  const canvas = document.getElementById("tutor-canvas");
+  if (!canvas || canvas.dataset.fitted !== "1") return [["live2d", "not-fitted"]];
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width < 8 || rect.height < 8) return [["live2d", "not-fitted"]];
+  const tutor = { x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+  const hits = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    if (obj.type === "Text" && obj.visible !== false && obj.alpha > 0.05) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+        if (strictHit(box, tutor)) hits.push(["phaser-text", "live2d", String(obj.text || "").slice(0, 24)]);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const stage = document.getElementById("pc-stage");
+  stage?.querySelectorAll("button, a, p, h1, h2, h3, li, label").forEach((el) => {
+    if (el.closest("#tutor-dock, [hidden]")) return;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") return;
+    const text = String(el.innerText || el.textContent || "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return;
+    const box = { x: r.x, y: r.y, w: r.width, h: r.height };
+    if (strictHit(box, tutor)) hits.push(["dom-text", "live2d", text.slice(0, 24)]);
+  });
+  return hits;
+}
+
+/** Chapter title must stay fully on the canvas and clear of every HUD button. */
+function collectTitleHudHits(scene, origin) {
+  let title = null;
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    if (obj.getData?.("kind") === "chapter-title" || obj.name === "chapter-title") title = obj;
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  if (!title || title.visible === false) return [];
+  const b = title.getBounds?.();
+  if (!b || b.width < 2 || b.height < 2) return [["chapter-title", "missing"]];
+  const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+  const hits = [];
+  const canvas = scene.game?.canvas?.getBoundingClientRect?.();
+  if (canvas && (box.x < canvas.left - 1 || box.x + box.w > canvas.right + 1 || box.y < canvas.top - 1 || box.y + box.h > canvas.bottom + 1)) {
+    hits.push(["chapter-title", "clipped"]);
+  }
+  const chrome = document.getElementById("pc-chrome");
+  if (!chrome || chrome.hidden) return hits;
+  for (const btn of chrome.querySelectorAll("button")) {
+    const r = btn.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    if (strictHit(box, { x: r.x, y: r.y, w: r.width, h: r.height })) {
+      hits.push(["chapter-title", btn.id || "hud"]);
+    }
+  }
+  return hits;
+}
+
+/** A pattern row is one sequence. Wrapping it into two rows breaks ●▲■●▲■●＿. */
+function collectPatternRowHits(scene, origin) {
+  const groups = new Map();
+  const walk = (obj) => {
+    if (!obj || obj.active === false) return;
+    const row = obj.getData?.("patternRow");
+    if (row != null) {
+      const box = pieceBox(obj, origin);
+      if (box) {
+        const list = groups.get(row) || [];
+        list.push(box);
+        groups.set(row, list);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const hits = [];
+  for (const [row, list] of groups) {
+    if (list.length < 2) continue;
+    const centers = list.map((box) => box.y + box.h / 2);
+    const spread = Math.max(...centers) - Math.min(...centers);
+    if (spread > 8) hits.push(["pattern-row", String(row)]);
+  }
+  return hits;
+}
+
+/**
+ * Every lesson page must paint its skeleton visual inside the viewport.
+ * A missing chart (height bail-out) is the same failure as an overlap.
+ */
+function collectArtHits(scene, origin) {
+  const expect = scene.frame?.artExpect;
+  if (!expect) return [];
+  if (!expect.parts?.length) return [["art-missing", expect.visual || "page", "unmapped"]];
+  const found = new Map();
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false || obj.alpha === 0) return;
+    const part = obj.getData?.("artPart");
+    if (part) {
+      const box = pieceBox(obj, origin);
+      if (box && box.w > 1 && box.h > 1) {
+        const list = found.get(part) || [];
+        list.push(box);
+        found.set(part, list);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const viewW = window.innerWidth;
+  const viewH = window.innerHeight;
+  const inside = (box) => box.x >= -2 && box.y >= -2 && box.x + box.w <= viewW + 2 && box.y + box.h <= viewH + 2;
+  const hits = [];
+  for (const spec of expect.parts) {
+    const pool = spec.any
+      ? spec.any.flatMap((name) => found.get(name) || [])
+      : (found.get(spec.part) || []);
+    const label = spec.any ? spec.any.join("|") : spec.part;
+    if (pool.length < (spec.min || 1)) {
+      hits.push(["art-missing", expect.visual, label, String(pool.length)]);
+      continue;
+    }
+    for (const box of pool) {
+      if (!(box.rawW > 1) || !(box.rawH > 1)) hits.push(["art-size", expect.visual, label]);
+      if (!inside(box)) hits.push(["art-offscreen", expect.visual, label]);
     }
   }
   return hits;

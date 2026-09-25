@@ -1,8 +1,11 @@
 import { LESSON_PHASES } from "../data/lessons.js";
-import { CHAPTERS, GUIDE, JA_BEATS, PHASES, SPEECH, UI } from "./copy.js";
+import { JA } from "./ja.js";
+import { ZH } from "./zh.js";
 
 export const LANG_KEY = "nanogpt-lang";
 export const GUIDE_KEY = "nanogpt-seen-guide";
+
+const PACKS = { zh: ZH, ja: JA };
 
 let lang = "zh";
 
@@ -34,41 +37,91 @@ export function writeSeenGuide() {
   }
 }
 
+/** Drop parser junk and backticks so they never reach the screen or the voice. */
+export function present(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/`/g, "")
+    .replace(/\s*\n+---\s*$/g, "")
+    .replace(/。。+/g, "。")
+    .trim();
+}
+
 export function t(key) {
-  return UI[lang]?.[key] ?? UI.zh[key] ?? key;
+  if (!key) return "";
+  const pack = PACKS[lang] || ZH;
+  const value = pack[key];
+  if (typeof value === "string" && value.length) return present(value);
+  const fallback = ZH[key];
+  return typeof fallback === "string" ? present(fallback) : key;
 }
 
 export function L(zh, ja) {
   return lang === "ja" ? ja : zh;
 }
 
-export function pick(entry) {
-  if (!entry) return "";
-  if (typeof entry === "string") return entry;
-  return entry[lang] || entry.zh || "";
+function ownedLine(id, suffix) {
+  const key = `${id}.${suffix}`;
+  const value = t(key);
+  return value && value !== key ? value : "";
+}
+
+export function resolveBeat(page) {
+  if (!page?.keys) return page;
+  const keys = page.keys;
+  const aim = t(keys.aim);
+  const bubble = t(keys.bubble);
+  const local = keys.local ? t(keys.local) : "";
+  const look = [t(keys.look), local].filter(Boolean).join("\n");
+  const summary = t(keys.summary);
+  const aside = keys.aside ? t(keys.aside) : "";
+  const checkQ = t(keys.checkQ);
+  const checkA = t(keys.checkA);
+  const stars = [1, 2, 3].map((n) => ownedLine(page.id, `star${n}`)).filter(Boolean);
+  const detail = ownedLine(page.id, "detail");
+  const isSum = String(page.id || "").endsWith("-sum");
+  const remember =
+    isSum && stars.length
+      ? stars.map((line) => `⭐ ${line}`).join("\n")
+      : [checkQ, checkA].filter(Boolean).join("\n");
+  return {
+    ...page,
+    purpose: aim,
+    caption: bubble,
+    goal: bubble && bubble !== aim ? `${bubble}\n${aim}` : aim,
+    why: look,
+    example: t(keys.action),
+    myths: [summary],
+    remember,
+    footnote: aside,
+    checkQ,
+    checkA,
+    stars,
+    detail,
+  };
+}
+
+/** Language switch restarts the scene; resolve strings for the active locale. */
+export function localizeBeat(beat) {
+  return resolveBeat(beat);
 }
 
 export function speechFor(id) {
-  const row = SPEECH[id];
-  if (!row) return "";
-  return lang === "ja" ? row.ja : row.zh;
+  return t(`${id}.vo`);
 }
 
-export function localizeBeat(beat) {
-  if (!beat || lang !== "ja") return beat;
-  const ja = JA_BEATS[beat.id];
-  if (!ja) return beat;
-  return { ...beat, ...ja, vo: undefined };
+export function exampleSlot(page) {
+  const slots = page?.exampleSlots;
+  if (!slots) return null;
+  return slots[lang] || null;
 }
 
 export function applyPhaseLabels() {
-  const pack = PHASES[lang] || PHASES.zh;
-  LESSON_PHASES.forEach((phase, index) => {
-    const next = pack[index];
-    if (!next) return;
-    phase.label = next.label;
-    phase.kicker = next.kicker;
-  });
+  for (let index = 0; index < LESSON_PHASES.length; index += 1) {
+    const phase = LESSON_PHASES[index];
+    phase.label = t(`phase.${index}.label`);
+    phase.kicker = t(`phase.${index}.kicker`);
+  }
 }
 
 export function applyDocumentLang() {
@@ -79,11 +132,7 @@ export function applyDocumentLang() {
 }
 
 export function setLang(next, { silent = false } = {}) {
-  const value = next === "ja" ? "ja" : "zh";
-  if (value === lang && !silent) {
-    /* still notify so a second click can restart if the first paint raced */
-  }
-  lang = value;
+  lang = next === "ja" ? "ja" : "zh";
   try {
     localStorage.setItem(LANG_KEY, lang);
   } catch {
@@ -107,23 +156,34 @@ export function initLocale() {
 }
 
 export function guideCards() {
-  return GUIDE.map((card, index) => ({
-    index: index + 1,
-    title: pick(card),
-    ...(() => {
-      const side = card[lang] || card.zh;
-      return { title: side.title, body: side.body };
-    })(),
+  return [1, 2, 3].map((index) => ({
+    index,
+    title: t(`guide.${index}.title`),
+    body: t(`guide.${index}.body`),
   }));
 }
 
 export function chapterList() {
-  return CHAPTERS.map((chapter) => ({
-    ...chapter,
-    shortLabel: pick(chapter.short),
-    titleLabel: pick(chapter.title),
-    blurbLabel: pick(chapter.blurb),
-    sheetLabel: pick(chapter.sheet) || pick(chapter.blurb),
+  return [1, 2, 3, 4, 5].map((index) => ({
+    id: `Level${index}`,
+    scene: `Level${index}`,
+    playable: true,
+    short: t(`chapter.${index}.short`),
+    title: t(`chapter.${index}.title`),
+    blurb: t(`chapter.${index}.blurb`),
+    shortLabel: t(`chapter.${index}.short`),
+    titleLabel: t(`chapter.${index}.title`),
+    blurbLabel: t(`chapter.${index}.blurb`),
+    sheetLabel: t(`chapter.${index}.blurb`),
+  }));
+}
+
+export function noteList() {
+  return ["vocab", "encode", "decode", "split", "loss", "embed", "attention", "train", "sample"].map((id) => ({
+    id,
+    term: t(`note.${id}.term`),
+    blurb: t(`note.${id}.blurb`),
+    note: t(`note.${id}.note`),
   }));
 }
 

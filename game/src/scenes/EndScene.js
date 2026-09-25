@@ -9,6 +9,7 @@ import {
   addMuteToggle,
   createButton,
   drawSticker,
+  clearPcHudStack,
   paintBackdrop,
   showTooltip,
   spawnConfetti,
@@ -27,6 +28,7 @@ export default class EndScene extends Phaser.Scene {
 
   create() {
     const phone = !isWidePcTutor();
+    clearPcHudStack();
     const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
     const v = shell.v;
     this.shell = shell;
@@ -60,7 +62,7 @@ export default class EndScene extends Phaser.Scene {
     const cards = [
       {
         icon: "deco-badge",
-        fallback: "带",
+        fallback: "字",
         title: t("cardTape"),
         caption: t("cardTapeCap"),
         tip: t("cardTapeTip"),
@@ -68,7 +70,7 @@ export default class EndScene extends Phaser.Scene {
       },
       {
         icon: "deco-window",
-        fallback: "移",
+        fallback: "猜",
         title: t("cardShift"),
         caption: t("cardShiftCap"),
         tip: t("cardShiftTip"),
@@ -76,7 +78,7 @@ export default class EndScene extends Phaser.Scene {
       },
       {
         icon: "deco-star",
-        fallback: "空",
+        fallback: "前",
         title: t("cardLook"),
         caption: t("cardLookCap"),
         tip: t("cardLookTip"),
@@ -84,7 +86,7 @@ export default class EndScene extends Phaser.Scene {
       },
       {
         icon: "deco-scroll",
-        fallback: "训",
+        fallback: "改",
         title: t("cardTrain"),
         caption: t("cardTrainCap"),
         tip: t("cardTrainTip"),
@@ -92,7 +94,7 @@ export default class EndScene extends Phaser.Scene {
       },
       {
         icon: "deco-sparkle",
-        fallback: "续",
+        fallback: "写",
         title: t("cardSample"),
         caption: t("cardSampleCap"),
         tip: t("cardSampleTip"),

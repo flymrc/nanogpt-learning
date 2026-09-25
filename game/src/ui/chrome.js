@@ -61,19 +61,41 @@ export function bindVoiceNote() {
   if (!note || note.dataset.bound === "1") return;
   note.dataset.bound = "1";
   note.setAttribute("aria-live", "polite");
+  const lineOf = () => {
+    let line = note.querySelector("#voice-line");
+    if (!line) {
+      line = document.createElement("span");
+      line.id = "voice-line";
+      note.textContent = "";
+      note.appendChild(line);
+    }
+    return line;
+  };
   window.addEventListener("nanogpt-narration", (event) => {
     const detail = event.detail || {};
     const text = String(detail.text || "").replace(/\s+/g, " ").trim();
     const ja = String(detail.lang || "").toLowerCase().startsWith("ja");
+    const line = lineOf();
+    if (!text) {
+      line.textContent = t("voiceIdle");
+      note.classList.remove("is-missing");
+      note.dataset.missing = "";
+      note.dataset.live = "";
+      note.removeAttribute("title");
+      note.removeAttribute("aria-label");
+      return;
+    }
+    const prefix = detail.kind === "pseudo" ? t("voicePseudo") : t("voiceBeat");
+    const shown = `${prefix}${text}`;
+    line.textContent = shown;
+    note.dataset.live = "1";
+    note.dataset.lang = detail.lang || "";
+    note.dataset.source = detail.source || "";
     if (detail.missingVoice && ja) {
       const tip = t("voiceMissing");
-      note.textContent = tip;
       note.title = tip;
-      note.setAttribute("aria-label", tip);
-      note.dataset.live = "1";
+      note.setAttribute("aria-label", `${shown} ${tip}`);
       note.dataset.missing = "1";
-      note.dataset.lang = detail.lang || "";
-      note.dataset.source = detail.source || "";
       note.classList.add("is-missing");
       return;
     }
@@ -81,18 +103,8 @@ export function bindVoiceNote() {
     note.dataset.missing = "";
     note.removeAttribute("title");
     note.removeAttribute("aria-label");
-    if (!text) {
-      note.textContent = t("voiceIdle");
-      note.dataset.live = "";
-      return;
-    }
-    const prefix = detail.kind === "pseudo" ? t("voicePseudo") : t("voiceBeat");
-    note.textContent = `${prefix}${text}`;
-    note.dataset.live = "1";
-    note.dataset.lang = detail.lang || "";
-    note.dataset.source = detail.source || "";
   });
   window.addEventListener("nanogpt-lang", () => {
-    if (!note.dataset.live) note.textContent = t("voiceIdle");
+    if (!note.dataset.live) lineOf().textContent = t("voiceIdle");
   });
 }
