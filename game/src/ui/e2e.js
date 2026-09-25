@@ -146,6 +146,8 @@ function assertLessonLayout(scene) {
   for (const hit of patternHits) overlaps.push(hit);
   const artHits = collectArtHits(scene, origin);
   for (const hit of artHits) overlaps.push(hit);
+  const readHits = collectReadabilityHits(scene, origin);
+  for (const hit of readHits) overlaps.push(hit);
 
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
@@ -165,6 +167,10 @@ function assertLessonLayout(scene) {
     shellRect &&
     Math.abs(shellRect.width - stageRect.width) < 2 &&
     Math.abs(shellRect.left - stageRect.left) < 2;
+  // main, before the Live2D height fit: reserve stayed 334px.
+  const lessonFloor = Math.min(1160, window.innerWidth - 334);
+  const lessonWidth = shellRect?.width || 0;
+  const lessonWidthOk = phone || lessonWidth + 2 >= lessonFloor;
   const overlayOk =
     phone ||
     (live2dOn &&
@@ -188,6 +194,7 @@ function assertLessonLayout(scene) {
       orphans.length === 0 &&
       hudOk &&
       overlayOk &&
+      lessonWidthOk &&
       (phone ? !live2dOn : live2dOn),
     mode: phone ? "mobile" : "pc",
     boxes,
@@ -200,6 +207,9 @@ function assertLessonLayout(scene) {
     overlayOk,
     hudParent,
     layout: document.documentElement.dataset.layout,
+    lessonWidth,
+    lessonFloor,
+    lessonWidthOk,
   };
 }
 
@@ -283,6 +293,14 @@ function collectLocalHits(scene, origin, cta, shell) {
     }
   }
   const chips = pieces.filter((box) => box.kind === "chip");
+  if (isWidePcTutor()) {
+    for (const tile of pieces) {
+      if (tile.kind !== "tile") continue;
+      if (tile.rawW < 28 - 0.5 || tile.rawH < 28 - 0.5) {
+        hits.push(["tile-size", `${Math.round(tile.rawW)}x${Math.round(tile.rawH)}`]);
+      }
+    }
+  }
   for (const chip of chips) {
     if (chip.rawW < MIN_CHIP_W - 0.5 || chip.rawH < MIN_CHIP_H - 0.5 || chip.idFont < MIN_ID_FONT) {
       hits.push(["chip-size", `${Math.round(chip.rawW)}x${Math.round(chip.rawH)}@${chip.idFont}`]);
@@ -306,6 +324,51 @@ function collectLocalHits(scene, origin, cta, shell) {
     const first = chips.reduce((best, chip) => (chip.y < best.y - 1 || (Math.abs(chip.y - best.y) <= 1 && chip.x < best.x) ? chip : best));
     for (const placeholder of placeholders) {
       if (boxesOverlap(placeholder, first)) hits.push(["placeholder", "first-chip"]);
+    }
+  }
+  return hits;
+}
+
+/** Banner sentence vs page counter, and phase-card copy must stay inside the card. */
+function collectReadabilityHits(scene, origin) {
+  let card = null;
+  const texts = [];
+  let step = null;
+  const banners = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false) return;
+    const kind = obj.getData?.("kind");
+    if (kind === "phase-card") card = pieceBox(obj, origin);
+    if ((kind === "phase-card-text" || kind === "phase-card-title") && obj.alpha > 0.2) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        texts.push({ x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height });
+      }
+    }
+    if ((kind === "banner-step" || kind === "banner-kicker" || kind === "banner-purpose") && obj.alpha > 0.2) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        const box = { kind, x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+        if (kind === "banner-step") step = box;
+        else banners.push(box);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  const hits = [];
+  if (card) {
+    const right = card.x + (card.rawW || card.w);
+    const bottom = card.y + (card.rawH || card.h);
+    for (const text of texts) {
+      if (text.x < card.x - 2 || text.y < card.y - 2 || text.x + text.w > right + 2 || text.y + text.h > bottom + 2) {
+        hits.push(["card-text", "outside"]);
+      }
+    }
+  }
+  if (step) {
+    for (const banner of banners) {
+      if (boxesOverlap(banner, step)) hits.push([banner.kind, "counter"]);
     }
   }
   return hits;

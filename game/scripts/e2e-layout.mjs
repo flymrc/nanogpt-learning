@@ -769,8 +769,17 @@ const LIVE2D_FIT_SIZES = [
   [2560, 1080],
 ];
 
+const FIT_LEVELS = [
+  ["Level1", LEVEL_PAGES.Level1.length],
+  ["Level2", LEVEL_PAGES.Level2.length],
+  ["Level3", LEVEL_PAGES.Level3.length],
+  ["Level4", LEVEL_PAGES.Level4.length],
+  ["Level5", LEVEL_PAGES.Level5.length],
+];
+const C3_P3_BEAT = LEVEL_PAGES.Level3.findIndex((page) => page.id === "c3-p3");
+
 async function assertLive2dPanel(browser) {
-  const shotDir = "/opt/cursor/artifacts/live2d-fit";
+  const shotDir = "/opt/cursor/artifacts/live2d-fit2";
   mkdirSync(shotDir, { recursive: true });
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
@@ -783,15 +792,19 @@ async function assertLive2dPanel(browser) {
     window.__nanoGPTReadLive2dFit = () => {
       const stageEl = document.getElementById("tutor-stage");
       const canvas = document.getElementById("tutor-canvas");
+      const shell = document.getElementById("game-shell")?.getBoundingClientRect();
       const stage = stageEl?.getBoundingClientRect();
       const crect = canvas?.getBoundingClientRect();
-      const bounds = window.__nanoGPTTutorHiDPI?.()?.place?.bounds;
+      const place = window.__nanoGPTTutorHiDPI?.()?.place;
+      const bounds = place?.bounds;
       if (!stage || !crect || !bounds || canvas.dataset.fitted !== "1") return { ready: false };
       const box = { x: crect.x + bounds.x, y: crect.y + bounds.y, w: bounds.w, h: bounds.h };
       const bottomGap = stage.bottom - (box.y + box.h);
-      const centerDelta = box.x + box.w / 2 - (stage.x + stage.width / 2);
-      const widthLimited = box.w >= stage.width - 40;
-      const heightOk = box.h >= stage.height * 0.8 - 0.5 || widthLimited;
+      const centerDelta = box.x + box.w / 2 - (crect.x + crect.width / 2);
+      const ratio = stage.height > 0 ? box.h / stage.height : 0;
+      const tall = stage.height >= 1000;
+      const widthLimited = place?.widthLimited === true || canvas.dataset.widthLimited === "1";
+      const heightOk = tall ? ratio >= 0.84 && ratio <= 0.96 : ratio >= 0.8 || widthLimited;
       const bottomOk = bottomGap >= -2 && bottomGap <= 12;
       const centered = Math.abs(centerDelta) <= 10;
       const inside =
@@ -803,42 +816,47 @@ async function assertLive2dPanel(browser) {
         box.y >= stage.y - 1 &&
         box.x + box.w <= stage.right + 1 &&
         box.y + box.h <= stage.bottom + 1;
+      const lessonFloor = Math.min(1160, window.innerWidth - 334);
+      const lessonWidth = shell?.width || 0;
+      const lessonOk = lessonWidth + 2 >= lessonFloor;
       return {
         ready: true,
-        ok: heightOk && bottomOk && centered && inside,
+        ok: heightOk && bottomOk && centered && inside && lessonOk,
         heightOk,
         bottomOk,
         centered,
         inside,
+        lessonOk,
         widthLimited,
         bottomGap,
         centerDelta,
-        ratio: box.h / stage.height,
+        ratio,
         box,
+        lessonWidth,
+        lessonFloor,
+        meshAspect: place?.meshAspect ?? null,
+        purposeAlpha: typeof window.__nanoGPTPurposeAlpha === "function" ? window.__nanoGPTPurposeAlpha() : null,
         panel: { x: stage.x, y: stage.y, w: stage.width, h: stage.height },
+        canvas: { x: crect.x, y: crect.y, w: crect.width, h: crect.height },
         pageId: window.__nanoGPTState?.().pageId || "",
       };
     };
   });
   await ready(page);
   await page.waitForFunction(() => document.getElementById("tutor-canvas")?.dataset.fitted === "1", { timeout: 30000 });
-  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
-  await page.waitForFunction(() => window.__nanoGPTState?.().pageId === "c1-intro", { timeout: 15000 });
-  const shots = new Set(["1024x522", "1920x1080", "2560x1080"]);
+  const shotSizes = new Set(["1024x522", "1280x640", "1920x1080", "2560x1080"]);
   const results = [];
+  let pages = 0;
   for (let index = 0; index < LIVE2D_FIT_SIZES.length; index += 1) {
     const [w, h] = LIVE2D_FIT_SIZES[index];
     const name = `${w}x${h}`;
     await page.setViewportSize({ width: w, height: h });
     await page.waitForFunction(
       ({ width, height }) => {
-        const fit = window.__nanoGPTReadLive2dFit?.();
-        const layout = window.__nanoGPTAssertLayout?.();
+        const canvas = document.getElementById("tutor-canvas");
         const stage = document.getElementById("tutor-stage")?.getBoundingClientRect();
         return Boolean(
-          fit?.ready &&
-            fit.ok &&
-            layout?.ok &&
+          canvas?.dataset.fitted === "1" &&
             Math.abs(window.innerWidth - width) < 2 &&
             Math.abs(window.innerHeight - height) < 2 &&
             stage &&
@@ -846,24 +864,78 @@ async function assertLive2dPanel(browser) {
         );
       },
       { width: w, height: h },
-      { timeout: 8000 },
+      { timeout: 15000 },
     );
-    const fit = await page.evaluate(() => window.__nanoGPTReadLive2dFit());
-    const layout = await page.evaluate(() => window.__nanoGPTAssertLayout?.());
-    const row = { name, fit, layoutOk: Boolean(layout?.ok), overlaps: layout?.overlaps || [] };
-    results.push(row);
-    if (shots.has(name)) await page.screenshot({ path: `${shotDir}/ja-c1-intro-${name}.png` });
-    if (!fit?.ok || !layout?.ok) {
-      await page.screenshot({ path: `${OUT}/live2d-fit-${name}.png` });
-      throw new Error(`live2d fit ${name} ${JSON.stringify(row)}`);
+    for (const lang of ["ja", "zh"]) {
+      await page.evaluate((next) => window.__nanoGPTSetLang(next), lang);
+      for (const [key, count] of FIT_LEVELS) {
+        for (let beat = 0; beat < count; beat += 1) {
+          const pageId = LEVEL_PAGES[key][beat].id;
+          await page.evaluate(([sceneKey, sceneBeat]) => window.__nanoGPTJump(sceneKey, sceneBeat, 0), [key, beat]);
+          await page.waitForFunction(
+            (id) => {
+              const state = window.__nanoGPTState?.();
+              const scenes = window.__nanoGPTGame?.scene?.getScenes?.(true) || [];
+              const idle = scenes.length > 0 && scenes.every((scene) => (scene.tweens?.getTweens?.() || []).length === 0);
+              const fit = window.__nanoGPTReadLive2dFit?.();
+              return Boolean(state?.pageId === id && state?.phase === 0 && idle && fit?.ready && window.__nanoGPTBannerSettled === true);
+            },
+            pageId,
+            { timeout: 15000 },
+          );
+          const report = await page.evaluate(() => {
+            const layout = window.__nanoGPTAssertLayout?.() || {};
+            const fit = window.__nanoGPTReadLive2dFit?.() || {};
+            return {
+              ok: Boolean(layout.ok && fit.ok),
+              overlaps: layout.overlaps || [],
+              overflows: layout.overflows || [],
+              orphans: layout.orphans || [],
+              lessonWidth: layout.lessonWidth,
+              lessonFloor: layout.lessonFloor,
+              lessonWidthOk: layout.lessonWidthOk,
+              fitOk: fit.ok,
+              ratio: fit.ratio,
+              bottomGap: fit.bottomGap,
+              centerDelta: fit.centerDelta,
+              widthLimited: fit.widthLimited,
+              heightOk: fit.heightOk,
+              lessonOk: fit.lessonOk,
+              meshAspect: fit.meshAspect,
+              purposeAlpha: fit.purposeAlpha,
+              box: fit.box,
+              canvas: fit.canvas,
+              inside: fit.inside,
+              centered: fit.centered,
+              bottomOk: fit.bottomOk,
+            };
+          });
+          pages += 1;
+          const shot = shotSizes.has(name) && ((lang === "ja" && pageId === "c1-intro") || (lang === "zh" && pageId === "c3-p3"));
+          if (shot) {
+            if (!(report.purposeAlpha >= 0.98)) {
+              await page.screenshot({ path: `${OUT}/live2d-fade-${lang}-${name}.png` });
+              throw new Error(`purpose faded after settle ${lang} ${name} alpha=${report.purposeAlpha}`);
+            }
+            await page.screenshot({ path: `${shotDir}/${lang}-${pageId}-${name}.png` });
+          }
+          if (!report.ok) {
+            await page.screenshot({ path: `${OUT}/live2d-fit-${lang}-${pageId}-${name}.png` });
+            throw new Error(`live2d layout ${lang} ${pageId} ${name} ${JSON.stringify(report)}`);
+          }
+        }
+      }
+      const sample = await page.evaluate(() => window.__nanoGPTReadLive2dFit());
+      results.push({ name, lang, sample });
+      console.log(
+        `ok live2d ${lang} ${name} ratio=${Number(sample.ratio).toFixed(2)} aspect=${Number(sample.meshAspect).toFixed(2)} lesson=${Math.round(sample.lessonWidth)}/${Math.round(sample.lessonFloor)} bottom=${Number(sample.bottomGap).toFixed(1)} limited=${sample.widthLimited} alpha=${Number(sample.purposeAlpha).toFixed(2)}`,
+      );
     }
-    console.log(
-      `ok live2d ${name} ratio=${fit.ratio.toFixed(2)} bottom=${fit.bottomGap.toFixed(1)} center=${fit.centerDelta.toFixed(1)} widthLimited=${fit.widthLimited}`,
-    );
   }
+  if (C3_P3_BEAT < 0) throw new Error("c3-p3 missing from spine");
   await page.close();
-  console.log(`LIVE2D_FIT_OK sizes=${results.length}`);
-  return { ok: true, sizes: results.length };
+  console.log(`LIVE2D_FIT_OK sizes=${LIVE2D_FIT_SIZES.length} pages=${pages}`);
+  return { ok: true, sizes: LIVE2D_FIT_SIZES.length, pages };
 }
 
 const mobile = await runViewport(

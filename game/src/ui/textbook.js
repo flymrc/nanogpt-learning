@@ -224,14 +224,30 @@ function fitPlain(scene, body, size, minSize, wrap, maxTextH) {
   }
   if (truncated) {
     const more = t("cardMore");
-    let withMore = wrapped ? `${wrapped}\n${more}` : more;
+    let lines = wrapped ? wrapped.split("\n") : [];
+    let withMore = lines.length ? `${lines.join("\n")}\n${more}` : more;
     probe.setText(withMore);
-    while (probe.height > maxTextH && wrapped.includes("\n")) {
-      wrapped = wrapped.split("\n").slice(0, -1).join("\n");
-      withMore = wrapped ? `${wrapped}\n${more}` : more;
+    while (probe.height > maxTextH && lines.length > 1) {
+      lines = lines.slice(0, -1);
+      withMore = `${lines.join("\n")}\n${more}`;
       probe.setText(withMore);
     }
-    wrapped = probe.text;
+    while (probe.height > maxTextH && font > 11) {
+      font -= 1;
+      probe.setFontSize(font);
+      probe.setText(withMore);
+    }
+    if (probe.height <= maxTextH + 0.5 && String(probe.text).includes(more)) wrapped = probe.text;
+    else {
+      probe.setText(wrapped);
+      truncated = false;
+    }
+  }
+  while (probe.height > maxTextH && font > 11) {
+    font -= 1;
+    probe.setFontSize(font);
+    wrapped = wrapToWidth(scene, wrapped, font, wrap, cardStyle);
+    probe.setText(wrapped);
   }
   const height = probe.height;
   probe.destroy();
@@ -284,9 +300,11 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   stripe.fillStyle(phaseAccent(meta.id), 1);
   stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 8, 8, height - 16, 5);
   const title = scene.add.text(-width / 2 + 22, -height / 2 + 8, meta.kicker, uiText(phone ? 13 : 14, { color: C.goldCss })).setOrigin(0, 0);
+  title.setData("kind", "phase-card-title");
   const textX = -width / 2 + 22;
   const textY = -height / 2 + 28;
   const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
+  text.setData("kind", "phase-card-text");
   box.add([g, stripe, title]);
   const lineCount = Math.max(1, shownFit.wrapped.split("\n").length);
   paintBookMarks(scene, box, shownFit.wrapped, font, textX, textY, text.height / lineCount);
@@ -309,6 +327,10 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
     });
   }
   box.setSize(width, height);
+  box.setData("kind", "phase-card");
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("shadow", false);
   scene.frame.stage.add(box);
   window.__nanoGPTCard = {
     id: beat?.id || "",

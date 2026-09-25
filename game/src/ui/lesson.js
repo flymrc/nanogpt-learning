@@ -18,7 +18,8 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
   else addChrome(scene, { level, total, title, shell });
 
   const rhythm = lessonRhythm(v);
-  const purposeH = clamp(Math.round((phone ? 68 : v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), phone ? 60 : 64, phone ? 76 : 88);
+  const purposeMin = phone ? 60 : v.h < 560 ? 48 : 64;
+  const purposeH = clamp(Math.round((phone ? 68 : v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), purposeMin, phone ? 76 : 88);
   const purposeBand = band(v.left, shell.content.top, v.innerW, purposeH);
   const stageTop = purposeBand.bottom + rhythm;
   const stageBand = band(v.left, stageTop, v.innerW, Math.max(80, shell.content.bottom - stageTop));
@@ -141,34 +142,63 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
   stripe.fillRoundedRect(-rect.w / 2 + 8, -rect.h / 2 + 8, 10, rect.h - 16, 6);
 
   const hang = tutorHangPx();
+  const rowY = -rect.h * (phone ? 0.24 : 0.28);
   const kicker = scene.add
-    .text(-rect.w / 2 + 26, -rect.h * 0.24, "这一课", uiText(phone ? 12 : 13, { color: C.goldCss }))
+    .text(-rect.w / 2 + 26, rowY, "这一课", uiText(phone ? 12 : 13, { color: C.goldCss }))
     .setOrigin(0, 0.5);
   const purpose = scene.add
     .text(-rect.w / 2 + 26, rect.h * 0.16, "", displayText(Math.max(phone ? 16 : 18, Math.round(rect.h * 0.26))))
     .setOrigin(0, 0.5);
   const step = scene.add
-    .text(rect.w / 2 - 12 - hang, phone ? -rect.h * 0.24 : 0, "", uiText(phone ? 12 : 14, { color: C.muted }))
+    .text(rect.w / 2 - 12 - hang, rowY, "", uiText(phone ? 12 : 14, { color: C.muted }))
     .setOrigin(1, 0.5);
+  kicker.setData("kind", "banner-kicker");
+  purpose.setData("kind", "banner-purpose");
+  step.setData("kind", "banner-step");
 
   box.add([g, stripe, kicker, purpose, step]);
   box.setSize(rect.w, rect.h);
   box.set = (text, index, total, extra = {}) => {
     kicker.setText(extra.kicker || t("thisLesson"));
+    kicker.setY(rowY);
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
-    const maxW = phone ? rect.w - 40 : rect.w - 88 - hang;
+    step.setY(rowY);
+    const gap = 12;
+    const stepLeft = rect.w / 2 - 12 - hang - step.width;
+    const fullW = Math.max(80, rect.w - 40 - (phone ? 0 : hang));
+    const clearW = Math.max(80, stepLeft - (-rect.w / 2 + 26) - gap);
+    const maxW = Math.min(fullW, clearW);
     let size = Math.max(phone ? 15 : 18, Math.round(rect.h * 0.26));
-    const wrapped = wrapToWidth(scene, text, size, maxW, displayText);
     purpose.setFontSize(size);
-    purpose.setText(wrapped);
-    while ((purpose.height > rect.h * 0.58 || purpose.width > maxW + 1) && size > 13) {
+    purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
+    const crowded = () => {
+      const tall = purpose.height > rect.h * 0.5;
+      const wide = purpose.width > maxW + 1;
+      const p = purpose.getBounds();
+      const s = step.getBounds();
+      const k = kicker.getBounds();
+      const hitStep = p.right > s.left - 4 && p.bottom > s.top + 1 && p.top < s.bottom - 1;
+      const hitKicker = p.top < k.bottom + 2 && p.right > k.left && p.left < k.right;
+      return tall || wide || hitStep || hitKicker;
+    };
+    while (crowded() && size > 13) {
       size -= 1;
       purpose.setFontSize(size);
       purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
     }
     purpose.setAlpha(0);
-    scene.tweens.add({ targets: purpose, alpha: 1, duration: 140 });
+    window.__nanoGPTPurposeAlpha = () => purpose.alpha;
+    window.__nanoGPTBannerSettled = false;
+    scene.tweens.add({
+      targets: purpose,
+      alpha: 1,
+      duration: 140,
+      onComplete: () => {
+        purpose.setAlpha(1);
+        window.__nanoGPTBannerSettled = true;
+      },
+    });
   };
   return box;
 }

@@ -123,7 +123,9 @@ export function planLessonHeader(scene, title) {
   const inner = Math.max(80, v.w - 32);
   const buttonRows = Math.max(1, Math.ceil((buttonW || inner) / inner));
   const buttonsBlock = buttonRows * buttonH + Math.max(0, buttonRows - 1) * 8;
-  const buttonTop = v.top + titleRowH + 10;
+  const stackGap = v.h < 560 ? 4 : 10;
+  const stackTail = v.h < 560 ? 6 : 14;
+  const buttonTop = v.top + titleRowH + stackGap;
   placeStackedHud(scene, buttonTop);
   scene.time.delayedCall(0, () => {
     if (!scene.sys?.isActive()) return;
@@ -131,7 +133,7 @@ export function planLessonHeader(scene, title) {
   });
   return {
     stacked: true,
-    headerH: titleRowH + 10 + buttonsBlock + 14,
+    headerH: titleRowH + stackGap + buttonsBlock + stackTail,
     fontSize: stackedFit.size,
     titleLeft,
     titleMax,

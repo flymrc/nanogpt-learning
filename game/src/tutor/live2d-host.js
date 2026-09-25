@@ -26,9 +26,19 @@ let lookLastMs = 0;
 let reserveLock = false;
 let dprWatch = null;
 
-const FIT_MARGIN_X = 14;
-const FIT_MARGIN_TOP = 10;
-const FIT_MARGIN_BOTTOM = 6;
+const FIT_PAD_X = 8;
+const FIT_PAD_TOP = 8;
+const FIT_PAD_BOTTOM = 6;
+const FIT_RIGHT_GAP = 6;
+const RESERVE_EXTRA = 16;
+/**
+ * On main, before this fit, the tutor canvas was width-capped near 300px
+ * and `--tutor-reserve` stayed 334. The lesson column was
+ * min(1160, viewport − 334). Never go narrower than that.
+ */
+const MAIN_TUTOR_RESERVE = 334;
+/** Tall screens: land inside 85–95% of the panel. Shorter ones fill the height. */
+const TALL_HEIGHT_RATIO = 0.92;
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
@@ -253,7 +263,7 @@ async function bootLive2d() {
   resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(() => resizePixi());
   resizeObserver.observe(stage);
-  if (!model.__visW) {
+  if (!model.__mesh) {
     requestAnimationFrame(() => placeModel());
   }
   applyBeat(currentTutor());
@@ -299,16 +309,82 @@ function resizePixi() {
   placeModel();
 }
 
-/** Visible mesh box at scale 1. The layout canvas is taller than the drawn girl. */
-function visibleMeshSize(host) {
-  if (host.__visW && host.__visH) return { w: host.__visW, h: host.__visH };
-  const sx = Math.abs(host.scale?.x || 1) || 1;
-  const sy = Math.abs(host.scale?.y || 1) || 1;
-  const bounds = host.getBounds?.();
-  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return null;
-  host.__visW = bounds.width / sx;
-  host.__visH = bounds.height / sy;
-  return { w: host.__visW, h: host.__visH };
+function lessonFloorPx(viewportW) {
+  return Math.min(1160, viewportW - MAIN_TUTOR_RESERVE);
+}
+
+/** Widest canvas that still leaves the lesson at least as wide as on main. */
+function maxCanvasWidth(dockRight) {
+  const vw = window.innerWidth;
+  const maxReserve = vw - lessonFloorPx(vw);
+  const right = Number.isFinite(dockRight) ? dockRight : vw;
+  return Math.max(96, Math.floor(right - FIT_RIGHT_GAP - (vw - maxReserve + RESERVE_EXTRA)));
+}
+
+function drawableName(id) {
+  if (id == null) return "";
+  if (typeof id === "string") return id;
+  return String(id.s || id.id || id._id || "");
+}
+
+/**
+ * Tight box of visible drawables, in the model's canvas pixels.
+ * getBounds() is the texture box (wide transparent padding). Hiyori's
+ * drawn mesh is much narrower than that box.
+ */
+function measureVisibleMesh(host) {
+  if (host.__mesh) return host.__mesh;
+  const im = host.internalModel;
+  const core = im?.coreModel;
+  if (!core?.getDrawableCount || !im.getDrawableVertices) return null;
+  const canvasW = im.width || 0;
+  const canvasH = im.height || 0;
+  const count = core.getDrawableCount();
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  let used = 0;
+  for (let index = 0; index < count; index += 1) {
+    if (typeof core.getDrawableDynamicFlagIsVisible === "function" && !core.getDrawableDynamicFlagIsVisible(index)) continue;
+    const opacity = typeof core.getDrawableOpacity === "function" ? core.getDrawableOpacity(index) : 1;
+    if (!(opacity > 0.05)) continue;
+    const name = drawableName(core.getDrawableId?.(index));
+    if (/hit/i.test(name)) continue;
+    let verts;
+    try {
+      verts = im.getDrawableVertices(index);
+    } catch {
+      continue;
+    }
+    if (!verts || verts.length < 4) continue;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k < verts.length; k += 2) {
+      const x = verts[k];
+      const y = verts[k + 1];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      if (x < x0) x0 = x;
+      if (y < y0) y0 = y;
+      if (x > x1) x1 = x;
+      if (y > y1) y1 = y;
+    }
+    if (!(x1 > x0) || !(y1 > y0)) continue;
+    if (canvasW > 32 && canvasH > 32 && x1 - x0 > canvasW * 0.92 && y1 - y0 > canvasH * 0.92) continue;
+    if (x0 < minX) minX = x0;
+    if (y0 < minY) minY = y0;
+    if (x1 > maxX) maxX = x1;
+    if (y1 > maxY) maxY = y1;
+    used += 1;
+  }
+  if (used < 4 || !(maxX > minX + 8) || !(maxY > minY + 8)) return null;
+  const mesh = { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY, used };
+  if (canvasW > 32 && mesh.w > canvasW * 1.02) return null;
+  if (canvasH > 32 && mesh.h > canvasH * 1.02) return null;
+  host.__mesh = mesh;
+  return mesh;
 }
 
 function watchDevicePixelRatio() {
@@ -330,7 +406,8 @@ function publishTutorReserve() {
   if (!canvas || canvas.dataset.fitted !== "1") return;
   const rect = canvas.getBoundingClientRect();
   if (rect.width < 8 || rect.left < 8) return;
-  const reserve = Math.ceil(window.innerWidth - rect.left + 16);
+  const maxReserve = window.innerWidth - lessonFloorPx(window.innerWidth);
+  const reserve = Math.min(maxReserve, Math.ceil(window.innerWidth - rect.left + RESERVE_EXTRA));
   if (reserve < 120 || reserve > window.innerWidth * 0.55) return;
   const prev = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve")) || 0;
   if (Math.abs(reserve - prev) < 8) return;
@@ -344,8 +421,9 @@ function publishTutorReserve() {
 }
 
 /**
- * Fill the right-hand panel: visible mesh scaled to the panel height,
- * limited by the panel width, centered, and standing on the bottom edge.
+ * Size the panel from the visible mesh at the fitted height.
+ * The lesson column keeps the width it had on main; if both cannot fit,
+ * the girl shrinks. Tall viewports land near 92% of the panel height.
  */
 function placeModel() {
   if (!pixiApp || !model) return;
@@ -355,56 +433,57 @@ function placeModel() {
   if (!canvas) return;
   canvas.dataset.fitted = "";
 
-  applyCanvasPixels(pixiApp, canvas, dock);
-  canvas.style.left = "0px";
-  canvas.style.top = "0px";
-
-  const mesh = visibleMeshSize(model);
+  const mesh = measureVisibleMesh(model);
   if (!mesh) {
     model.__fitTries = (model.__fitTries || 0) + 1;
     if (model.__fitTries < 40) requestAnimationFrame(() => placeModel());
     return;
   }
 
-  const availW = Math.max(48, dock.w - FIT_MARGIN_X * 2);
-  const availH = Math.max(48, dock.h - FIT_MARGIN_TOP - FIT_MARGIN_BOTTOM);
-  const scale = Math.min(availH / mesh.h, availW / mesh.w);
-  model.anchor.set(0.5, 0.5);
-  model.scale.set(scale);
-  model.x = dock.w / 2;
-  model.y = dock.h / 2;
-
-  let bounds = model.getBounds?.();
-  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
-  const targetCx = dock.w / 2;
-  const targetBottom = dock.h - FIT_MARGIN_BOTTOM;
-  model.x += targetCx - (bounds.x + bounds.width / 2);
-  model.y += targetBottom - (bounds.y + bounds.height);
-  bounds = model.getBounds?.();
-  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
-
-  if (bounds.x < FIT_MARGIN_X) model.x += FIT_MARGIN_X - bounds.x;
-  if (bounds.x + bounds.width > dock.w - FIT_MARGIN_X) {
-    model.x -= bounds.x + bounds.width - (dock.w - FIT_MARGIN_X);
+  const dockEl = document.getElementById("tutor-dock");
+  const dockRight = dockEl?.getBoundingClientRect().right ?? window.innerWidth;
+  const capW = maxCanvasWidth(dockRight);
+  const tall = dock.h >= 1000;
+  const targetH = tall ? dock.h * TALL_HEIGHT_RATIO : Math.max(120, dock.h - FIT_PAD_TOP - FIT_PAD_BOTTOM);
+  let scale = targetH / mesh.h;
+  let widthLimited = false;
+  const wantedW = mesh.w * scale + FIT_PAD_X * 2;
+  if (wantedW > capW) {
+    widthLimited = true;
+    scale = Math.max(0.01, (capW - FIT_PAD_X * 2) / mesh.w);
   }
-  if (bounds.y < FIT_MARGIN_TOP) model.y += FIT_MARGIN_TOP - bounds.y;
-  bounds = model.getBounds?.();
-  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
 
-  const pad = 2;
-  const left = Math.max(0, Math.floor(bounds.x - pad));
-  const top = Math.max(0, Math.floor(bounds.y - pad));
-  const width = Math.min(dock.w - left, Math.ceil(bounds.width + pad * 2));
-  const height = Math.min(dock.h - top, Math.ceil(bounds.height + pad * 2));
-  if (width < 40 || height < 40) return;
+  const meshW = mesh.w * scale;
+  const meshH = mesh.h * scale;
+  const canvasW = Math.max(48, Math.ceil(meshW + FIT_PAD_X * 2));
+  const canvasH = Math.max(48, Math.ceil(meshH + FIT_PAD_TOP + FIT_PAD_BOTTOM));
+  let left = Math.round(dock.w - FIT_RIGHT_GAP - canvasW);
+  let top = Math.round(dock.h - FIT_PAD_BOTTOM - meshH - FIT_PAD_TOP);
+  if (top < 0) top = 0;
+  if (left + canvasW > dock.w) left = Math.round(dock.w - canvasW);
 
+  model.anchor.set(0, 0);
+  model.scale.set(scale);
+  model.x = left + FIT_PAD_X - mesh.minX * scale;
+  model.y = top + FIT_PAD_TOP - mesh.minY * scale;
   model.x = Math.round(model.x - left);
   model.y = Math.round(model.y - top);
-  lastBufferKey = `fit-${width}x${height}@${dock.dpr}`;
-  applyCanvasPixels(pixiApp, canvas, { w: width, h: height, dpr: dock.dpr });
+
+  lastBufferKey = `fit-${canvasW}x${canvasH}@${dock.dpr}`;
+  applyCanvasPixels(pixiApp, canvas, { w: canvasW, h: canvasH, dpr: dock.dpr });
   canvas.style.left = `${left}px`;
   canvas.style.top = `${top}px`;
   canvas.dataset.fitted = "1";
+  canvas.dataset.widthLimited = widthLimited ? "1" : "0";
+  model.__visible = {
+    x: FIT_PAD_X,
+    y: FIT_PAD_TOP,
+    w: meshW,
+    h: meshH,
+    aspect: mesh.w / mesh.h,
+    widthLimited,
+    capW,
+  };
   publishTutorReserve();
 }
 
@@ -644,10 +723,12 @@ function installDebugProbe() {
             x: model.x,
             y: model.y,
             scale: model.scale?.x,
-            bounds: (() => {
-              const b = model.getBounds?.();
-              return b ? { x: b.x, y: b.y, w: b.width, h: b.height } : null;
-            })(),
+            bounds: model.__visible
+              ? { x: model.__visible.x, y: model.__visible.y, w: model.__visible.w, h: model.__visible.h }
+              : null,
+            meshAspect: model.__visible?.aspect ?? null,
+            widthLimited: Boolean(model.__visible?.widthLimited),
+            capW: model.__visible?.capW ?? null,
             slot: { w: box.w, h: box.h },
           }
         : null,
