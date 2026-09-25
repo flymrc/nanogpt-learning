@@ -690,8 +690,12 @@ export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
     const focus = focusIndex(shared);
     const zeroFrom = visual === "mix" ? glyphs.length : focus + 1;
     if (glyphs.length) {
-      const tileRoom = Math.max(16, ceilingOf(scene, stage) - top - schemeBlock() - 6 - STICKER_SHADOW_Y);
-      const tileMax = Math.min(40, tileRoom);
+      const room = Math.max(16, ceilingOf(scene, stage) - top);
+      const tileFloor = 28;
+      const chartFloor = 24 + STICKER_SHADOW_Y + CAPTION_CLEAR + SCHEME_CAPTION_H;
+      let tileMax = room - schemeBlock() - 6 - STICKER_SHADOW_Y;
+      if (tileMax < tileFloor && room >= tileFloor + STICKER_SHADOW_Y + 6 + chartFloor) tileMax = tileFloor;
+      tileMax = Math.min(40, Math.max(12, tileMax));
       const row = drawTiles(scene, stage, glyphs, top, { maxW: tileMax, maxH: tileMax, singleRow: true });
       row?.nodes?.forEach((node, index) => {
         if (index >= zeroFrom) node.setAlpha(0.35);
