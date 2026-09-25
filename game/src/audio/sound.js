@@ -1,6 +1,8 @@
+import { eachVoClip } from "./vo-catalog.js";
+
 const MUTE_KEY = "nanogpt-game-muted";
 
-/** Lesson lines use Web Speech. Old zh mp3 clips do not match the new script. */
+/** BGM and SFX. Lesson lines prefer public/audio/vo mp3s and fall back to Web Speech. */
 export const AUDIO_KEYS = ["bgm", "sfx-tap", "sfx-pop"];
 
 let startTimer = 0;
@@ -34,6 +36,9 @@ export function applyMute(game, muted) {
 export function preloadAudio(scene) {
   AUDIO_KEYS.forEach((key) => {
     scene.load.audio(key, [`audio/${key}.ogg`, `audio/${key}.mp3`]);
+  });
+  eachVoClip().forEach(({ cacheKey, url }) => {
+    scene.load.audio(cacheKey, url);
   });
 }
 
@@ -290,7 +295,9 @@ export function flushNarration(scene) {
   const next = scene?.game?.registry?.get("pendingNarration");
   if (!next || readMuted()) return;
   scene.game.registry.set("pendingNarration", null);
-  if (next.clip && scene.cache?.audio?.exists(next.clip)) {
+  const clipReady = next.clip && scene.cache?.audio?.exists(next.clip);
+  if (clipReady) {
+    if (typeof window !== "undefined") window.__nanoGPTUtterance = { text: next.text };
     speak(scene, next.clip);
     publishNarration({ ...next, playing: true, queued: false, muted: false, source: "clip", missingVoice: false, voiceName: "" });
     return;

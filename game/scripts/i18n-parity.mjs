@@ -6,6 +6,7 @@ import { JA } from "../src/i18n/ja.js";
 import { PAGES } from "../src/i18n/skeleton.js";
 import { ZH } from "../src/i18n/zh.js";
 import { END_BEAT, TITLE_BEAT } from "../src/data/lessons.js";
+import { checkVoFiles } from "./vo-check.mjs";
 
 const BANNED = [
   "纸带",
@@ -103,6 +104,8 @@ for (const [key, value] of Object.entries(JA)) {
 for (const word of ["分数", "份数", "九成", "平均", "拖动", "按住", "运行", "ckpt", "旋钮", "信心", "墙上"]) {
   if (Object.values(ZH).some((value) => value.includes(word))) fail(`zh still says ${word}`);
 }
+
+for (const error of checkVoFiles()) fail(error);
 
 if (errors.length) {
   console.error("I18N_FAIL");

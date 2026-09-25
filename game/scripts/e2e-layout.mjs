@@ -75,6 +75,7 @@ async function assertVo(page, key, beat) {
       const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
       return pageId === expected.id
         && narr.id === expected.id
+        && narr.source === "clip"
         && body === expected.text
         && utter === expected.text
         && narrText === expected.text;
@@ -568,6 +569,8 @@ async function openSpeechPage(browser, { mode, label }) {
     hasTouch: mobile,
     userAgent: mobile ? MOBILE_UA : undefined,
   });
+  // These pages assert the Web Speech fallback. Drop the recorded clips so the loader misses them.
+  await page.route("**/audio/vo/**", (route) => route.abort());
   await page.addInitScript(speechMockSource(mode));
   await ready(page);
   const hooked = await page.evaluate((expected) => {
