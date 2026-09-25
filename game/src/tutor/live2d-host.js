@@ -23,7 +23,12 @@ let lookHook = null;
 const lookTarget = { x: 0, y: 0 };
 const lookCurrent = { x: 0, y: 0 };
 let lookLastMs = 0;
-let reservePosts = 0;
+let reserveLock = false;
+let dprWatch = null;
+
+const FIT_MARGIN_X = 14;
+const FIT_MARGIN_TOP = 10;
+const FIT_MARGIN_BOTTOM = 6;
 
 function displayDpr() {
   const raw = Number(window.devicePixelRatio);
@@ -95,6 +100,13 @@ export function mountTutorHost() {
       window.clearTimeout(window.__nanoGPTTutorResize);
       window.__nanoGPTTutorResize = window.setTimeout(syncTutorLayout, 160);
     });
+    window.addEventListener("orientationchange", () => syncTutorLayout());
+    window.visualViewport?.addEventListener("resize", () => {
+      window.clearTimeout(window.__nanoGPTTutorResize);
+      window.__nanoGPTTutorResize = window.setTimeout(syncTutorLayout, 160);
+    });
+    globalThis.screen?.orientation?.addEventListener?.("change", () => syncTutorLayout());
+    watchDevicePixelRatio();
     window.addEventListener("nanogpt-voice", (event) => {
       setTalking(Boolean(event.detail?.playing));
     });
@@ -117,10 +129,8 @@ function syncTutorLayout() {
   if (!layout || !dock) return;
 
   const eligible = isWidePcTutor();
-  const wasHidden = dock.hidden;
   layout.classList.toggle("is-wide", eligible);
   dock.hidden = !eligible;
-  if (eligible && wasHidden) reservePosts = 0;
 
   if (!eligible) {
     teardownLive2d();
@@ -243,7 +253,7 @@ async function bootLive2d() {
   resizeObserver?.disconnect();
   resizeObserver = new ResizeObserver(() => resizePixi());
   resizeObserver.observe(stage);
-  if (!model.__naturalW) {
+  if (!model.__visW) {
     requestAnimationFrame(() => placeModel());
   }
   applyBeat(currentTutor());
@@ -289,21 +299,33 @@ function resizePixi() {
   placeModel();
 }
 
-function naturalSize(host) {
-  if (host.__naturalW && host.__naturalH) {
-    return { w: host.__naturalW, h: host.__naturalH };
-  }
-  const sx = host.scale?.x || 1;
-  const sy = host.scale?.y || 1;
-  const w = host.width / sx;
-  const h = host.height / sy;
-  if (!(w > 8) || !(h > 8)) return null;
-  host.__naturalW = w;
-  host.__naturalH = h;
-  return { w, h };
+/** Visible mesh box at scale 1. The layout canvas is taller than the drawn girl. */
+function visibleMeshSize(host) {
+  if (host.__visW && host.__visH) return { w: host.__visW, h: host.__visH };
+  const sx = Math.abs(host.scale?.x || 1) || 1;
+  const sy = Math.abs(host.scale?.y || 1) || 1;
+  const bounds = host.getBounds?.();
+  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return null;
+  host.__visW = bounds.width / sx;
+  host.__visH = bounds.height / sy;
+  return { w: host.__visW, h: host.__visH };
+}
+
+function watchDevicePixelRatio() {
+  dprWatch?.removeEventListener?.("change", onDprChange);
+  const raw = Number(window.devicePixelRatio);
+  const dpr = Number.isFinite(raw) && raw > 0 ? raw : 1;
+  dprWatch = window.matchMedia(`(resolution: ${dpr}dppx)`);
+  dprWatch.addEventListener?.("change", onDprChange);
+}
+
+function onDprChange() {
+  watchDevicePixelRatio();
+  syncTutorLayout();
 }
 
 function publishTutorReserve() {
+  if (reserveLock) return;
   const canvas = document.getElementById("tutor-canvas");
   if (!canvas || canvas.dataset.fitted !== "1") return;
   const rect = canvas.getBoundingClientRect();
@@ -312,38 +334,64 @@ function publishTutorReserve() {
   if (reserve < 120 || reserve > window.innerWidth * 0.55) return;
   const prev = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--tutor-reserve")) || 0;
   if (Math.abs(reserve - prev) < 8) return;
-  if (reservePosts >= 2) return;
-  reservePosts += 1;
-  document.documentElement.style.setProperty("--tutor-reserve", `${reserve}px`);
-  window.dispatchEvent(new Event("resize"));
+  reserveLock = true;
+  try {
+    document.documentElement.style.setProperty("--tutor-reserve", `${reserve}px`);
+    window.dispatchEvent(new Event("resize"));
+  } finally {
+    reserveLock = false;
+  }
 }
 
+/**
+ * Fill the right-hand panel: visible mesh scaled to the panel height,
+ * limited by the panel width, centered, and standing on the bottom edge.
+ */
 function placeModel() {
   if (!pixiApp || !model) return;
   const dock = stageBox();
   if (dock.w < 40 || dock.h < 40) return;
-  const natural = naturalSize(model);
-  if (!natural) return;
   const canvas = ensureTutorCanvas();
   if (!canvas) return;
   canvas.dataset.fitted = "";
 
-  const maxH = Math.max(160, dock.h - 12);
-  const maxW = Math.min(300, Math.max(120, dock.w - 16));
-  const scale = Math.min(maxH / natural.h, maxW / natural.w);
-  model.anchor.set(0.5, 0);
-  model.scale.set(scale);
-
   applyCanvasPixels(pixiApp, canvas, dock);
   canvas.style.left = "0px";
   canvas.style.top = "0px";
-  const bodyW = natural.w * scale;
-  model.x = Math.round(dock.w - 12 - bodyW / 2);
-  model.y = 6;
-  const bounds = model.getBounds?.();
+
+  const mesh = visibleMeshSize(model);
+  if (!mesh) {
+    model.__fitTries = (model.__fitTries || 0) + 1;
+    if (model.__fitTries < 40) requestAnimationFrame(() => placeModel());
+    return;
+  }
+
+  const availW = Math.max(48, dock.w - FIT_MARGIN_X * 2);
+  const availH = Math.max(48, dock.h - FIT_MARGIN_TOP - FIT_MARGIN_BOTTOM);
+  const scale = Math.min(availH / mesh.h, availW / mesh.w);
+  model.anchor.set(0.5, 0.5);
+  model.scale.set(scale);
+  model.x = dock.w / 2;
+  model.y = dock.h / 2;
+
+  let bounds = model.getBounds?.();
+  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
+  const targetCx = dock.w / 2;
+  const targetBottom = dock.h - FIT_MARGIN_BOTTOM;
+  model.x += targetCx - (bounds.x + bounds.width / 2);
+  model.y += targetBottom - (bounds.y + bounds.height);
+  bounds = model.getBounds?.();
   if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
 
-  const pad = 6;
+  if (bounds.x < FIT_MARGIN_X) model.x += FIT_MARGIN_X - bounds.x;
+  if (bounds.x + bounds.width > dock.w - FIT_MARGIN_X) {
+    model.x -= bounds.x + bounds.width - (dock.w - FIT_MARGIN_X);
+  }
+  if (bounds.y < FIT_MARGIN_TOP) model.y += FIT_MARGIN_TOP - bounds.y;
+  bounds = model.getBounds?.();
+  if (!bounds || !(bounds.width > 8) || !(bounds.height > 8)) return;
+
+  const pad = 2;
   const left = Math.max(0, Math.floor(bounds.x - pad));
   const top = Math.max(0, Math.floor(bounds.y - pad));
   const width = Math.min(dock.w - left, Math.ceil(bounds.width + pad * 2));

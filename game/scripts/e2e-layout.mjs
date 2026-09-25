@@ -758,6 +758,114 @@ async function assertMuteSlash(page) {
 
 const speech = await assertJaSpeech(browser);
 
+const LIVE2D_FIT_SIZES = [
+  [1440, 900],
+  [1280, 600],
+  [1024, 522],
+  [1280, 640],
+  [1366, 768],
+  [1920, 960],
+  [1920, 1080],
+  [2560, 1080],
+];
+
+async function assertLive2dPanel(browser) {
+  const shotDir = "/opt/cursor/artifacts/live2d-fit";
+  mkdirSync(shotDir, { recursive: true });
+  const page = await browser.newPage({
+    viewport: { width: 1440, height: 900 },
+    deviceScaleFactor: 2,
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem("nanogpt-lang", "ja");
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+    window.__nanoGPTReadLive2dFit = () => {
+      const stageEl = document.getElementById("tutor-stage");
+      const canvas = document.getElementById("tutor-canvas");
+      const stage = stageEl?.getBoundingClientRect();
+      const crect = canvas?.getBoundingClientRect();
+      const bounds = window.__nanoGPTTutorHiDPI?.()?.place?.bounds;
+      if (!stage || !crect || !bounds || canvas.dataset.fitted !== "1") return { ready: false };
+      const box = { x: crect.x + bounds.x, y: crect.y + bounds.y, w: bounds.w, h: bounds.h };
+      const bottomGap = stage.bottom - (box.y + box.h);
+      const centerDelta = box.x + box.w / 2 - (stage.x + stage.width / 2);
+      const widthLimited = box.w >= stage.width - 40;
+      const heightOk = box.h >= stage.height * 0.8 - 0.5 || widthLimited;
+      const bottomOk = bottomGap >= -2 && bottomGap <= 12;
+      const centered = Math.abs(centerDelta) <= 10;
+      const inside =
+        box.x >= -1 &&
+        box.y >= -1 &&
+        box.x + box.w <= window.innerWidth + 1 &&
+        box.y + box.h <= window.innerHeight + 1 &&
+        box.x >= stage.x - 1 &&
+        box.y >= stage.y - 1 &&
+        box.x + box.w <= stage.right + 1 &&
+        box.y + box.h <= stage.bottom + 1;
+      return {
+        ready: true,
+        ok: heightOk && bottomOk && centered && inside,
+        heightOk,
+        bottomOk,
+        centered,
+        inside,
+        widthLimited,
+        bottomGap,
+        centerDelta,
+        ratio: box.h / stage.height,
+        box,
+        panel: { x: stage.x, y: stage.y, w: stage.width, h: stage.height },
+        pageId: window.__nanoGPTState?.().pageId || "",
+      };
+    };
+  });
+  await ready(page);
+  await page.waitForFunction(() => document.getElementById("tutor-canvas")?.dataset.fitted === "1", { timeout: 30000 });
+  await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
+  await page.waitForFunction(() => window.__nanoGPTState?.().pageId === "c1-intro", { timeout: 15000 });
+  const shots = new Set(["1024x522", "1920x1080", "2560x1080"]);
+  const results = [];
+  for (let index = 0; index < LIVE2D_FIT_SIZES.length; index += 1) {
+    const [w, h] = LIVE2D_FIT_SIZES[index];
+    const name = `${w}x${h}`;
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForFunction(
+      ({ width, height }) => {
+        const fit = window.__nanoGPTReadLive2dFit?.();
+        const layout = window.__nanoGPTAssertLayout?.();
+        const stage = document.getElementById("tutor-stage")?.getBoundingClientRect();
+        return Boolean(
+          fit?.ready &&
+            fit.ok &&
+            layout?.ok &&
+            Math.abs(window.innerWidth - width) < 2 &&
+            Math.abs(window.innerHeight - height) < 2 &&
+            stage &&
+            Math.abs(stage.height - height) < 8,
+        );
+      },
+      { width: w, height: h },
+      { timeout: 8000 },
+    );
+    const fit = await page.evaluate(() => window.__nanoGPTReadLive2dFit());
+    const layout = await page.evaluate(() => window.__nanoGPTAssertLayout?.());
+    const row = { name, fit, layoutOk: Boolean(layout?.ok), overlaps: layout?.overlaps || [] };
+    results.push(row);
+    if (shots.has(name)) await page.screenshot({ path: `${shotDir}/ja-c1-intro-${name}.png` });
+    if (!fit?.ok || !layout?.ok) {
+      await page.screenshot({ path: `${OUT}/live2d-fit-${name}.png` });
+      throw new Error(`live2d fit ${name} ${JSON.stringify(row)}`);
+    }
+    console.log(
+      `ok live2d ${name} ratio=${fit.ratio.toFixed(2)} bottom=${fit.bottomGap.toFixed(1)} center=${fit.centerDelta.toFixed(1)} widthLimited=${fit.widthLimited}`,
+    );
+  }
+  await page.close();
+  console.log(`LIVE2D_FIT_OK sizes=${results.length}`);
+  return { ok: true, sizes: results.length };
+}
+
 const mobile = await runViewport(
   "mobile",
   {
@@ -788,6 +896,8 @@ const pc1024 = await runViewport(
   },
   { allPhases: false },
 );
+
+const live2dFit = await assertLive2dPanel(browser);
 
 await browser.close();
 
@@ -825,7 +935,8 @@ const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
 const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
 const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk) {
+const live2dOk = live2dFit?.ok === true;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -841,6 +952,8 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     flowOk,
     speechOk,
     speech,
+    live2dOk,
+    live2dFit,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);
