@@ -63,6 +63,8 @@ export default class HomeScene extends Phaser.Scene {
     title.setName("chapter-title");
     title.setData("kind", "caption");
     title.setData("hubRole", "title");
+    title.setData("source", t("hub.title"));
+    title.setData("wrapWidth", v.innerW - 8);
 
     const subSize = plan.scale > 1.001 ? Math.round((phone ? 18 : 20) * plan.scale) : phone ? 18 : 20;
     const introFit = fitBlock(
@@ -79,6 +81,8 @@ export default class HomeScene extends Phaser.Scene {
       .setOrigin(0.5);
     intro.setData("kind", "caption");
     intro.setData("hubRole", "sub");
+    intro.setData("source", t("hub.intro"));
+    intro.setData("wrapWidth", v.innerW - 8);
 
     this.cards = [];
     const slot = plan.slots.cards;
@@ -298,12 +302,16 @@ function buildCard(scene, spec, x, y, w, h, scale = 1) {
   const textTop = side ? contentTop + Math.max(0, (Math.max(art.h, blockH) - blockH) / 2) : art.y + art.h + textGap;
   const title = scene.add.text(textX, textTop, titleFit.body, hubDisplay(titleFit.size)).setOrigin(0, 0);
   tagText(title, spec.id, "card-title");
+  title.setData("source", t(spec.titleKey));
+  title.setData("wrapWidth", textW);
   card.add(title);
   const blurbTop = textTop + title.height + titleBlurbGap;
   const blurb = scene.add
     .text(textX, blurbTop, blurbFit.body, hubUi(blurbFit.size, { color: C.muted }))
     .setOrigin(0, 0);
   tagText(blurb, spec.id, "card-desc");
+  blurb.setData("source", t(spec.blurbKey));
+  blurb.setData("wrapWidth", textW);
   card.add(blurb);
   const badgeX = textX;
   const badgeY = blurbTop + blurb.height + blurbActionGap + Math.max(0, (actionSlot - badgeH) / 2);

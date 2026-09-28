@@ -174,9 +174,15 @@ export function orphanLines(body) {
   return hits;
 }
 
-/** Pull glyphs onto a short last line until it is no longer an orphan, or the width runs out. */
-function rebalanceTail(lines, widthOf, maxWidth) {
+/**
+ * Fix a short last line without cutting a space-delimited phrase.
+ * Half-width spaces are bunsetsu breaks. A phrase is split only when that
+ * phrase alone is wider than the line (`wide` marks those fragments).
+ * Otherwise move a whole phrase, or leave the orphan so the caller shrinks the font.
+ */
+function rebalancePhrases(lines, wideFlags, widthOf, maxWidth) {
   const out = lines.slice();
+  const wide = wideFlags.slice();
   let guard = 0;
   while (out.length >= 2 && guard < 40) {
     guard += 1;
@@ -185,7 +191,21 @@ function rebalanceTail(lines, widthOf, maxWidth) {
     if (!last) break;
     const compact = [...String(last).replace(/\s+/g, "")];
     if (visibleCount(last) > 2 && compact.length !== 1) break;
-    const prevChars = [...out[lastIdx - 1]];
+    const prev = String(out[lastIdx - 1] ?? "").replace(/\s+$/u, "");
+    const parts = prev.split(/\s+/).filter(Boolean);
+    if (!parts.length) break;
+    if (parts.length >= 2) {
+      const moved = parts.pop();
+      const nextPrev = parts.join(" ");
+      const nextLast = `${moved} ${String(last).replace(/^\s+/u, "")}`;
+      if (widthOf && widthOf(nextLast) > maxWidth) break;
+      out[lastIdx - 1] = nextPrev;
+      out[lastIdx] = nextLast;
+      wide[lastIdx] = false;
+      continue;
+    }
+    if (!wide[lastIdx - 1]) break;
+    const prevChars = [...prev];
     while (prevChars.length && /\s/u.test(prevChars[prevChars.length - 1])) prevChars.pop();
     if (prevChars.length <= 1) break;
     const moved = prevChars.pop();
@@ -195,17 +215,22 @@ function rebalanceTail(lines, widthOf, maxWidth) {
     if (widthOf && widthOf(nextLast) > maxWidth) break;
     if (!nextPrev) {
       out.splice(lastIdx - 1, 1);
+      wide.splice(lastIdx - 1, 1);
       out[out.length - 1] = nextLast;
+      wide[out.length - 1] = true;
       continue;
     }
     out[lastIdx - 1] = nextPrev;
     out[lastIdx] = nextLast;
+    wide[lastIdx - 1] = true;
+    wide[lastIdx] = true;
   }
-  return out;
+  return { lines: out, wide };
 }
 
 /**
- * Wrap at spaces first (the kid script marks words that way), then glyphs.
+ * Wrap at half-width spaces first (bunsetsu), then glyphs inside a phrase
+ * only when that phrase is wider than the line.
  * Callers shrink the font while `orphanLines` is non-empty.
  */
 export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
@@ -229,39 +254,55 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
     return out.length ? out : [""];
   };
   const lines = [];
+  const wide = [];
+  const pushLine = (text, overWide) => {
+    lines.push(text);
+    wide.push(Boolean(overWide));
+  };
   for (const para of String(raw ?? "").split("\n")) {
     const words = para.split(/\s+/).filter(Boolean);
     if (!words.length) {
-      lines.push("");
+      pushLine("", false);
       continue;
     }
     let current = "";
+    let currentWide = false;
     for (const word of words) {
-      const chunks = widthOf(word) > maxWidth ? breakToken(word) : [word];
+      const over = widthOf(word) > maxWidth;
+      const chunks = over ? breakToken(word) : [word];
       chunks.forEach((chunk, index) => {
-        if (index < chunks.length - 1) {
-          if (current) lines.push(current);
-          lines.push(chunk);
+        const mid = over && index < chunks.length - 1;
+        const tail = over && index === chunks.length - 1;
+        if (mid) {
+          if (current) pushLine(current, currentWide);
+          pushLine(chunk, true);
           current = "";
+          currentWide = false;
           return;
         }
         const trial = current ? `${current} ${chunk}` : chunk;
         if (current && widthOf(trial) > maxWidth) {
-          lines.push(current);
+          pushLine(current, currentWide);
           current = chunk;
+          currentWide = tail;
         } else {
           current = trial;
+          currentWide = currentWide || tail;
         }
       });
     }
-    lines.push(current);
+    pushLine(current, currentWide);
   }
   let next = applyKinsoku(lines, widthOf, maxWidth);
+  let flags = next.length === wide.length ? wide.slice() : next.map(() => false);
   for (let pass = 0; pass < 3; pass += 1) {
-    const balanced = rebalanceTail(next, widthOf, maxWidth);
-    next = applyKinsoku(balanced, widthOf, maxWidth);
+    const balanced = rebalancePhrases(next, flags, widthOf, maxWidth);
+    const kin = applyKinsoku(balanced.lines, widthOf, maxWidth);
+    const kinFlags = kin.length === balanced.wide.length ? balanced.wide : kin.map(() => false);
+    next = kin;
+    flags = kinFlags;
     if (!orphanLines(next.join("\n")).length) break;
-    if (balanced.join("\n") === next.join("\n")) break;
+    if (balanced.lines.join("\n") === next.join("\n")) break;
   }
   const wrapped = next.join("\n");
   probe.destroy();

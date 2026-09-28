@@ -899,10 +899,58 @@ function collectTopBarHits() {
   return hits;
 }
 
+/** Line breaks must land on half-width spaces unless one phrase is wider than the line. */
+function phraseSplitHits(source, wrapped, phraseTooWide) {
+  const phrases = String(source || "").split(/\s+/).filter(Boolean);
+  if (phrases.length < 2) return [];
+  const lines = String(wrapped || "").split("\n").map((line) => line.replace(/\s+/g, ""));
+  const flat = phrases.join("");
+  if (lines.join("") !== flat) return [["phrase-mismatch", String(wrapped || "").slice(0, 48)]];
+  const ends = new Set();
+  let acc = 0;
+  for (const phrase of phrases) {
+    acc += [...phrase].length;
+    ends.add(acc);
+  }
+  const hits = [];
+  let pos = 0;
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    pos += [...lines[i]].length;
+    if (ends.has(pos)) continue;
+    let start = 0;
+    let phrase = "";
+    for (const item of phrases) {
+      const next = start + [...item].length;
+      if (pos > start && pos < next) {
+        phrase = item;
+        break;
+      }
+      start = next;
+    }
+    if (phrase && phraseTooWide(phrase)) continue;
+    hits.push(["phrase-break", lines[i], lines[i + 1]]);
+  }
+  return hits;
+}
+
+function phraseWiderThan(obj, phrase, maxWidth) {
+  const probe = obj.scene.make.text({
+    x: -12000,
+    y: -12000,
+    text: phrase,
+    style: obj.style,
+    add: false,
+  });
+  const width = probe.width;
+  probe.destroy();
+  return width > maxWidth + 1;
+}
+
 /**
  * Home copy: one font per string, no short last line on the title or description,
  * button text inside its pill with padding, caption fully visible,
  * and the mobile chrome does not repeat the page title.
+ * Japanese titles and descriptions break on half-width bunsetsu spaces.
  */
 function collectHomeCopyHits(scene, origin) {
   const hits = [];
@@ -919,6 +967,12 @@ function collectHomeCopyHits(scene, origin) {
         return;
       }
       for (const line of orphanLines(body)) hits.push(["orphan-line", role, line]);
+      const source = String(obj.getData?.("source") || "");
+      if (source.includes(" ") && (role === "title" || role === "sub" || role === "card-title" || role === "card-desc")) {
+        const wrapWidth = Number(obj.getData?.("wrapWidth")) || obj.width;
+        const tooWide = (phrase) => phraseWiderThan(obj, phrase, wrapWidth);
+        for (const hit of phraseSplitHits(source, body, tooWide)) hits.push(hit);
+      }
       if (role === "card-action") {
         const pillHit = pillPaddingHit(obj, origin);
         if (pillHit) hits.push(pillHit);
