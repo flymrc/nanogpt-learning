@@ -94,12 +94,21 @@ export function stickerColor(seed) {
 /** No line may start with closing punctuation (禁则). */
 const KINSOKU_HEAD = "。，、！？）」』】》〉";
 
-function applyKinsoku(lines) {
+function applyKinsoku(lines, widthOf, maxWidth) {
   const out = [];
   for (const line of lines) {
     let rest = line;
     while (out.length && out[out.length - 1] !== "" && rest && KINSOKU_HEAD.includes(rest[0])) {
-      out[out.length - 1] += rest[0];
+      const prev = out[out.length - 1];
+      const prevChars = [...prev];
+      const joined = prev + rest[0];
+      if (widthOf && prevChars.length > 1 && widthOf(joined) > maxWidth) {
+        const last = prevChars.pop();
+        out[out.length - 1] = prevChars.join("");
+        rest = last + rest;
+        continue;
+      }
+      out[out.length - 1] = joined;
       rest = rest.slice(1);
     }
     if (rest || line === "") out.push(rest);
@@ -110,6 +119,10 @@ function applyKinsoku(lines) {
 /** Phaser wordWrap ignores CJK (no spaces). Split on glyphs to a pixel width. */
 export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
   const probe = scene.add.text(-4000, -4000, "", styleFn(size)).setVisible(false);
+  const widthOf = (value) => {
+    probe.setText(value);
+    return probe.width;
+  };
   const lines = [];
   String(raw || "")
     .split("\n")
@@ -117,7 +130,7 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
       let current = "";
       for (const ch of para) {
         probe.setText(current + ch);
-        if (current && probe.width > maxWidth) {
+        if (current && widthOf(current + ch) > maxWidth) {
           lines.push(current);
           current = ch;
         } else {
@@ -127,8 +140,9 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
       lines.push(current);
       if (index < String(raw || "").split("\n").length - 1) lines.push("");
     });
+  const wrapped = applyKinsoku(lines, widthOf, maxWidth).join("\n");
   probe.destroy();
-  return applyKinsoku(lines).join("\n");
+  return wrapped;
 }
 
 /** Lines that are a single leftover character after a wrap. A one-character string is not an orphan. */
@@ -190,6 +204,7 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
     }
     lines.push(current);
   }
+  const wrapped = applyKinsoku(lines, widthOf, maxWidth).join("\n");
   probe.destroy();
-  return applyKinsoku(lines).join("\n");
+  return wrapped;
 }
