@@ -61,7 +61,10 @@ async function ready(page) {
   await page.goto(BASE, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
   await page.evaluate(() => document.fonts?.ready);
-  await page.waitForTimeout(600);
+  // Boot finishes with a delayed start of Home. A jump issued during that
+  // window is replaced by Home, and the speech checks never see Level1.
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 45000 });
+  await page.waitForTimeout(200);
 }
 
 async function assertVo(page, key, beat) {
@@ -648,7 +651,7 @@ async function assertJaSpeech(browser) {
 async function pageWithJaVoice(browser) {
   const page = await openSpeechPage(browser, { mode: "ja", label: "mobile" });
   await page.click("#lang-toggle");
-  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.waitForFunction(() => document.documentElement.lang === "ja" && window.__nanoGPTState?.().scene === "Home");
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && window.__nanoGPTState?.().beat === 0);
   await page.waitForTimeout(200);
@@ -714,7 +717,7 @@ async function pageWithJaVoice(browser) {
 async function pageWithoutJaVoice(browser, label) {
   const page = await openSpeechPage(browser, { mode: "none", label });
   await page.click("#lang-toggle");
-  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.waitForFunction(() => document.documentElement.lang === "ja" && window.__nanoGPTState?.().scene === "Home");
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1");
   await page.waitForFunction(() => {
