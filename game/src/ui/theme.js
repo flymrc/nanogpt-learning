@@ -233,13 +233,18 @@ function rebalancePhrases(lines, wideFlags, widthOf, maxWidth) {
  * only when that phrase is wider than the line.
  * Callers shrink the font while `orphanLines` is non-empty.
  */
-export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
+function latinWord(token) {
+  return /^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(token);
+}
+
+export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { latinWhole = false } = {}) {
   const probe = scene.add.text(-8000, -8000, "", styleFn(size)).setVisible(false);
   const widthOf = (value) => {
     probe.setText(value);
     return probe.width;
   };
   const breakToken = (token) => {
+    if (latinWhole && latinWord(token)) return [token];
     const out = [];
     let current = "";
     for (const ch of token) {

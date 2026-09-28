@@ -930,6 +930,7 @@ function stageWorldBox(obj, origin) {
 }
 
 function stagePairAllowed(a, b) {
+  if (a.role === "prop" || b.role === "prop" || a.role === "actor" || b.role === "actor") return true;
   if (stageAncestor(a.node, b.node) || stageAncestor(b.node, a.node)) return true;
   const faceBody = (a.role === "face" && b.role === "body") || (a.role === "body" && b.role === "face");
   if (faceBody) return Boolean(a.id) && a.id === b.id;
@@ -942,10 +943,68 @@ function stagePairAllowed(a, b) {
   return false;
 }
 
+function hexOf(value) {
+  const raw = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase();
+  const rgb = raw.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!rgb) return "";
+  const n = (part) => Number(part).toString(16).padStart(2, "0");
+  return `#${n(rgb[1])}${n(rgb[2])}${n(rgb[3])}`;
+}
+
+function channelLin(part) {
+  const c = part / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+function contrastRatio(fg, bg) {
+  const lum = (hex) => {
+    const n = hex.replace("#", "");
+    const r = channelLin(parseInt(n.slice(0, 2), 16));
+    const g = channelLin(parseInt(n.slice(2, 4), 16));
+    const b = channelLin(parseInt(n.slice(4, 6), 16));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const a = lum(fg);
+  const b = lum(bg);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+/** A Latin word in the source must stay intact on one rendered line. */
+function splitEnglishWords(source, rendered) {
+  const words = String(source || "").match(/[A-Za-z]{2,}(?:[-'][A-Za-z]+)*/g) || [];
+  if (!words.length) return [];
+  const lines = String(rendered || "").split("\n");
+  const hits = [];
+  const seen = new Set();
+  for (const word of words) {
+    if (seen.has(word)) continue;
+    seen.add(word);
+    if (lines.some((line) => line.includes(word))) continue;
+    if (lines.join("").includes(word)) hits.push(word);
+  }
+  return hits;
+}
+
+function unionOf(boxes) {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const box of boxes) {
+    x0 = Math.min(x0, box.x);
+    y0 = Math.min(y0, box.y);
+    x1 = Math.max(x1, box.x + box.w);
+    y1 = Math.max(y1, box.y + box.h);
+  }
+  if (!Number.isFinite(x0)) return null;
+  return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+}
+
 /** Faces, labels, signs, and cards inside a RAG picture. Held paper may cover its own body. */
 function collectRagStageHits(scene, origin) {
   const key = String(scene.sys?.settings?.key || "");
-  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, ratio: 1, height: 0 };
+  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, ratio: 1, height: 0 };
   if (!key.startsWith("Rag") || key === "RagTitle" || key === "RagEnd") return [];
   const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
   if (!scheme) return [];
@@ -960,6 +1019,8 @@ function collectRagStageHits(scene, origin) {
   const hits = [];
   let overlaps = 0;
   let tiny = 0;
+  let contrast = 0;
+  let words = 0;
   const phone = !isWidePcTutor();
   const minFont = phone ? 12 : 13;
   for (const box of boxes) {
@@ -967,6 +1028,20 @@ function collectRagStageHits(scene, origin) {
     if (box.font + 0.25 < minFont) {
       tiny += 1;
       if (hits.length < 8) hits.push(["stage-tiny", box.sample, String(Math.round(box.font * 10) / 10)]);
+    }
+    const bg = hexOf(box.node.getData?.("stageBg"));
+    const fg = hexOf(box.node.getData?.("stageFg") || box.node.style?.color);
+    if (bg && fg) {
+      const ratio = contrastRatio(fg, bg);
+      if (ratio < 4.5) {
+        contrast += 1;
+        if (hits.length < 8) hits.push(["stage-contrast", box.sample, ratio.toFixed(2)]);
+      }
+    }
+    const source = box.node.getData?.("source") || box.node.text;
+    for (const word of splitEnglishWords(source, box.node.text)) {
+      words += 1;
+      if (hits.length < 8) hits.push(["stage-word", word]);
     }
   }
   for (let i = 0; i < boxes.length; i += 1) {
@@ -981,13 +1056,51 @@ function collectRagStageHits(scene, origin) {
   }
   const matrix = scheme.getWorldTransformMatrix?.();
   const height = (scheme.getData?.("height") || 0) * stageScale(matrix, "y");
+  const width = (scheme.getData?.("width") || 0) * stageScale(matrix, "x");
   const ratio = height / Math.max(1, window.innerHeight || 1);
   let short = 0;
   if (phone && scene.phase === 2 && ratio < 0.35) {
     short = 1;
     hits.push(["stage-short", ratio.toFixed(3), String(Math.round(height))]);
   }
-  window.__nanoGPTStage = { active: true, overlaps, tiny, short, ratio, height: Math.round(height) };
+  let fill = 0;
+  let actors = 0;
+  if (!phone && width > 8 && height > 8) {
+    const union = unionOf(boxes);
+    if (union) {
+      const area = (union.w * union.h) / (width * height);
+      const widthR = union.w / width;
+      const heightR = union.h / height;
+      if (!(area >= 0.55 || (widthR >= 0.55 && heightR >= 0.55))) {
+        fill = 1;
+        hits.push(["stage-fill", area.toFixed(2), `${widthR.toFixed(2)}x${heightR.toFixed(2)}`]);
+      }
+    } else {
+      fill = 1;
+      hits.push(["stage-fill", "0", "empty"]);
+    }
+    const cast = boxes.filter((box) => box.role === "actor");
+    if (cast.length) {
+      const tallest = Math.max(...cast.map((box) => box.h));
+      const frac = tallest / height;
+      if (frac + 0.005 < 0.28) {
+        actors = 1;
+        hits.push(["stage-actor", frac.toFixed(3), String(Math.round(tallest))]);
+      }
+    }
+  }
+  window.__nanoGPTStage = {
+    active: true,
+    overlaps,
+    tiny,
+    short,
+    fill,
+    actors,
+    contrast,
+    words,
+    ratio,
+    height: Math.round(height),
+  };
   return hits;
 }
 

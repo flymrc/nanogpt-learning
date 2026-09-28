@@ -1799,13 +1799,17 @@ async function playRagSteps(page, name, first) {
     key: window.__nanoGPTState?.().scene || "",
   }));
   const lesson = /^Rag[1-5]$/.test(meta.key);
-  const tally = { overlaps: 0, tiny: 0, short: 0 };
+  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0 };
   const addStage = (result) => {
     const stage = result?.stage;
     if (!stage?.active) return;
     tally.overlaps += stage.overlaps || 0;
     tally.tiny += stage.tiny || 0;
     tally.short += stage.short || 0;
+    tally.fill += stage.fill || 0;
+    tally.actors += stage.actors || 0;
+    tally.contrast += stage.contrast || 0;
+    tally.words += stage.words || 0;
   };
   if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
   const doPhase = meta.phase === 2;
@@ -2011,13 +2015,17 @@ const stage = stageReports.reduce(
     sum.overlaps += tally.overlaps || 0;
     sum.tiny += tally.tiny || 0;
     sum.short += tally.short || 0;
+    sum.fill += tally.fill || 0;
+    sum.actors += tally.actors || 0;
+    sum.contrast += tally.contrast || 0;
+    sum.words += tally.words || 0;
     return sum;
   },
-  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0 },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0 },
 );
 const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
-const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.mid >= doPages && stage.checks > 0;
-const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short}`;
+const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.mid >= doPages && stage.checks > 0;
+const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words}`;
 console.log(stageLine);
 if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk) {
   console.error("E2E_FAIL", {
