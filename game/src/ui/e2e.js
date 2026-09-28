@@ -156,6 +156,7 @@ function assertLessonLayout(scene) {
   for (const hit of collectCopyHits(scene)) overlaps.push(hit);
   for (const hit of collectCaptionHits(scene, origin)) overlaps.push(hit);
   for (const hit of collectRagTextHits(scene, origin)) overlaps.push(hit);
+  for (const hit of collectRagStageHits(scene, origin)) overlaps.push(hit);
   for (const hit of collectTopBarHits()) overlaps.push(hit);
   if (scene.sys?.settings?.key === "Home") {
     for (const hit of collectHomeCopyHits(scene, origin)) overlaps.push(hit);
@@ -264,6 +265,7 @@ function assertLessonLayout(scene) {
     lessonCentered,
     skyBackdrop,
     gapClear,
+    stage: window.__nanoGPTStage || null,
   };
 }
 
@@ -417,7 +419,7 @@ function collectReadabilityHits(scene, origin) {
         });
       }
     }
-    if ((kind === "banner-step" || kind === "banner-kicker" || kind === "banner-purpose") && obj.alpha > 0.2) {
+    if ((kind === "banner-step" || kind === "banner-kicker" || kind === "banner-purpose" || kind === "banner-more") && obj.alpha > 0.2) {
       const b = obj.getBounds?.();
       if (b && b.width > 1 && b.height > 1) {
         const box = { kind, x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
@@ -850,6 +852,143 @@ function collectCopyHits(scene) {
 
 function flatCopy(value) {
   return String(value || "").replace(/\s+/g, "");
+}
+
+function stageIntersects(a, b) {
+  const pad = 1;
+  return a.x + pad < b.x + b.w - pad && a.x + a.w - pad > b.x + pad && a.y + pad < b.y + b.h - pad && a.y + a.h - pad > b.y + pad;
+}
+
+function stageAncestor(parent, child) {
+  let node = child?.parentContainer;
+  while (node) {
+    if (node === parent) return true;
+    node = node.parentContainer;
+  }
+  return false;
+}
+
+function stageScale(matrix, axis) {
+  if (!matrix) return 1;
+  return axis === "x" ? Math.hypot(matrix.a, matrix.b) || 1 : Math.hypot(matrix.c, matrix.d) || 1;
+}
+
+function stageWorldBox(obj, origin) {
+  const role = obj.getData?.("stageRole") || "";
+  const id = String(obj.getData?.("stageId") || "");
+  const hold = String(obj.getData?.("stageHold") || "");
+  if (obj.type === "Text") {
+    const body = String(obj.text || "").trim();
+    if (!body) return null;
+    const bounds = obj.getBounds?.();
+    if (!bounds || bounds.width < 1 || bounds.height < 1) return null;
+    const matrix = obj.getWorldTransformMatrix?.();
+    const font = parseFloat(obj.style?.fontSize) || 0;
+    return {
+      node: obj,
+      role: role || "text",
+      id,
+      hold,
+      text: true,
+      font: font * stageScale(matrix, "x"),
+      sample: body.slice(0, 18),
+      x: origin.x + bounds.x,
+      y: origin.y + bounds.y,
+      w: bounds.width,
+      h: bounds.height,
+    };
+  }
+  if (!role) return null;
+  const width = obj.getData?.("width");
+  const height = obj.getData?.("height");
+  if (!(width > 1) || !(height > 1)) return null;
+  const matrix = obj.getWorldTransformMatrix?.();
+  const cx = matrix?.tx ?? obj.x;
+  const cy = matrix?.ty ?? obj.y;
+  const sx = stageScale(matrix, "x");
+  const sy = stageScale(matrix, "y");
+  const hw = (width * sx) / 2;
+  const hh = (height * sy) / 2;
+  const rot = matrix ? Math.atan2(matrix.b, matrix.a) : 0;
+  const c = Math.abs(Math.cos(rot));
+  const s = Math.abs(Math.sin(rot));
+  const aw = hw * c + hh * s;
+  const ah = hw * s + hh * c;
+  return {
+    node: obj,
+    role,
+    id,
+    hold,
+    text: false,
+    font: 0,
+    sample: role,
+    x: origin.x + cx - aw,
+    y: origin.y + cy - ah,
+    w: aw * 2,
+    h: ah * 2,
+  };
+}
+
+function stagePairAllowed(a, b) {
+  if (stageAncestor(a.node, b.node) || stageAncestor(b.node, a.node)) return true;
+  const faceBody = (a.role === "face" && b.role === "body") || (a.role === "body" && b.role === "face");
+  if (faceBody) return Boolean(a.id) && a.id === b.id;
+  const heldBody = (a.role === "held" && b.role === "body") || (a.role === "body" && b.role === "held");
+  if (heldBody) {
+    const held = a.role === "held" ? a : b;
+    const body = a.role === "body" ? a : b;
+    return Boolean(held.hold) && held.hold === body.id;
+  }
+  return false;
+}
+
+/** Faces, labels, signs, and cards inside a RAG picture. Held paper may cover its own body. */
+function collectRagStageHits(scene, origin) {
+  const key = String(scene.sys?.settings?.key || "");
+  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, ratio: 1, height: 0 };
+  if (!key.startsWith("Rag") || key === "RagTitle" || key === "RagEnd") return [];
+  const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
+  if (!scheme) return [];
+  const boxes = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false || obj.alpha < 0.2) return;
+    const box = stageWorldBox(obj, origin);
+    if (box) boxes.push(box);
+    (obj.list || []).forEach(walk);
+  };
+  walk(scheme);
+  const hits = [];
+  let overlaps = 0;
+  let tiny = 0;
+  const phone = !isWidePcTutor();
+  const minFont = phone ? 12 : 13;
+  for (const box of boxes) {
+    if (!box.text) continue;
+    if (box.font + 0.25 < minFont) {
+      tiny += 1;
+      if (hits.length < 8) hits.push(["stage-tiny", box.sample, String(Math.round(box.font * 10) / 10)]);
+    }
+  }
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (stagePairAllowed(a, b)) continue;
+      if (!stageIntersects(a, b)) continue;
+      overlaps += 1;
+      if (hits.length < 8) hits.push(["stage-overlap", `${a.role}:${a.id || a.sample}`, `${b.role}:${b.id || b.sample}`]);
+    }
+  }
+  const matrix = scheme.getWorldTransformMatrix?.();
+  const height = (scheme.getData?.("height") || 0) * stageScale(matrix, "y");
+  const ratio = height / Math.max(1, window.innerHeight || 1);
+  let short = 0;
+  if (phone && scene.phase === 2 && ratio < 0.35) {
+    short = 1;
+    hits.push(["stage-short", ratio.toFixed(3), String(Math.round(height))]);
+  }
+  window.__nanoGPTStage = { active: true, overlaps, tiny, short, ratio, height: Math.round(height) };
+  return hits;
 }
 
 /** RAG pages wrap. A text object must not end in an ellipsis or spill out of its card. */

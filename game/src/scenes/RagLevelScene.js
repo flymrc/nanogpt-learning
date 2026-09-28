@@ -92,8 +92,12 @@ function makeRagLevel(level) {
     showBeat(index, { instant = false, phase, speak } = {}) {
       this.beat = index;
       this.phase = phase ?? this.phase ?? 0;
+      this.__ragStep = 0;
+      this.__ragZoom = null;
+      this.__ragPage = "";
       const raw = pages[index];
       const beat = presentBeat(this, raw, { speak });
+      this.frame.fitPurpose?.(this.phase);
       teachLesson(this, this.frame, beat, {
         index: before + index,
         total: RAG_PAGES.length,

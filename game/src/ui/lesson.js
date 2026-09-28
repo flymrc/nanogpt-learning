@@ -8,6 +8,32 @@ import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
 import { C, displayText, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
+export function openCopyPop(text) {
+  let pop = document.getElementById("copy-pop");
+  if (!pop) {
+    pop = document.createElement("div");
+    pop.id = "copy-pop";
+    pop.hidden = true;
+    pop.innerHTML = '<div class="copy-pop-card" role="dialog"><p id="copy-pop-body"></p><button type="button" id="copy-pop-close"></button></div>';
+    document.body.appendChild(pop);
+    pop.addEventListener("click", (event) => {
+      if (event.target === pop || event.target?.id === "copy-pop-close") closeCopyPop();
+    });
+  }
+  const body = document.getElementById("copy-pop-body");
+  const close = document.getElementById("copy-pop-close");
+  if (body) body.textContent = String(text || "");
+  if (close) close.textContent = t("close");
+  pop.hidden = false;
+  window.__nanoGPTCopyPopOpen = true;
+}
+
+export function closeCopyPop() {
+  const pop = document.getElementById("copy-pop");
+  if (pop) pop.hidden = true;
+  window.__nanoGPTCopyPopOpen = false;
+}
+
 export function makeLessonFrame(scene, { level, total, title, startLabel } = {}) {
   syncHubChrome(scene.sys.settings.key);
   const phone = !isWidePcTutor();
@@ -55,7 +81,16 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
 
   bindAdvance(scene, () => scene.advance?.());
 
-  return { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
+  const frame = { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
+  frame.fitPurpose = (phase) => {
+    const collapsed = phone && getCourse() === "rag";
+    const nextH = collapsed ? 32 : purposeH;
+    frame.purposeBand = band(v.left, shell.content.top, v.innerW, nextH);
+    const nextTop = frame.purposeBand.bottom + rhythm + (collapsed ? 4 : 0);
+    frame.stageBand = band(v.left, nextTop, v.innerW, Math.max(80, shell.content.bottom - nextTop));
+    frame.purpose.relayout?.(frame.purposeBand, { collapsed, phone });
+  };
+  return frame;
 }
 
 /** Bottom of lesson content must stay this far above the CTA. */
@@ -157,18 +192,75 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
   const step = scene.add
     .text(rect.w / 2 - 12 - hang, rowY, "", uiText(phone ? 12 : 14, { color: C.muted }))
     .setOrigin(1, 0.5);
+  const more = scene.add
+    .text(0, 0, "", uiText(phone ? 13 : 14, { color: C.blueCss }))
+    .setOrigin(0, 0.5)
+    .setVisible(false);
+  more.setData("kind", "banner-more");
   kicker.setData("kind", "banner-kicker");
   purpose.setData("kind", "banner-purpose");
   step.setData("kind", "banner-step");
 
-  box.add([g, stripe, kicker, purpose, step]);
+  box.add([g, stripe, kicker, purpose, step, more]);
   box.setSize(rect.w, rect.h);
+  box.layoutRect = rect;
+  box.collapsed = false;
+  box.relayout = (next, { collapsed = false, phone: isPhone = phone } = {}) => {
+    box.layoutRect = next;
+    box.collapsed = collapsed;
+    box.setPosition(next.cx, next.cy);
+    box.setSize(next.w, next.h);
+    box.setData("width", next.w);
+    box.setData("height", next.h);
+    box.setData("shadow", true);
+    g.clear();
+    drawSticker(g, -next.w / 2, -next.h / 2, next.w, next.h, isPhone ? 16 : 20, C.surface);
+    stripe.clear();
+    stripe.fillStyle(C.gold, 1);
+    stripe.fillRoundedRect(-next.w / 2 + 8, -next.h / 2 + 8, 10, Math.max(12, next.h - 16), 6);
+    box.removeAllListeners("pointerdown");
+    box.disableInteractive();
+    more.setVisible(collapsed);
+    purpose.setVisible(!collapsed);
+    if (!collapsed) return;
+    const row = 0;
+    kicker.setY(row);
+    step.setY(row);
+    more.setText(t("purposeMore"));
+    more.setPosition(-next.w / 2 + 26 + kicker.width + 10, row);
+    more.setVisible(true);
+    box.setInteractive(new Phaser.Geom.Rectangle(-next.w / 2, -next.h / 2, next.w, next.h), Phaser.Geom.Rectangle.Contains);
+    box.on("pointerdown", (_pointer, _x, _y, event) => {
+      event?.stopPropagation?.();
+      openCopyPop(window.__nanoGPTPurposeFull || "");
+    });
+  };
   box.set = (text, index, total, extra = {}) => {
+    const live = box.layoutRect || rect;
+    const rowYLive = box.collapsed ? 0 : -live.h * (phone ? 0.24 : 0.28);
     kicker.setText(extra.kicker || t("thisLesson"));
-    kicker.setY(rowY);
+    kicker.setY(rowYLive);
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
-    step.setY(rowY);
+    step.setY(rowYLive);
+    window.__nanoGPTPurposeFull = String(text || "");
+    if (box.collapsed) {
+      purpose.setText("");
+      purpose.setFontSize(12);
+      purpose.setPosition(0, 0);
+      purpose.setVisible(false);
+      purpose.setAlpha(0);
+      more.setText(t("purposeMore"));
+      more.setPosition(-live.w / 2 + 26 + kicker.width + 10, rowYLive);
+      more.setVisible(true);
+      window.__nanoGPTPurposeAlpha = () => 1;
+      window.__nanoGPTBannerSettled = true;
+      window.__nanoGPTOpenPurpose = () => openCopyPop(window.__nanoGPTPurposeFull || "");
+      window.__nanoGPTClosePurpose = () => closeCopyPop();
+      return;
+    }
+    purpose.setVisible(true);
+    more.setVisible(false);
     const ragLesson = getCourse() === "rag";
     const ja = getLang() === "ja";
     const wrap = (value, font, width) => (ragLesson && ja

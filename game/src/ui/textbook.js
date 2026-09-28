@@ -6,7 +6,7 @@ import { drawSticker } from "./components.js";
 import { lessonRhythm } from "./layout.js";
 import { installLayoutProbe } from "./e2e.js";
 import { artBandReserve } from "./page-art.js";
-import { ctaCeiling, keepStageAboveCta, layerBottom, placeLessonCta } from "./lesson.js";
+import { ctaCeiling, keepStageAboveCta, layerBottom, openCopyPop, placeLessonCta } from "./lesson.js";
 import { C, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
 let bookMounted = false;
@@ -329,29 +329,51 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   // instruction down to a blur. Short lines keep a readable size. The
   // picture then fills whatever is left above the button.
   const shortStage = !phone && (scene.frame?.v?.h || 900) < 760;
-  const pictureFloor = rag ? (phone ? 228 : shortStage ? 280 : 220) : 0;
+  const doPhone = rag && phone && meta.id === "do";
+  const viewportH = typeof window !== "undefined" ? window.innerHeight || scene.frame?.v?.h || 844 : 844;
+  // Scheme sits under the caption block. Phone pictures stay at least ~40% of the viewport.
+  const captionBlock = 48;
+  const wantScheme = Math.round(viewportH * 0.4);
+  const wantPicture = wantScheme + captionBlock + 28;
+  const roomForPicture = Math.max(64, stage.bottom - 12 - cardTop - rhythm);
+  const pictureFloor = rag
+    ? (phone
+      ? Math.min(Math.max(228, roomForPicture - 72), Math.max(228, wantPicture))
+      : shortStage ? 300 : 240)
+    : 0;
   const preferred = rag
     ? Math.max(64, Math.min(phone ? stage.h * 0.4 : stage.h * 0.3, Math.max(64, available - pictureFloor)))
     : phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
   const yielded = rag ? available - pictureFloor : available - Math.max(0, reserve);
   const maxH = rag
-    ? Math.min(preferred, Math.max(56, yielded))
+    ? Math.min(preferred, Math.max(phone ? 52 : 56, yielded), phone ? 68 : 10000)
     : Math.min(preferred, Math.max(48, yielded));
   const chrome = 40;
   const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
   const fit = rag ? fitComplete : fitPlain;
   const shownFit = rag
-    ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: true })
+    ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: !doPhone })
     : fit(scene, copy.shown, startSize, 13, wrap, maxTextH);
   const revealFit = copy.reveal
     ? (rag
       ? fitComplete(scene, copy.reveal, startSize, 13, wrap, maxTextH, { keep: true })
       : fit(scene, copy.reveal, startSize, 13, wrap, maxTextH))
     : null;
+  const flatCopy = (value) => String(value || "").replace(/\s+/g, "");
+  let expandable = doPhone && flatCopy(shownFit.source) !== flatCopy(copy.shown);
+  if (expandable) {
+    const room = Math.max(16, maxTextH - 28);
+    const again = fitComplete(scene, copy.shown, startSize, 13, wrap, room, { keep: false });
+    shownFit.wrapped = again.wrapped;
+    shownFit.font = again.font;
+    shownFit.height = again.height;
+    shownFit.source = again.source;
+    expandable = flatCopy(again.source) !== flatCopy(copy.shown);
+  }
   const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);
   const textH = Math.max(shownFit.height, revealFit?.height || 0);
-  const contentH = chrome + textH;
+  const contentH = chrome + textH + (expandable ? 28 : 0);
   const height = Math.min(maxH, Math.max(48, contentH));
   const box = scene.add.container(stage.cx, cardTop + height / 2);
   const g = scene.add.graphics();
@@ -364,15 +386,36 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const textX = -width / 2 + 22;
   const textY = -height / 2 + 28;
   const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
-  const textRoom = Math.max(16, height - 36);
-  if (rag && text.height > textRoom) text.setScale(textRoom / text.height);
+  const textRoom = Math.max(16, height - 36 - (expandable ? 28 : 0));
+  if (rag && !doPhone && text.height > textRoom) text.setScale(textRoom / text.height);
+  if (doPhone && text.height > textRoom) {
+    let lines = String(text.text || "").split("\n");
+    while (lines.length > 1 && text.height > textRoom) {
+      lines = lines.slice(0, -1);
+      text.setText(lines.join("\n"));
+    }
+    shownFit.wrapped = text.text;
+    shownFit.source = text.text;
+    expandable = true;
+  }
   text.setData("kind", "phase-card-text");
   text.setData("source", shownFit.source || copy.shown);
   text.setData("wrapWidth", wrap);
   box.add([g, stripe, title]);
-  const lineCount = Math.max(1, shownFit.wrapped.split("\n").length);
+  const lineCount = Math.max(1, String(shownFit.wrapped || "").split("\n").length);
   paintBookMarks(scene, box, shownFit.wrapped, font, textX, textY, text.height / lineCount);
   box.add(text);
+  if (expandable) {
+    const more = scene.add.text(width / 2 - 16, height / 2 - 16, t("copyAll"), uiText(13, { color: C.blueCss })).setOrigin(1, 0.5);
+    more.setData("source", t("copyAll"));
+    more.setData("kind", "phase-card-more");
+    more.setInteractive(new Phaser.Geom.Rectangle(-more.width - 8, -16, more.width + 16, 32), Phaser.Geom.Rectangle.Contains);
+    more.on("pointerdown", (_pointer, _x, _y, event) => {
+      event?.stopPropagation?.();
+      openCopyPop(copy.shown);
+    });
+    box.add(more);
+  }
   const paint = (source) => {
     text.setText(source);
   };
@@ -413,7 +456,9 @@ export function paintLessonStage(scene, beat, phase, onPick) {
   const reserve = artBandReserve(beat, phase, artW) + 12;
   const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick);
   const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom, reserve });
-  const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v);
+  const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v, {
+    reserve: beat?.course === "rag" && phone ? 0 : undefined,
+  });
   scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };
   scene.frame.lastCard = { left: scene.frame.stageBand.left, top: card.bottom - card.height, w: scene.frame.stageBand.w, h: card.height };
   scene.frame.lastExample = band;
@@ -449,11 +494,11 @@ function phaseAccent(id) {
   return C.blue;
 }
 
-export function exampleBand(stage, cardBottom, v) {
+export function exampleBand(stage, cardBottom, v, { reserve: reserveOverride } = {}) {
   const rhythm = lessonRhythm(v);
   const top = cardBottom + rhythm;
   const inset = isWidePcTutor() ? 16 : 8;
-  const reserve = isWidePcTutor() ? 0 : 12;
+  const reserve = reserveOverride ?? (isWidePcTutor() ? 0 : 12);
   const bottom = stage.bottom - reserve;
   return {
     ...stage,

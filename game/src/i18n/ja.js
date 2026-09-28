@@ -19,6 +19,8 @@ export const JA = {
   "mute": "ミュート",
   "unmute": "ミュート解除",
   "thisLesson": "このページ",
+  "purposeMore": "全文",
+  "copyAll": "すべて",
   "nextPage": "つぎ",
   "nextBeat": "次のページ",
   "nextBeatHint": "ページをかえる",

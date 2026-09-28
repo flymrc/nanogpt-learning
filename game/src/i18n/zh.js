@@ -19,6 +19,8 @@ export const ZH = {
   "mute": "静音",
   "unmute": "取消静音",
   "thisLesson": "这一页",
+  "purposeMore": "看全文",
+  "copyAll": "全部",
   "nextPage": "继续",
   "nextBeat": "下一页",
   "nextBeatHint": "翻一页",

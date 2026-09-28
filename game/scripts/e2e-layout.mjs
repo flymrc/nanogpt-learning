@@ -35,12 +35,19 @@ const RAG_LEVEL_PAGES = {
   Rag5: ragPagesFor(5),
 };
 
-const RAG_SHOTS = [
-  ["r1-p9", "ch1"],
-  ["r2-p3", "ch2"],
-  ["r3-p3", "ch3"],
-  ["r4-p6", "ch4"],
-  ["r5-p4", "ch5"],
+const RAG3_SHOTS = [
+  ["r1-p9", "zh", 1440, 900, "ch1-do-zh-1440x900.png"],
+  ["r1-p9", "ja", 390, 844, "ch1-do-ja-390x844.png"],
+  ["r2-p3", "ja", 390, 844, "ch2-cut-ja-390x844.png"],
+  ["r2-p3", "zh", 1440, 900, "ch2-cut-zh-1440x900.png"],
+  ["r3-p3", "zh", 1440, 900, "ch3-score-zh-1440x900.png"],
+  ["r3-p3", "ja", 390, 844, "ch3-score-ja-390x844.png"],
+  ["r4-p6", "zh", 1440, 900, "ch4-fill-zh-1440x900.png"],
+  ["r4-p6", "ja", 390, 844, "ch4-fill-ja-390x844.png"],
+  ["r5-p4", "zh", 1440, 900, "ch5-threshold-zh-1440x900.png"],
+  ["r5-p4", "ja", 390, 844, "ch5-threshold-ja-390x844.png"],
+  ["r5-p2", "ja", 1440, 900, "ch5-take-ja-1440x900.png"],
+  ["r2-p1", "zh", 1440, 900, "ch2-cards-zh-1440x900.png"],
 ];
 
 function expectedVo(lang, key, beat) {
@@ -1779,35 +1786,80 @@ async function assertHomeHub(browser) {
 const live2dFit = await assertLive2dPanel(browser);
 const home = await assertHomeHub(browser);
 
-function ragShotFor(pageId, lang, width, height) {
-  const spec = RAG_SHOTS.find(([id]) => id === pageId);
-  if (!spec) return "";
-  const wide = width === 1440 && height === 900;
-  const phone = width === 390 && height === 844;
-  const chapterShot = (lang === "zh" && wide) || (lang === "ja" && phone);
-  const bothLocales = wide && (pageId === "r3-p3" || pageId === "r5-p4");
-  if (!chapterShot && !bothLocales) return "";
-  return `/opt/cursor/artifacts/rag/${spec[1]}-${lang}-${width}x${height}.png`;
+function rag3ShotFor(pageId, lang, width, height, phase) {
+  if (phase !== 2) return "";
+  const spec = RAG3_SHOTS.find((row) => row[0] === pageId && row[1] === lang && row[2] === width && row[3] === height);
+  return spec ? `/opt/cursor/artifacts/rag3/${spec[4]}` : "";
+}
+
+async function playRagSteps(page, name, first) {
+  const meta = await page.evaluate(() => ({
+    steps: Number(window.__nanoGPTRagSteps || 0),
+    phase: window.__nanoGPTState?.().phase ?? 0,
+    key: window.__nanoGPTState?.().scene || "",
+  }));
+  const lesson = /^Rag[1-5]$/.test(meta.key);
+  const tally = { overlaps: 0, tiny: 0, short: 0 };
+  const addStage = (result) => {
+    const stage = result?.stage;
+    if (!stage?.active) return;
+    tally.overlaps += stage.overlaps || 0;
+    tally.tiny += stage.tiny || 0;
+    tally.short += stage.short || 0;
+  };
+  if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
+  const doPhase = meta.phase === 2;
+  let mid = doPhase ? 1 : 0;
+  let checks = 1;
+  let end = first;
+  let failed = first?.ok ? null : first;
+  addStage(first);
+  for (let i = 0; i < meta.steps; i += 1) {
+    await page.evaluate(() => {
+      if (typeof window.__nanoGPTRagTap !== "function") throw new Error("missing rag tap");
+      window.__nanoGPTRagTap();
+    });
+    await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+    const isEnd = i === meta.steps - 1;
+    if (!doPhase && !isEnd) continue;
+    const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+    checks += 1;
+    if (doPhase && !isEnd) mid += 1;
+    end = result;
+    addStage(result);
+    if (!result?.ok) {
+      failed = failed || result;
+      if (isEnd) await page.screenshot({ path: `${OUT}/${name}-end.png` });
+    }
+  }
+  return { end, mid, checks, failed, tally };
 }
 
 async function jumpRag(page, key, beat, phase, name) {
   await jumpLanded(page, key, beat, phase);
   await page.waitForTimeout(280);
   await assertRagVo(page, key, beat);
-  const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  const first = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (name.startsWith("rag-mobile")) {
     const card = await page.evaluate(() => window.__nanoGPTCard || null);
     if (card?.truncated) throw new Error(`rag card truncated ${name}`);
   }
-  if (!result?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
-  const shot = ragShotFor(
-    result?.pageId || (await page.evaluate(() => window.__nanoGPTState?.().pageId || "")),
-    name.includes("-ja-") ? "ja" : "zh",
-    page.viewportSize().width,
-    page.viewportSize().height,
-  );
-  if (shot && phase === 2) await page.screenshot({ path: shot });
-  return { name, ...result };
+  if (!first?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
+  const play = await playRagSteps(page, name, first);
+  const end = play.end || first;
+  const failed = play.failed;
+  const pageId = end?.pageId || first?.pageId || (await page.evaluate(() => window.__nanoGPTState?.().pageId || ""));
+  const shot = rag3ShotFor(pageId, name.includes("-ja-") ? "ja" : "zh", page.viewportSize().width, page.viewportSize().height, phase);
+  if (shot) await page.screenshot({ path: shot });
+  const result = failed ? { ...end, ok: false, overlaps: failed.overlaps || end.overlaps, overflows: failed.overflows || end.overflows } : end;
+  return {
+    name,
+    ...result,
+    stageMid: play.mid,
+    stageChecks: play.checks,
+    stageTally: play.tally,
+    stage: end?.stage || first?.stage || null,
+  };
 }
 
 async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
@@ -1873,7 +1925,7 @@ async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
 }
 
 async function runRagViewport(browser, label, pageOpts, { allPhases }) {
-  mkdirSync("/opt/cursor/artifacts/rag", { recursive: true });
+  mkdirSync("/opt/cursor/artifacts/rag3", { recursive: true });
   const zh = await runRagLocale(browser, label, pageOpts, "zh", { allPhases });
   const ja = await runRagLocale(browser, label, pageOpts, "ja", { allPhases });
   const reports = [...zh.reports, ...ja.reports];
@@ -1950,7 +2002,24 @@ const homeOk = home?.ok === true;
 const ragWalked =
   ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
 const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk) {
+const stageReports = [...ragMobile.reports, ...ragPc.reports, ...ragPc1024.reports];
+const stage = stageReports.reduce(
+  (sum, report) => {
+    const tally = report.stageTally || {};
+    sum.checks += report.stageChecks || 0;
+    sum.mid += report.stageMid || 0;
+    sum.overlaps += tally.overlaps || 0;
+    sum.tiny += tally.tiny || 0;
+    sum.short += tally.short || 0;
+    return sum;
+  },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0 },
+);
+const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
+const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.mid >= doPages && stage.checks > 0;
+const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short}`;
+console.log(stageLine);
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -1972,6 +2041,8 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     home,
     ragOk,
     ragWalked,
+    stageOk,
+    stage,
     ragMobile: ragMobile.walked,
     ragPc: ragPc.walked,
     ragPc1024: ragPc1024.walked,
