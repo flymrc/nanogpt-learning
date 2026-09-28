@@ -194,6 +194,12 @@ function checkRagPack() {
     for (let page = 1; page <= 13; page += 1) allowed.add(page);
     for (const value of Object.values(data.card_word_counts || {})) allowed.add(value);
     allowed.add(data.word_match?.experiment_one_big_card?.n_words);
+    for (const card of Object.values(data.word_match?.card_word_shares || {})) {
+      for (const value of Object.values(card)) allowed.add(value);
+    }
+    for (const question of Object.values(data.word_match?.question_word_shares || {})) {
+      for (const value of Object.values(question)) allowed.add(value);
+    }
     return allowed;
   };
   const checkNumbers = (page, loc, spec, allowed) => {
