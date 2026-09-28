@@ -257,14 +257,26 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   container.setData("height", h);
   container.setData("shadow", true);
 
+  let labelSize = opts.fontSize ?? scaled(scene, 26);
   const text = scene.add
-    .text(0, caption ? -12 : -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
+    .text(0, caption ? -12 : -2, label, displayText(labelSize, { color: opts.textColor ?? C.text }))
     .setOrigin(0.5);
+  while (text.width > w - 18 && labelSize > 11) {
+    labelSize -= 1;
+    text.setFontSize(labelSize);
+  }
   const cap = caption
     ? scene.add
         .text(0, 16, caption, uiText(opts.captionSize ?? 14, { color: opts.captionColor ?? C.muted }))
         .setOrigin(0.5)
     : null;
+  if (cap) {
+    let capSize = opts.captionSize ?? 14;
+    while (cap.width > w - 18 && capSize > 10) {
+      capSize -= 1;
+      cap.setFontSize(capSize);
+    }
+  }
 
   container.add(cap ? [bg, text, cap] : [bg, text]);
   container.setSize(w, h);

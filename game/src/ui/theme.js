@@ -1,4 +1,5 @@
 import { displayRatio } from "./dpr.js";
+import { getLang } from "../i18n/locale.js";
 
 /** Landscape design reference only — scenes should use getView(). */
 export const W = 1280;
@@ -36,16 +37,30 @@ export const C = {
 
 export const STICKERS = [0xff8b94, 0xffd166, 0x7ee8d8, 0x8ec5ff, 0xe5b3ff, 0xffb4d9, 0xffc9a3, 0xb8f2a0];
 
-export const FONT_UI =
-  '"Noto Sans SC", "Noto Sans JP", "PingFang SC", "Hiragino Sans", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif';
-export const FONT_DISPLAY =
-  '"ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "Noto Sans JP", "PingFang SC", "Hiragino Sans", "WenQuanYi Micro Hei", sans-serif';
-export const FONT_MONO = '"Fredoka", "Noto Sans SC", "Noto Sans JP", "IBM Plex Mono", monospace';
+/** Symbol faces sit after the locale face so a kanji is never drawn from the other script. */
+const FONT_SYMBOLS = '"Noto Sans Symbols 2", "Noto Emoji", sans-serif';
+
+export const FONT_UI_ZH = `"Noto Sans SC", ${FONT_SYMBOLS}`;
+export const FONT_UI_JA = `"Noto Sans JP", "Noto Sans SC", ${FONT_SYMBOLS}`;
+export const FONT_DISPLAY_ZH = `"ZCOOL QingKe HuangYou", "Noto Sans SC", ${FONT_SYMBOLS}`;
+export const FONT_DISPLAY_JA = `"Noto Sans JP", "Noto Sans SC", ${FONT_SYMBOLS}`;
+export const FONT_MONO_ZH = `"Fredoka", "Noto Sans SC", ${FONT_SYMBOLS}`;
+
+export const FONT_UI = FONT_UI_ZH;
+export const FONT_DISPLAY = FONT_DISPLAY_ZH;
+export const FONT_MONO = FONT_MONO_ZH;
+
+function localeFamily(kind) {
+  const ja = getLang() === "ja";
+  if (kind === "display") return ja ? FONT_DISPLAY_JA : FONT_DISPLAY_ZH;
+  if (kind === "mono") return ja ? FONT_UI_JA : FONT_MONO_ZH;
+  return ja ? FONT_UI_JA : FONT_UI_ZH;
+}
 
 function textStyle(fontFamily, size, extra = {}) {
-  const { resolution, ...rest } = extra;
+  const { resolution, fontFamily: familyOverride, ...rest } = extra;
   return {
-    fontFamily,
+    fontFamily: familyOverride || fontFamily,
     fontSize: `${Math.max(1, Math.round(size))}px`,
     color: C.text,
     ...rest,
@@ -56,27 +71,25 @@ function textStyle(fontFamily, size, extra = {}) {
 }
 
 export function uiText(size, extra = {}) {
-  return textStyle(FONT_UI, size, extra);
+  return textStyle(localeFamily("ui"), size, { fontStyle: "500", ...extra });
 }
 
 export function displayText(size, extra = {}) {
-  return textStyle(FONT_DISPLAY, size, extra);
+  const ja = getLang() === "ja";
+  return textStyle(localeFamily("display"), size, {
+    ...(ja ? { fontStyle: "700" } : {}),
+    ...extra,
+  });
 }
 
 export function monoText(size, extra = {}) {
-  return textStyle(FONT_MONO, size, extra);
+  return textStyle(localeFamily("mono"), size, extra);
 }
 
 export function stickerColor(seed) {
   const n = typeof seed === "number" ? seed : String(seed).charCodeAt(0) || 0;
   return STICKERS[Math.abs(n) % STICKERS.length];
 }
-
-/** Home display faces. One family per locale so a kanji cannot fall through to another design. */
-export const FONT_DISPLAY_ZH = '"ZCOOL QingKe HuangYou", sans-serif';
-export const FONT_DISPLAY_JA = '"Noto Sans JP", sans-serif';
-export const FONT_UI_ZH = '"Noto Sans SC", sans-serif';
-export const FONT_UI_JA = '"Noto Sans JP", sans-serif';
 
 /** No line may start with closing punctuation (禁则). */
 const KINSOKU_HEAD = "。，、！？）」』】》〉";

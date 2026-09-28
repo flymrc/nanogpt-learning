@@ -101,11 +101,14 @@ async function boot() {
   if (document.fonts?.ready) {
     const loads = document.fonts.load
       ? [
-          document.fonts.load('700 32px "Noto Sans JP"'),
-          document.fonts.load('500 28px "Noto Sans JP"'),
-          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"'),
-          document.fonts.load('500 28px "Noto Sans SC"'),
-          document.fonts.load('700 32px "Fredoka"'),
+          document.fonts.load('700 32px "Noto Sans JP"', "字次少ジーくんホーム組"),
+          document.fonts.load('500 28px "Noto Sans JP"', "まえを見てつぎをあてる"),
+          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"', "小G学写字首页"),
+          document.fonts.load('500 28px "Noto Sans SC"', "小G学写字首页请组"),
+          document.fonts.load('700 32px "Noto Sans SC"', "小G学写字"),
+          document.fonts.load('700 32px "Fredoka"', "All First"),
+          document.fonts.load('500 28px "Noto Sans Symbols 2"', "␣↵□○"),
+          document.fonts.load('500 28px "Noto Emoji"', "🍌🍎🔴🔵⭐"),
         ]
       : [];
     await Promise.race([

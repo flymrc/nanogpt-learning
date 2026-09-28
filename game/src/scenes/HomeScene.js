@@ -2,15 +2,15 @@ import Phaser from "phaser";
 import { narrateLine } from "../audio/narrate.js";
 import { playSfx, unlockAudio } from "../audio/sound.js";
 import { TUTORIALS } from "../data/tutorials.js";
-import { getLang, t } from "../i18n/locale.js";
+import { t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addMuteToggle, clearPcHudStack, drawSticker, paintBackdrop, planLessonHeader } from "../ui/components.js";
 import { installLayoutProbe } from "../ui/e2e.js";
-import { STICKER_SHADOW_X, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
+import { STICKER_SHADOW_X, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { syncMobileChrome } from "../ui/mode.js";
 import { syncHubChrome } from "../ui/chrome.js";
 import { clearLessonRoute } from "../ui/route.js";
-import { C, FONT_DISPLAY_JA, FONT_DISPLAY_ZH, FONT_UI_JA, FONT_UI_ZH, displayText, monoText, orphanLines, uiText, wrapAtBreaks } from "../ui/theme.js";
+import { C, displayText, monoText, orphanLines, uiText, wrapAtBreaks } from "../ui/theme.js";
 
 export default class HomeScene extends Phaser.Scene {
   constructor() {
@@ -76,7 +76,7 @@ export default class HomeScene extends Phaser.Scene {
       const row = Math.floor(index / cols);
       const x = v.cx - rowW / 2 + plan.cardW / 2 + col * (plan.cardW + plan.cardGap);
       const y = slot.top + plan.cardH / 2 + row * (plan.cardH + plan.cardGap);
-      this.cards.push(buildCard(this, spec, x, y, plan.cardW, plan.cardH));
+      this.cards.push(buildCard(this, spec, x, y, plan.cardW, plan.cardH, plan.scale));
     });
 
     this.pageId = "home";
@@ -98,23 +98,11 @@ function measureVoicePad() {
 }
 
 function hubDisplay(size, extra = {}) {
-  const ja = getLang() === "ja";
-  return displayText(size, {
-    fontFamily: ja ? FONT_DISPLAY_JA : FONT_DISPLAY_ZH,
-    ...(ja ? { fontStyle: "700" } : {}),
-    lineSpacing: 2,
-    ...extra,
-  });
+  return displayText(size, { lineSpacing: 2, ...extra });
 }
 
 function hubUi(size, extra = {}) {
-  const ja = getLang() === "ja";
-  return uiText(size, {
-    fontFamily: ja ? FONT_UI_JA : FONT_UI_ZH,
-    fontStyle: "500",
-    lineSpacing: 2,
-    ...extra,
-  });
+  return uiText(size, { lineSpacing: 2, ...extra });
 }
 
 function layoutHub(v, top, bottom, count, blocks) {
@@ -122,48 +110,45 @@ function layoutHub(v, top, bottom, count, blocks) {
   const rows = Math.ceil(count / Math.max(1, cols));
   const gap = 16;
   const cardGap = 16;
-  const measured = fitMeasure(
-    bottom - top,
-    (s) => {
-      const titleSize = Math.round((v.portrait ? 34 : 46) * s);
-      const titleH = Math.max(32, Math.round(blocks.titleH * s));
-      const introH = Math.max(22, Math.round(blocks.introH * s));
-      const cardH = Math.round((v.portrait ? 172 : 196) * s);
-      const cardsH = rows * cardH + (rows - 1) * cardGap;
-      const items = [
-        { id: "title", h: titleH },
-        { id: "intro", h: introH },
-        { id: "cards", h: cardsH },
-      ];
-      const stacked = stackSlots(items, {
-        top: 0,
-        bottom: titleH + introH + cardsH + gap * 2,
-        gap,
-        justify: "start",
-      });
-      const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
-      const cardW = (rowBudget - cardGap * (cols - 1)) / cols;
-      return {
-        h: stacked.used,
-        items,
-        gap,
-        cardH,
-        cardW,
-        cardGap,
-        cols,
-        rows,
-        titleSize,
-      };
-    },
-    { minScale: 0.58 },
-  );
-  const stacked = stackSlots(measured.items, {
+  const available = Math.max(120, bottom - top);
+  const measure = (s) => {
+    const titleSize = Math.round(Math.min(92, (v.portrait ? 34 : 48) * s));
+    const titleH = Math.max(32, Math.round(blocks.titleH * s));
+    const introH = Math.max(22, Math.round(blocks.introH * s));
+    const cardH = Math.round((v.portrait ? 172 : 210) * s);
+    const cardsH = rows * cardH + (rows - 1) * cardGap;
+    const items = [
+      { id: "title", h: titleH },
+      { id: "intro", h: introH },
+      { id: "cards", h: cardsH },
+    ];
+    const raw = titleH + introH + cardsH + gap * 2;
+    const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
+    const cardW = (rowBudget - cardGap * (cols - 1)) / cols;
+    return { h: raw, items, gap, cardH, cardW, cardGap, cols, rows, titleSize };
+  };
+  const base = measure(1);
+  // The lesson column can be nearly square on a wide screen (1160×1080) and
+  // still have a short stack floating in the middle. Grow on that PC area.
+  const roomy = v.w >= 700 && v.h >= 800 && base.h + 80 < available;
+  const cap = roomy ? Math.min(2.45, (base.h + (available - base.h) * 0.9) / Math.max(1, base.h)) : 1;
+  let chosen = null;
+  for (let i = 0; i <= 48; i += 1) {
+    const s = cap - ((cap - 0.58) * i) / 48;
+    const plan = measure(s);
+    if (plan.h <= available + 1) {
+      chosen = { ...plan, scale: s };
+      break;
+    }
+  }
+  if (!chosen) chosen = { ...measure(0.58), scale: 0.58 };
+  const stacked = stackSlots(chosen.items, {
     top,
     bottom,
-    gap: measured.gap,
+    gap: chosen.gap,
     justify: "center",
   });
-  return { ...measured, slots: stacked.slots };
+  return { ...chosen, slots: stacked.slots };
 }
 
 function fitLine(scene, str, maxW, size, min, styleFn) {
@@ -193,7 +178,7 @@ function fitBlock(scene, str, maxW, maxH, size, min, styleFn) {
   return { body, size: current, height };
 }
 
-function buildCard(scene, spec, x, y, w, h) {
+function buildCard(scene, spec, x, y, w, h, scale = 1) {
   const enabled = spec.status === "ready";
   const card = scene.add.container(x, y);
   const plate = scene.add.graphics();
@@ -228,10 +213,12 @@ function buildCard(scene, spec, x, y, w, h) {
   const columnTextH = Math.max(36, innerBottom - textTop);
   const actionH = 30;
   const room = Math.max(24, columnTextH - actionH - 14);
-  const titleStart = textW > 210 ? 30 : side ? 24 : 22;
+  const typeScale = Math.max(1, Math.min(1.85, scale));
+  const titleStart = Math.round((textW > 210 ? 30 : side ? 24 : 22) * typeScale);
   const titleFit = fitBlock(scene, t(spec.titleKey), textW, Math.max(18, Math.floor(room * 0.62)), titleStart, 13, hubDisplay);
   const blurbMax = Math.max(16, room - titleFit.height);
-  const blurbFit = fitBlock(scene, t(spec.blurbKey), textW, blurbMax, textW > 210 ? 18 : 16, 12, (size) => hubUi(size, { color: C.muted }));
+  const blurbStart = Math.round((textW > 210 ? 18 : 16) * typeScale);
+  const blurbFit = fitBlock(scene, t(spec.blurbKey), textW, blurbMax, blurbStart, 12, (size) => hubUi(size, { color: C.muted }));
   const title = scene.add.text(textX, textTop, titleFit.body, hubDisplay(titleFit.size)).setOrigin(0, 0);
   tagText(title, spec.id, "card-title");
   card.add(title);
@@ -247,7 +234,7 @@ function buildCard(scene, spec, x, y, w, h) {
   blurb.setY(blurbTop);
 
   const action = t(spec.actionKey);
-  const actionSize = fitLine(scene, action, textW - 8, 16, 12, (size) => hubUi(size, { color: C.textDark }));
+  const actionSize = fitLine(scene, action, textW - 8, Math.round(16 * typeScale), 12, (size) => hubUi(size, { color: C.textDark }));
   const actionText = scene.add.text(0, 0, action, hubUi(actionSize)).setOrigin(0, 0.5);
   const badgeW = Math.min(textW, Math.max(72, actionText.width + 22));
   const badgeH = 28;

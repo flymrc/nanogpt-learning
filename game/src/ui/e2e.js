@@ -152,6 +152,9 @@ function assertLessonLayout(scene) {
   for (const hit of artHits) overlaps.push(hit);
   const readHits = collectReadabilityHits(scene, origin);
   for (const hit of readHits) overlaps.push(hit);
+  for (const hit of collectCopyHits(scene)) overlaps.push(hit);
+  for (const hit of collectCaptionHits(scene, origin)) overlaps.push(hit);
+  for (const hit of collectTopBarHits()) overlaps.push(hit);
   if (scene.sys?.settings?.key === "Home") {
     for (const hit of collectHomeCopyHits(scene, origin)) overlaps.push(hit);
   }
@@ -678,6 +681,221 @@ function captionVisualLines(line) {
     }
   }
   return [...rows.values()];
+}
+
+const COPY_ROOTS = [
+  "mobile-chrome",
+  "pc-chrome",
+  "voice-note",
+  "notes-overlay",
+  "pseudo-overlay",
+  "lesson-book-overlay",
+  "guide-overlay",
+  "catalog-overlay",
+  "chapter-sheet",
+];
+
+const spanCache = new Map();
+
+function spansFor(family) {
+  if (spanCache.has(family) && document.fonts.size === spanCache.get(family).fontCount) {
+    return spanCache.get(family).spans;
+  }
+  const spans = [];
+  let fontCount = 0;
+  for (const face of document.fonts) {
+    fontCount += 1;
+    const name = String(face.family || "").replace(/^["']|["']$/g, "");
+    if (name !== family) continue;
+    for (const span of parseUnicodeRanges(face.unicodeRange)) {
+      if (span[0] <= 0 && span[1] >= 0x10ffff) continue;
+      spans.push(span);
+    }
+  }
+  const merged = [];
+  spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  for (const [start, end] of spans) {
+    const last = merged[merged.length - 1];
+    if (last && start <= last[1] + 1) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  if (merged.length) spanCache.set(family, { spans: merged, fontCount });
+  return merged;
+}
+
+function familyHas(family, cp) {
+  const spans = spansFor(family);
+  let lo = 0;
+  let hi = spans.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [start, end] = spans[mid];
+    if (cp < start) hi = mid - 1;
+    else if (cp > end) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
+
+function parseStack(fontFamily) {
+  const parts = [];
+  let current = "";
+  let quoted = false;
+  for (const ch of String(fontFamily || "")) {
+    if (ch === '"' || ch === "'") {
+      quoted = !quoted;
+      continue;
+    }
+    if (ch === "," && !quoted) {
+      parts.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts.filter((name) => name && name !== "sans-serif" && name !== "serif" && name !== "monospace");
+}
+
+function isHan(cp) {
+  return (cp >= 0x3400 && cp <= 0x9fff) || (cp >= 0xf900 && cp <= 0xfaff);
+}
+
+function isKana(cp) {
+  return (cp >= 0x3040 && cp <= 0x30ff) || (cp >= 0x31f0 && cp <= 0x31ff);
+}
+
+function glyphProblems(fontFamily, text, lang, role) {
+  const stack = parseStack(fontFamily);
+  const primary = stack[0] || "";
+  const hits = [];
+  const body = String(text || "");
+  const script = [...body].some((ch) => {
+    const cp = ch.codePointAt(0);
+    return isHan(cp) || isKana(cp);
+  });
+  if (lang === "ja" && script && primary !== "Noto Sans JP") hits.push(["font-family", role, primary || "missing"]);
+  const seen = new Set();
+  for (const ch of body) {
+    if (!ch.trim()) continue;
+    const cp = ch.codePointAt(0);
+    if (seen.has(cp)) continue;
+    seen.add(cp);
+    const owner = stack.find((family) => familyHas(family, cp)) || "";
+    if (!owner) {
+      hits.push(["font-fallback", role, primary || "missing", ch]);
+      continue;
+    }
+    if (lang === "ja" && (isHan(cp) || isKana(cp))) {
+      if (familyHas("Noto Sans JP", cp) && owner !== "Noto Sans JP") hits.push(["font-fallback", role, owner, ch]);
+      else if (!familyHas("Noto Sans JP", cp) && owner === "ZCOOL QingKe HuangYou") hits.push(["font-fallback", role, owner, ch]);
+    }
+    if (lang === "zh" && isHan(cp)) {
+      if (owner !== "Noto Sans SC" && owner !== "ZCOOL QingKe HuangYou") hits.push(["font-fallback", role, owner, ch]);
+      if (primary === "ZCOOL QingKe HuangYou" && !familyHas("ZCOOL QingKe HuangYou", cp)) {
+        hits.push(["font-fallback", role, owner, ch]);
+      }
+    }
+  }
+  return hits;
+}
+
+function rootVisible(el) {
+  if (!el || el.hidden) return false;
+  const style = getComputedStyle(el);
+  return style.display !== "none" && style.visibility !== "hidden";
+}
+
+function ownText(el) {
+  let text = "";
+  for (const node of el.childNodes) {
+    if (node.nodeType === Node.TEXT_NODE) text += node.textContent || "";
+  }
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function collectCopyHits(scene) {
+  const lang = String(document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh";
+  const hits = [];
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false) return;
+    if (obj.type === "Text" && obj.alpha > 0.05) {
+      const body = String(obj.text || "").trim();
+      if (body) {
+        const role = obj.getData?.("hubRole") || obj.getData?.("kind") || obj.name || "text";
+        hits.push(...glyphProblems(obj.style?.fontFamily, body, lang, role));
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+
+  for (const id of COPY_ROOTS) {
+    const root = document.getElementById(id);
+    if (!rootVisible(root)) continue;
+    const nodes = [root, ...root.querySelectorAll("button, h1, h2, h3, p, li, span, strong, em, pre, a, label")];
+    for (const el of nodes) {
+      if (el.closest("svg")) continue;
+      if (!rootVisible(el)) continue;
+      const body = ownText(el);
+      if (!body) continue;
+      const role = el.id || el.className || id;
+      hits.push(...glyphProblems(getComputedStyle(el).fontFamily, body, lang, String(role).slice(0, 40)));
+    }
+  }
+  return hits;
+}
+
+function collectCaptionHits(scene, origin) {
+  window.__nanoGPTReflowCaption?.();
+  const hits = [];
+  const note = document.getElementById("voice-note");
+  const line = document.getElementById("voice-line");
+  if (!rootVisible(note)) return hits;
+  const style = getComputedStyle(line || note);
+  if (style.textOverflow === "ellipsis" || (line && getComputedStyle(line).whiteSpace === "nowrap") || getComputedStyle(note).whiteSpace === "nowrap") {
+    hits.push(["caption-ellipsis", "style"]);
+  }
+  if (elementClipped(note) || elementClipped(line)) hits.push(["caption-ellipsis", "clipped"]);
+  const narr = window.__nanoGPTNarration?.();
+  const shown = String(line?.textContent || note?.textContent || "").replace(/\s+/g, " ").trim();
+  const text = String(narr?.text || "").replace(/\s+/g, " ").trim();
+  if (text && !shown.includes(text)) hits.push(["caption-ellipsis", "missing-text"]);
+  if (text && shown.includes("…") && !text.includes("…")) hits.push(["caption-ellipsis", "dots"]);
+  const box = domBox(note, "caption");
+  const cta = scene.frame?.nextBtn ? phaserBox(scene.frame.nextBtn, "cta", origin) : null;
+  if (box && cta && intersects(box, cta)) hits.push(["caption", "cta"]);
+  return hits;
+}
+
+function collectTopBarHits() {
+  if (isWidePcTutor()) return [];
+  if (document.documentElement.dataset.scene !== "lesson") return [];
+  const actions = document.getElementById("mobile-actions");
+  if (!rootVisible(actions)) return [];
+  const boxes = [...actions.querySelectorAll("button")]
+    .filter((btn) => rootVisible(btn))
+    .map((btn) => {
+      const rect = btn.getBoundingClientRect();
+      return { id: btn.id || "button", x: rect.x, y: rect.y, w: rect.width, h: rect.height };
+    })
+    .filter((box) => box.w > 2 && box.h > 2);
+  const hits = [];
+  for (let i = 0; i < boxes.length; i += 1) {
+    for (let j = i + 1; j < boxes.length; j += 1) {
+      if (boxesOverlap(boxes[i], boxes[j])) hits.push(["topbar-overlap", boxes[i].id, boxes[j].id]);
+    }
+  }
+  const rows = [];
+  for (const box of [...boxes].sort((a, b) => a.y - b.y)) {
+    const row = rows.find((entry) => Math.abs(entry.y - box.y) < 8);
+    if (row) row.items.push(box);
+    else rows.push({ y: box.y, items: [box] });
+  }
+  for (const row of rows) {
+    if (row.items.length === 1) hits.push(["topbar-orphan", row.items[0].id]);
+  }
+  return hits;
 }
 
 /**

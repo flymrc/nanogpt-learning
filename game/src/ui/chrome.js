@@ -85,12 +85,23 @@ export function bindVoiceNote() {
     }
     return line;
   };
-  const fillLine = (line, shown) => {
-    // Home wraps between words. A nowrap word cannot leave one character on the next line.
-    if (document.documentElement.dataset.scene !== "home") {
-      line.textContent = shown;
-      return;
+  const reflowCaption = (line) => {
+    const note = line?.parentElement;
+    if (!line) return;
+    const words = [...line.querySelectorAll(".voice-word")];
+    for (const word of words) word.classList.remove("is-breakable");
+    const limit = line.clientWidth || note?.clientWidth || 0;
+    if (limit < 8) return;
+    const lineOverflow = line.scrollWidth > limit + 1;
+    const noteOverflow = Boolean(note) && note.scrollWidth > note.clientWidth + 1;
+    if (!lineOverflow && !noteOverflow) return;
+    for (const word of words) {
+      const range = document.createRange();
+      range.selectNodeContents(word);
+      if (range.getBoundingClientRect().width > limit - 1) word.classList.add("is-breakable");
     }
+  };
+  const fillLine = (line, shown) => {
     line.replaceChildren();
     for (const part of String(shown).split(/(\s+)/)) {
       if (!part) continue;
@@ -103,7 +114,13 @@ export function bindVoiceNote() {
       word.textContent = part;
       line.appendChild(word);
     }
+    reflowCaption(line);
   };
+  window.__nanoGPTReflowCaption = () => {
+    const line = document.getElementById("voice-line");
+    if (line) reflowCaption(line);
+  };
+  window.addEventListener("resize", () => window.__nanoGPTReflowCaption?.());
   window.addEventListener("nanogpt-narration", (event) => {
     const detail = event.detail || {};
     const text = String(detail.text || "").replace(/\s+/g, " ").trim();
