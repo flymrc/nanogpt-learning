@@ -721,13 +721,14 @@ async function pageWithoutJaVoice(browser, label) {
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1");
   await page.waitForFunction(() => {
-    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak");
+    // Home may already have spoken Chinese before the toggle. The missing-voice
+    // check is the later Japanese utterance, not the first speak in the log.
+    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak" && entry.lang === "ja-JP");
     const note = document.getElementById("voice-note");
     const tip = note?.getAttribute("aria-label") || note?.title || "";
     const line = document.getElementById("voice-line")?.textContent || "";
     return Boolean(
       hit &&
-        hit.lang === "ja-JP" &&
         !hit.voice &&
         note?.dataset.missing === "1" &&
         tip.includes("Chrome") &&
