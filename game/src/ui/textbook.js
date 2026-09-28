@@ -191,7 +191,7 @@ function cardStyle(size, extra = {}) {
 
 function cardCopy(beat, phase) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
-  const sum = String(beat?.id || "").endsWith("-sum");
+  const sum = /-(sum|rev)$/.test(String(beat?.id || ""));
   if (meta.id === "check" && sum && beat.stars?.length) {
     return { shown: beat.stars.map((line) => `⭐ ${line}`).join("\n"), reveal: null };
   }
