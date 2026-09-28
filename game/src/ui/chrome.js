@@ -60,6 +60,7 @@ export function applyChromeCopy() {
 
 /** Lesson tools stay in the tutorial. Home keeps language and mute. */
 export function syncHubChrome(sceneKey) {
+  document.documentElement.dataset.scene = sceneKey === "Home" ? "home" : "lesson";
   const lesson = Boolean(sceneKey) && sceneKey !== "Home" && sceneKey !== "Boot";
   for (const id of LESSON_CHROME) {
     const el = document.getElementById(id);
@@ -84,13 +85,32 @@ export function bindVoiceNote() {
     }
     return line;
   };
+  const fillLine = (line, shown) => {
+    // Home wraps between words. A nowrap word cannot leave one character on the next line.
+    if (document.documentElement.dataset.scene !== "home") {
+      line.textContent = shown;
+      return;
+    }
+    line.replaceChildren();
+    for (const part of String(shown).split(/(\s+)/)) {
+      if (!part) continue;
+      if (/^\s+$/.test(part)) {
+        line.appendChild(document.createTextNode(part));
+        continue;
+      }
+      const word = document.createElement("span");
+      word.className = "voice-word";
+      word.textContent = part;
+      line.appendChild(word);
+    }
+  };
   window.addEventListener("nanogpt-narration", (event) => {
     const detail = event.detail || {};
     const text = String(detail.text || "").replace(/\s+/g, " ").trim();
     const ja = String(detail.lang || "").toLowerCase().startsWith("ja");
     const line = lineOf();
     if (!text) {
-      line.textContent = t("voiceIdle");
+      fillLine(line, t("voiceIdle"));
       note.classList.remove("is-missing");
       note.dataset.missing = "";
       note.dataset.live = "";
@@ -100,7 +120,7 @@ export function bindVoiceNote() {
     }
     const prefix = detail.kind === "pseudo" ? t("voicePseudo") : t("voiceBeat");
     const shown = `${prefix}${text}`;
-    line.textContent = shown;
+    fillLine(line, shown);
     note.dataset.live = "1";
     note.dataset.lang = detail.lang || "";
     note.dataset.source = detail.source || "";
@@ -118,6 +138,6 @@ export function bindVoiceNote() {
     note.removeAttribute("aria-label");
   });
   window.addEventListener("nanogpt-lang", () => {
-    if (!note.dataset.live) lineOf().textContent = t("voiceIdle");
+    if (!note.dataset.live) fillLine(lineOf(), t("voiceIdle"));
   });
 }

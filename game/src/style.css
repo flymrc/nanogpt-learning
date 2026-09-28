@@ -830,11 +830,47 @@ html.has-game-cursor * {
   pointer-events: none;
 }
 
+html[lang="ja"] .voice-note {
+  font-family: "Noto Sans JP", sans-serif;
+}
+
+html[lang="zh-CN"] .voice-note {
+  font-family: "Noto Sans SC", "PingFang SC", sans-serif;
+}
+
 #voice-line {
   display: block;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+html[data-scene="home"] .voice-note,
+html[data-scene="home"] #voice-line {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  height: auto;
+  line-height: 1.35;
+}
+
+html[data-scene="home"] .voice-word {
+  white-space: nowrap;
+}
+
+html.is-mobile[data-scene="home"] #mobile-chrome {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+html.is-mobile[data-scene="home"] #mobile-title,
+html.is-mobile[data-scene="home"] #mobile-badge {
+  display: none !important;
+}
+
+html.is-mobile[data-scene="home"] .mobile-chrome__actions {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 .voice-note.is-missing {
@@ -846,6 +882,24 @@ html.has-game-cursor * {
 html.is-mobile .voice-note {
   flex: 1 1 100%;
   min-width: 0;
+}
+
+html.is-mobile[data-scene="home"] .voice-note {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  flex: none;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  z-index: 18;
+  height: auto;
+  padding: 4px 10px;
+  border: 2px solid #3b2a2e;
+  border-radius: 8px;
+  background: rgba(255, 248, 238, 0.94);
+  box-sizing: border-box;
 }
 
 html.is-pc .voice-note {
@@ -860,6 +914,14 @@ html.is-pc .voice-note {
   border: 2px solid #3b2a2e;
   border-radius: 8px;
   background: rgba(255, 248, 238, 0.94);
+}
+
+html.is-pc[data-scene="home"] .voice-note {
+  max-width: calc(100% - 32px);
+  width: max-content;
+  height: auto;
+  line-height: 1.35;
+  padding: 4px 10px;
 }
 
 .sheet-overlay {

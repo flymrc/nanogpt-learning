@@ -72,6 +72,12 @@ export function stickerColor(seed) {
   return STICKERS[Math.abs(n) % STICKERS.length];
 }
 
+/** Home display faces. One family per locale so a kanji cannot fall through to another design. */
+export const FONT_DISPLAY_ZH = '"ZCOOL QingKe HuangYou", sans-serif';
+export const FONT_DISPLAY_JA = '"Noto Sans JP", sans-serif';
+export const FONT_UI_ZH = '"Noto Sans SC", sans-serif';
+export const FONT_UI_JA = '"Noto Sans JP", sans-serif';
+
 /** No line may start with closing punctuation (禁则). */
 const KINSOKU_HEAD = "。，、！？）」』】》〉";
 
@@ -108,6 +114,69 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
       lines.push(current);
       if (index < String(raw || "").split("\n").length - 1) lines.push("");
     });
+  probe.destroy();
+  return applyKinsoku(lines).join("\n");
+}
+
+/** Lines that are a single leftover character after a wrap. A one-character string is not an orphan. */
+export function orphanLines(body) {
+  const lines = String(body ?? "").split("\n");
+  if (lines.length < 2) return [];
+  return lines.filter((line) => [...line.replace(/\s+/g, "")].length === 1);
+}
+
+/**
+ * Wrap at spaces first (the kid script marks words that way), then glyphs.
+ * Callers shrink the font while `orphanLines` is non-empty.
+ */
+export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
+  const probe = scene.add.text(-8000, -8000, "", styleFn(size)).setVisible(false);
+  const widthOf = (value) => {
+    probe.setText(value);
+    return probe.width;
+  };
+  const breakToken = (token) => {
+    const out = [];
+    let current = "";
+    for (const ch of token) {
+      if (current && widthOf(current + ch) > maxWidth) {
+        out.push(current);
+        current = ch;
+      } else {
+        current += ch;
+      }
+    }
+    if (current) out.push(current);
+    return out.length ? out : [""];
+  };
+  const lines = [];
+  for (const para of String(raw ?? "").split("\n")) {
+    const words = para.split(/\s+/).filter(Boolean);
+    if (!words.length) {
+      lines.push("");
+      continue;
+    }
+    let current = "";
+    for (const word of words) {
+      const chunks = widthOf(word) > maxWidth ? breakToken(word) : [word];
+      chunks.forEach((chunk, index) => {
+        if (index < chunks.length - 1) {
+          if (current) lines.push(current);
+          lines.push(chunk);
+          current = "";
+          return;
+        }
+        const trial = current ? `${current} ${chunk}` : chunk;
+        if (current && widthOf(trial) > maxWidth) {
+          lines.push(current);
+          current = chunk;
+        } else {
+          current = trial;
+        }
+      });
+    }
+    lines.push(current);
+  }
   probe.destroy();
   return applyKinsoku(lines).join("\n");
 }

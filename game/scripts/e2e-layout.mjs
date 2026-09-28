@@ -1341,12 +1341,13 @@ const pc1024 = await runViewport(
   { allPhases: false },
 );
 
-const HOME_SHOTS = {
-  "mobile-zh": "mobile-zh.png",
-  "mobile-ja": "mobile-ja.png",
-  "pc1440-zh": "pc1440-zh.png",
-  "pc1024x522-ja": "pc1024x522-ja.png",
-};
+function homeShot(lang, width, height) {
+  return `/opt/cursor/artifacts/home/home-${lang}-${width}x${height}.png`;
+}
+
+function lessonShot(lang, width, height) {
+  return `/opt/cursor/artifacts/home/lesson-${lang}-${width}x${height}.png`;
+}
 
 async function waitHome(page, mobile) {
   await page.waitForFunction(
@@ -1376,9 +1377,9 @@ async function clickHubCard(page, id) {
 async function assertHomeViewport(page, label, lang, mobile) {
   await waitHome(page, mobile);
   const layout = await page.evaluate(() => window.__nanoGPTAssertLayout());
-  const shot = HOME_SHOTS[`${label}-${lang}`];
-  if (shot || !layout?.ok) {
-    await page.screenshot({ path: shot ? `/opt/cursor/artifacts/home/${shot}` : `${OUT}/home-${label}-${lang}.png` });
+  await page.screenshot({ path: homeShot(lang, page.viewportSize().width, page.viewportSize().height) });
+  if (!layout?.ok) {
+    await page.screenshot({ path: `${OUT}/home-${label}-${lang}.png` });
   }
   if (!layout?.ok) {
     throw new Error(`home layout ${lang} ${label} ${JSON.stringify({ overlaps: layout?.overlaps, overflows: layout?.overflows, orphans: layout?.orphans })}`);
@@ -1425,6 +1426,10 @@ async function assertHomeViewport(page, label, lang, mobile) {
   }, copy.home);
   if (homeBtn.hidden || homeBtn.w < 8 || homeBtn.text !== homeBtn.expected) {
     throw new Error(`home button ${JSON.stringify(homeBtn)}`);
+  }
+  const view = page.viewportSize();
+  if ((mobile && view.width === 390) || (!mobile && view.width === 1440 && view.height === 900)) {
+    await page.screenshot({ path: lessonShot(lang, view.width, view.height) });
   }
   await page.click("#home-toggle");
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });

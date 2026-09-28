@@ -99,8 +99,17 @@ function applyGameSize(game) {
 
 async function boot() {
   if (document.fonts?.ready) {
+    const loads = document.fonts.load
+      ? [
+          document.fonts.load('700 32px "Noto Sans JP"'),
+          document.fonts.load('500 28px "Noto Sans JP"'),
+          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"'),
+          document.fonts.load('500 28px "Noto Sans SC"'),
+          document.fonts.load('700 32px "Fredoka"'),
+        ]
+      : [];
     await Promise.race([
-      document.fonts.ready,
+      Promise.all([document.fonts.ready, ...loads]),
       new Promise((resolve) => window.setTimeout(resolve, 2000)),
     ]);
   }

@@ -152,6 +152,9 @@ function assertLessonLayout(scene) {
   for (const hit of artHits) overlaps.push(hit);
   const readHits = collectReadabilityHits(scene, origin);
   for (const hit of readHits) overlaps.push(hit);
+  if (scene.sys?.settings?.key === "Home") {
+    for (const hit of collectHomeCopyHits(scene, origin)) overlaps.push(hit);
+  }
 
   const dock = document.getElementById("tutor-dock");
   const dockStyle = dock ? getComputedStyle(dock) : null;
@@ -598,6 +601,184 @@ function collectArtHits(scene, origin) {
     }
   }
   return hits;
+}
+
+function primaryFamily(fontFamily) {
+  const raw = String(fontFamily || "").trim();
+  const quoted = raw.match(/^["']([^"']+)["']/);
+  if (quoted) return quoted[1];
+  return raw.split(",")[0].replace(/["']/g, "").trim();
+}
+
+function parseUnicodeRanges(rangeText) {
+  const spans = [];
+  for (const part of String(rangeText || "").split(",")) {
+    const match = part.trim().match(/U\+([0-9A-Fa-f]+)(?:-([0-9A-Fa-f]+))?/i);
+    if (!match) continue;
+    const start = Number.parseInt(match[1], 16);
+    const end = match[2] ? Number.parseInt(match[2], 16) : start;
+    if (Number.isFinite(start) && Number.isFinite(end)) spans.push([start, end]);
+  }
+  return spans;
+}
+
+function familyGlyphs(family, text) {
+  const faces = [...document.fonts].filter((face) => {
+    const name = String(face.family || "").replace(/^["']|["']$/g, "");
+    return name === family && face.status === "loaded";
+  });
+  const chars = [...String(text || "")].filter((ch) => ch.trim());
+  if (!faces.length) return { ok: false, missing: [...new Set(chars)], reason: "unloaded" };
+  const spans = faces.flatMap((face) => parseUnicodeRanges(face.unicodeRange));
+  const universal = spans.some(([start, end]) => start <= 0 && end >= 0x10ffff);
+  if (!spans.length || universal) return { ok: false, missing: [], reason: universal ? "unbounded" : "no-range" };
+  const missing = [];
+  for (const ch of chars) {
+    const cp = ch.codePointAt(0);
+    if (!spans.some(([start, end]) => cp >= start && cp <= end)) missing.push(ch);
+  }
+  return { ok: missing.length === 0, missing: [...new Set(missing)], reason: "" };
+}
+
+function elementClipped(el) {
+  if (!el) return false;
+  const style = getComputedStyle(el);
+  if (style.display === "none" || style.visibility === "hidden") return false;
+  return el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1;
+}
+
+function captionVisualLines(line) {
+  if (!line) return [];
+  const rows = new Map();
+  const push = (text, top) => {
+    const clean = String(text || "").replace(/\s+/g, "");
+    if (!clean) return;
+    const key = Math.round(top);
+    rows.set(key, `${rows.get(key) || ""}${clean}`);
+  };
+  if (line.querySelector(".voice-word")) {
+    for (const word of line.querySelectorAll(".voice-word")) {
+      const rect = word.getBoundingClientRect();
+      if (rect.width < 1) continue;
+      push(word.textContent, rect.top);
+    }
+  } else {
+    const text = line.firstChild;
+    if (text && text.nodeType === Node.TEXT_NODE) {
+      let offset = 0;
+      const raw = text.textContent || "";
+      while (offset < raw.length) {
+        const range = document.createRange();
+        range.setStart(text, offset);
+        range.setEnd(text, offset + 1);
+        const rect = range.getBoundingClientRect();
+        if (rect.width > 0) push(raw[offset], rect.top);
+        offset += 1;
+      }
+    }
+  }
+  return [...rows.values()];
+}
+
+/**
+ * Home copy: one font per string, no one-character wrap, caption fully visible,
+ * and the mobile chrome does not repeat the page title.
+ */
+function collectHomeCopyHits(scene, origin) {
+  const hits = [];
+  const lang = String(document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh";
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false) return;
+    if (obj.type === "Text" && obj.alpha > 0.05) {
+      const role = obj.getData?.("hubRole") || obj.name || "text";
+      const body = String(obj.text || "");
+      const family = primaryFamily(obj.style?.fontFamily);
+      const copyRoles = new Set(["title", "sub", "card-title", "card-desc", "card-action"]);
+      if (!copyRoles.has(role)) {
+        (obj.list || []).forEach(walk);
+        return;
+      }
+      for (const line of orphanLinesFrom(body)) hits.push(["orphan-line", role, line]);
+      const covered = familyGlyphs(family, body);
+      if (!covered.ok) {
+        const sample = covered.missing.slice(0, 8).join("");
+        hits.push(["font-fallback", role, family, covered.reason || sample || "missing"]);
+      }
+      if (lang === "ja" && family !== "Noto Sans JP") {
+        hits.push(["font-family", role, family]);
+      }
+      if (lang === "zh" && (role === "title" || role === "card-title") && family !== "ZCOOL QingKe HuangYou") {
+        hits.push(["font-family", role, family]);
+      }
+      if (lang === "zh" && (role === "sub" || role === "card-desc" || role === "card-action") && family !== "Noto Sans SC") {
+        hits.push(["font-family", role, family]);
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+
+  const voice = document.getElementById("voice-line") || document.getElementById("voice-note");
+  if (voice) {
+    const family = primaryFamily(getComputedStyle(voice).fontFamily);
+    const covered = familyGlyphs(family, voice.textContent || "");
+    if (!covered.ok) hits.push(["font-fallback", "caption", family, covered.reason || covered.missing.slice(0, 8).join("")]);
+    if (lang === "ja" && family !== "Noto Sans JP") hits.push(["font-family", "caption", family]);
+    if (lang === "zh" && family !== "Noto Sans SC") hits.push(["font-family", "caption", family]);
+    const lines = captionVisualLines(voice);
+    if (lines.length > 1) {
+      for (const line of lines) {
+        if ([...line].length === 1) hits.push(["orphan-line", "caption", line]);
+      }
+    }
+  }
+  const note = document.getElementById("voice-note");
+  const line = document.getElementById("voice-line");
+  if (elementClipped(note) || elementClipped(line)) hits.push(["caption-ellipsis", "voice"]);
+  const narr = window.__nanoGPTNarration?.();
+  const shown = String(line?.textContent || note?.textContent || "");
+  if (narr?.text && !shown.includes(String(narr.text).replace(/\s+/g, " ").trim())) {
+    hits.push(["caption-ellipsis", "missing-text"]);
+  }
+
+  if (!isWidePcTutor()) {
+    const chromeTitle = document.getElementById("mobile-title");
+    const style = chromeTitle ? getComputedStyle(chromeTitle) : null;
+    const shownTitle =
+      chromeTitle &&
+      style &&
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      chromeTitle.getBoundingClientRect().height > 2;
+    if (shownTitle) hits.push(["duplicate-title", "mobile-chrome"]);
+  }
+
+  const noteBox = domBox(note, "voice");
+  if (noteBox) {
+    const walkCards = (obj) => {
+      if (!obj || obj.active === false) return;
+      if (obj.getData?.("kind") === "hub-card") {
+        const box = pieceBox(obj, origin);
+        if (box && strictHit(noteBox, box)) hits.push(["voice", "hub-card", String(obj.getData("cardId") || "")]);
+      }
+      if (obj.type === "Text" && (obj.getData?.("hubRole") === "title" || obj.getData?.("hubRole") === "sub")) {
+        const b = obj.getBounds?.();
+        if (b && b.width > 1) {
+          const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+          if (strictHit(noteBox, box)) hits.push(["voice", obj.getData("hubRole")]);
+        }
+      }
+      (obj.list || []).forEach(walkCards);
+    };
+    (scene.children?.list || []).forEach(walkCards);
+  }
+  return hits;
+}
+
+function orphanLinesFrom(body) {
+  const lines = String(body || "").split("\n");
+  if (lines.length < 2) return [];
+  return lines.filter((line) => [...line.replace(/\s+/g, "")].length === 1);
 }
 
 function collectOrphanOverlays(scene) {
