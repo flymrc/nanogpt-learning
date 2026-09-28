@@ -139,11 +139,11 @@ export function teachLesson(scene, frame, beat, { index, total, phase = 0, insta
   return meta;
 }
 
-export function drawPhaseTabs(scene, stage, phase, onPick) {
+export function drawPhaseTabs(scene, stage, phase, onPick, { h: hOverride } = {}) {
   const n = LESSON_PHASES.length;
   const phone = !isWidePcTutor();
   const gap = phone ? 4 : 8;
-  const h = phone ? 30 : 32;
+  const h = hOverride || (phone ? 30 : 32);
   const w = Math.min(phone ? 72 : 78, (stage.w - gap * (n - 1)) / n);
   const y = stage.top + h / 2;
   const start = stage.cx - ((n - 1) * (w + gap)) / 2;
@@ -315,45 +315,135 @@ function paintBookMarks(scene, parent, source, size, originX, originY, lineH) {
   probe.destroy();
 }
 
-export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = {}) {
+function drawCompactPhaseCard(scene, stage, beat, phase, meta, copy, cardTop, width, height = 36) {
+  const box = scene.add.container(stage.cx, cardTop + height / 2);
+  const g = scene.add.graphics();
+  drawSticker(g, -width / 2, -height / 2, width, height, 14, C.surface);
+  const stripe = scene.add.graphics();
+  stripe.fillStyle(phaseAccent(meta.id), 1);
+  stripe.fillRoundedRect(-width / 2 + 8, -height / 2 + 6, 8, height - 12, 4);
+  const title = scene.add.text(-width / 2 + 22, 0, meta.kicker, uiText(14, { color: C.goldCss })).setOrigin(0, 0.5);
+  title.setData("kind", "phase-card-title");
+  const moreLabel = t("purposeMore");
+  const more = scene.add.text(width / 2 - 14, 0, moreLabel, uiText(13, { color: C.blueCss })).setOrigin(1, 0.5);
+  more.setData("kind", "phase-card-more");
+  more.setData("source", moreLabel);
+  const textX = -width / 2 + 22 + title.width + 12;
+  const textRight = width / 2 - 14 - more.width - 12;
+  const textMax = Math.max(48, textRight - textX);
+  const full = String(copy.shown || "").split("\n").map((line) => line.trim()).filter(Boolean).join(" ");
+  const probe = scene.add.text(0, 0, "", cardStyle(15)).setVisible(false);
+  let size = 15;
+  let shown = full;
+  const widthOf = (value, n) => {
+    probe.setFontSize(n);
+    probe.setText(value);
+    return probe.width;
+  };
+  while (size > 13 && widthOf(shown, size) > textMax) size -= 1;
+  if (widthOf(shown, size) > textMax) {
+    const parts = full.split(/\s+/).filter(Boolean);
+    if (parts.length > 1) {
+      let acc = "";
+      for (const part of parts) {
+        const trial = acc ? `${acc} ${part}` : part;
+        if (widthOf(trial, size) > textMax) break;
+        acc = trial;
+      }
+      shown = acc;
+    }
+    if (!shown || widthOf(shown, size) > textMax) {
+      const chars = [...full];
+      let next = "";
+      for (const ch of chars) {
+        if (widthOf(next + ch, size) > textMax) break;
+        next += ch;
+      }
+      shown = next || chars[0] || "";
+    }
+  }
+  probe.destroy();
+  const text = scene.add.text(textX, 0, shown, cardStyle(size)).setOrigin(0, 0.5);
+  text.setData("kind", "phase-card-text");
+  text.setData("source", shown);
+  text.setData("wrapWidth", textMax);
+  const open = (_pointer, _x, _y, event) => {
+    event?.stopPropagation?.();
+    openCopyPop(copy.shown);
+  };
+  more.setInteractive(new Phaser.Geom.Rectangle(-more.width - 8, -16, more.width + 16, 32), Phaser.Geom.Rectangle.Contains);
+  more.on("pointerdown", open);
+  box.add([g, stripe, title, text, more]);
+  box.setSize(width, height);
+  box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+  box.on("pointerdown", open);
+  box.setData("kind", "phase-card");
+  box.setData("width", width);
+  box.setData("height", height);
+  box.setData("shadow", false);
+  scene.frame.stage.add(box);
+  window.__nanoGPTCard = {
+    id: beat?.id || "",
+    phase,
+    full: copy.shown,
+    shown,
+    truncated: false,
+    revealed: false,
+  };
+  return { bottom: cardTop + height, height };
+}
+
+export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap, compactH = 36 } = {}) {
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
   const phone = !isWidePcTutor();
   const rag = beat?.course === "rag" || getCourse() === "rag";
-  const cardTop = (top ?? stage.top) + rhythm;
+  const cardTop = (top ?? stage.top) + (gap ?? rhythm);
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
   const copy = cardCopy(beat, phase);
+  if (rag && !phone && (meta.id === "look" || meta.id === "do")) {
+    return drawCompactPhaseCard(scene, stage, beat, phase, meta, copy, cardTop, width, compactH);
+  }
   const available = stage.bottom - cardTop - rhythm;
   // A fixed art reserve crushed every RAG card to 48px and scaled the
   // instruction down to a blur. Short lines keep a readable size. The
   // picture then fills whatever is left above the button.
   const shortStage = !phone && (scene.frame?.v?.h || 900) < 760;
   const doPhone = rag && phone && meta.id === "do";
+  const pcLookDo = rag && !phone && (meta.id === "look" || meta.id === "do");
   const viewportH = typeof window !== "undefined" ? window.innerHeight || scene.frame?.v?.h || 844 : 844;
   // Scheme sits under the caption block. Phone pictures stay at least ~40% of the viewport.
+  // On a wide PC, 看看 / やって leave at least half the column for the picture.
   const captionBlock = 48;
   const wantScheme = Math.round(viewportH * 0.4);
   const wantPicture = wantScheme + captionBlock + 28;
   const roomForPicture = Math.max(64, stage.bottom - 12 - cardTop - rhythm);
+  const panelH = scene.frame?.v?.h || viewportH;
+  const pcPicture = Math.round(panelH * 0.5) + 58;
   const pictureFloor = rag
     ? (phone
       ? Math.min(Math.max(228, roomForPicture - 72), Math.max(228, wantPicture))
-      : shortStage ? 300 : 240)
+      : pcLookDo
+        ? Math.max(shortStage ? 300 : 240, pcPicture)
+        : shortStage ? 300 : 240)
     : 0;
   const preferred = rag
     ? Math.max(64, Math.min(phone ? stage.h * 0.4 : stage.h * 0.3, Math.max(64, available - pictureFloor)))
     : phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
   const yielded = rag ? available - pictureFloor : available - Math.max(0, reserve);
   const maxH = rag
-    ? Math.min(preferred, Math.max(phone ? 52 : 56, yielded), phone ? 68 : 10000)
+    ? (pcLookDo
+      ? Math.max(40, Math.min(88, yielded))
+      : Math.min(preferred, Math.max(phone ? 52 : 56, yielded), phone ? 68 : 10000))
     : Math.min(preferred, Math.max(48, yielded));
   const chrome = 40;
   const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
   const fit = rag ? fitComplete : fitPlain;
+  const clipCard = doPhone || pcLookDo;
   const shownFit = rag
-    ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: !doPhone })
+    ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: !clipCard })
     : fit(scene, copy.shown, startSize, 13, wrap, maxTextH);
   const revealFit = copy.reveal
     ? (rag
@@ -361,7 +451,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
       : fit(scene, copy.reveal, startSize, 13, wrap, maxTextH))
     : null;
   const flatCopy = (value) => String(value || "").replace(/\s+/g, "");
-  let expandable = doPhone && flatCopy(shownFit.source) !== flatCopy(copy.shown);
+  let expandable = clipCard && flatCopy(shownFit.source) !== flatCopy(copy.shown);
   if (expandable) {
     const room = Math.max(16, maxTextH - 28);
     const again = fitComplete(scene, copy.shown, startSize, 13, wrap, room, { keep: false });
@@ -387,8 +477,8 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const textY = -height / 2 + 28;
   const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
   const textRoom = Math.max(16, height - 36 - (expandable ? 28 : 0));
-  if (rag && !doPhone && text.height > textRoom) text.setScale(textRoom / text.height);
-  if (doPhone && text.height > textRoom) {
+  if (rag && !clipCard && text.height > textRoom) text.setScale(textRoom / text.height);
+  if (clipCard && text.height > textRoom) {
     let lines = String(text.text || "").split("\n");
     while (lines.length > 1 && text.height > textRoom) {
       lines = lines.slice(0, -1);
@@ -406,7 +496,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   paintBookMarks(scene, box, shownFit.wrapped, font, textX, textY, text.height / lineCount);
   box.add(text);
   if (expandable) {
-    const more = scene.add.text(width / 2 - 16, height / 2 - 16, t("copyAll"), uiText(13, { color: C.blueCss })).setOrigin(1, 0.5);
+    const more = scene.add.text(width / 2 - 16, height / 2 - 16, pcLookDo ? t("purposeMore") : t("copyAll"), uiText(13, { color: C.blueCss })).setOrigin(1, 0.5);
     more.setData("source", t("copyAll"));
     more.setData("kind", "phase-card-more");
     more.setInteractive(new Phaser.Geom.Rectangle(-more.width - 8, -16, more.width + 16, 32), Phaser.Geom.Rectangle.Contains);
@@ -452,12 +542,21 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
 
 export function paintLessonStage(scene, beat, phase, onPick) {
   const phone = !isWidePcTutor();
+  const rag = beat?.course === "rag" || getCourse() === "rag";
+  const pcPack = rag && !phone && (phase === 1 || phase === 2);
   const artW = Math.max(80, scene.frame.stageBand.w - (phone ? 16 : 32));
   const reserve = artBandReserve(beat, phase, artW) + 12;
-  const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick);
-  const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, { top: tabs.bottom, reserve });
+  const shortPack = pcPack && (scene.frame?.v?.h || 900) < 720;
+  const tabs = drawPhaseTabs(scene, scene.frame.stageBand, phase, onPick, { h: shortPack ? 26 : pcPack ? 30 : 0 });
+  const card = drawPhaseCard(scene, scene.frame.stageBand, beat, phase, {
+    top: tabs.bottom,
+    reserve,
+    gap: shortPack ? 2 : pcPack ? 6 : undefined,
+    compactH: shortPack ? 28 : 36,
+  });
   const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v, {
     reserve: beat?.course === "rag" && phone ? 0 : undefined,
+    gap: shortPack ? 2 : pcPack ? 6 : undefined,
   });
   scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };
   scene.frame.lastCard = { left: scene.frame.stageBand.left, top: card.bottom - card.height, w: scene.frame.stageBand.w, h: card.height };
@@ -494,8 +593,8 @@ function phaseAccent(id) {
   return C.blue;
 }
 
-export function exampleBand(stage, cardBottom, v, { reserve: reserveOverride } = {}) {
-  const rhythm = lessonRhythm(v);
+export function exampleBand(stage, cardBottom, v, { reserve: reserveOverride, gap } = {}) {
+  const rhythm = gap ?? lessonRhythm(v);
   const top = cardBottom + rhythm;
   const inset = isWidePcTutor() ? 16 : 8;
   const reserve = reserveOverride ?? (isWidePcTutor() ? 0 : 12);

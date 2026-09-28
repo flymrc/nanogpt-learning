@@ -1799,7 +1799,7 @@ async function playRagSteps(page, name, first) {
     key: window.__nanoGPTState?.().scene || "",
   }));
   const lesson = /^Rag[1-5]$/.test(meta.key);
-  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0 };
+  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 };
   const addStage = (result) => {
     const stage = result?.stage;
     if (!stage?.active) return;
@@ -1810,6 +1810,7 @@ async function playRagSteps(page, name, first) {
     tally.actors += stage.actors || 0;
     tally.contrast += stage.contrast || 0;
     tally.words += stage.words || 0;
+    tally.empty += stage.empty || 0;
   };
   if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
   const doPhase = meta.phase === 2;
@@ -1965,6 +1966,64 @@ const ragPc1024 = await runRagViewport(
   { allPhases: false },
 );
 
+async function shootRag5(page, key, beat, phase, taps, file) {
+  await jumpLanded(page, key, beat, phase);
+  await page.waitForTimeout(240);
+  for (let i = 0; i < taps; i += 1) {
+    await page.evaluate(() => window.__nanoGPTRagTap());
+    await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+  }
+  await page.screenshot({ path: file });
+  const probe = await page.evaluate(() => window.__nanoGPTStage || null);
+  console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
+}
+
+async function saveRag5Shots(browser) {
+  const dir = "/opt/cursor/artifacts/rag5";
+  mkdirSync(dir, { recursive: true });
+  const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const jaPc = await open(1440, 900, "ja");
+  const take = beatOf("Rag5", "r5-p2");
+  await shootRag5(jaPc, "Rag5", take, 2, 1, `${dir}/r5-ch5-take-ja-1440-tap1.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 2, `${dir}/r5-ch5-take-ja-1440-tap2.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 3, `${dir}/r5-ch5-take-ja-1440-tap3.png`);
+  const ch1 = beatOf("Rag1", "r1-p9");
+  await shootRag5(jaPc, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-ja-1440.png`);
+  await jaPc.close();
+  const zhPc = await open(1440, 900, "zh");
+  const fill = beatOf("Rag4", "r4-p6");
+  await shootRag5(zhPc, "Rag4", fill, 2, 0, `${dir}/r5-ch4-fill-zh-1440-blank.png`);
+  await shootRag5(zhPc, "Rag4", fill, 2, 1, `${dir}/r5-ch4-fill-zh-1440-filled.png`);
+  await shootRag5(zhPc, "Rag3", beatOf("Rag3", "r3-p3"), 2, 1, `${dir}/r5-ch3-score-zh-1440.png`);
+  await shootRag5(zhPc, "Rag5", beatOf("Rag5", "r5-p4"), 2, 1, `${dir}/r5-ch5-threshold-zh-1440.png`);
+  await zhPc.close();
+  const zhShort = await open(1024, 640, "zh");
+  await shootRag5(zhShort, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-zh-1024.png`);
+  await zhShort.close();
+  const jaPhone = await open(390, 844, "ja", true);
+  await shootRag5(jaPhone, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-ja-390.png`);
+  await jaPhone.close();
+}
+
+await saveRag5Shots(browser);
+
 await browser.close();
 
 const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024 };
@@ -2019,13 +2078,14 @@ const stage = stageReports.reduce(
     sum.actors += tally.actors || 0;
     sum.contrast += tally.contrast || 0;
     sum.words += tally.words || 0;
+    sum.empty += tally.empty || 0;
     return sum;
   },
-  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0 },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 },
 );
 const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
-const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.mid >= doPages && stage.checks > 0;
-const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words}`;
+const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.empty === 0 && stage.mid >= doPages && stage.checks > 0;
+const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
 console.log(stageLine);
 if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk) {
   console.error("E2E_FAIL", {

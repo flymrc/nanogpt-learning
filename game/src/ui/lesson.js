@@ -83,12 +83,26 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
 
   const frame = { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
   frame.fitPurpose = (phase) => {
-    const collapsed = phone && getCourse() === "rag";
-    const nextH = collapsed ? 32 : purposeH;
-    frame.purposeBand = band(v.left, shell.content.top, v.innerW, nextH);
-    const nextTop = frame.purposeBand.bottom + rhythm + (collapsed ? 4 : 0);
-    frame.stageBand = band(v.left, nextTop, v.innerW, Math.max(80, shell.content.bottom - nextTop));
+    const rag = getCourse() === "rag";
+    const lookOrDo = phase === 1 || phase === 2;
+    // Phone already uses the one-line 全文 toggle. On a wide PC the same
+    // toggle applies to 看看 / やって so the picture can take half the column.
+    const collapsed = rag && (phone || lookOrDo);
+    const pcPack = collapsed && !phone;
+    const shortPack = pcPack && v.h < 720;
+    const nextH = collapsed ? (shortPack ? 26 : pcPack ? 30 : 32) : purposeH;
+    const purposeTop = pcPack ? (shell.header?.bottom ?? shell.content.top) + (shortPack ? 4 : 6) : shell.content.top;
+    frame.purposeBand = band(v.left, purposeTop, v.innerW, nextH);
+    const nextTop = frame.purposeBand.bottom + (pcPack ? 10 : rhythm);
     frame.purpose.relayout?.(frame.purposeBand, { collapsed, phone });
+    if (pcPack) seatCtaLow(frame);
+    let bandBottom = shell.content.bottom;
+    if (pcPack) {
+      const bounds = frame.nextBtn?.getBounds?.();
+      const ctaTop = bounds && bounds.height > 2 ? bounds.top : shell.footer.top;
+      bandBottom = Math.max(bandBottom, ctaTop - 12);
+    }
+    frame.stageBand = band(v.left, nextTop, v.innerW, Math.max(80, bandBottom - nextTop));
   };
   return frame;
 }
@@ -98,6 +112,20 @@ export function ctaClearance(frame) {
   return Math.max(12, frame?.rhythm || lessonRhythm(frame?.v));
 }
 
+function pcPackedPicture(frame) {
+  return getCourse() === "rag" && isWidePcTutor() && Boolean(frame?.purpose?.collapsed);
+}
+
+/** Drop the pink button to the bottom edge so the picture can use the footer padding. */
+function seatCtaLow(frame) {
+  const btn = frame?.nextBtn;
+  if (!btn || !frame?.v) return;
+  const hit = btn.input?.hitArea;
+  const h = hit?.height || 68;
+  const viewH = frame.v.bottom + (frame.v.padBottom || 0);
+  btn.y = viewH - h / 2 - 6;
+}
+
 /** Highest Y a Phaser label/chip may occupy (CTA top minus gap). */
 export function ctaCeiling(frame) {
   const btn = frame?.nextBtn;
@@ -105,6 +133,7 @@ export function ctaCeiling(frame) {
   const footerTop = frame?.shell?.footer?.top ?? 0;
   const bounds = btn?.getBounds?.();
   const ctaTop = bounds && bounds.height > 2 ? bounds.top : footerTop;
+  if (pcPackedPicture(frame)) return ctaTop - 12;
   return Math.min(footerTop, ctaTop) - gap;
 }
 
@@ -115,6 +144,10 @@ export function placeLessonCta(frame, contentBottom) {
   const phone = !isWidePcTutor();
   if (phone) {
     btn.y = frame.shell.footer.cy;
+    return;
+  }
+  if (pcPackedPicture(frame)) {
+    seatCtaLow(frame);
     return;
   }
   const rhythm = frame.rhythm || lessonRhythm(frame.v);

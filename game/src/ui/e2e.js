@@ -929,16 +929,18 @@ function stageWorldBox(obj, origin) {
   };
 }
 
+function actorKey(box) {
+  return box.hold || box.id || "";
+}
+
 function stagePairAllowed(a, b) {
   if (a.role === "prop" || b.role === "prop" || a.role === "actor" || b.role === "actor") return true;
   if (stageAncestor(a.node, b.node) || stageAncestor(b.node, a.node)) return true;
-  const faceBody = (a.role === "face" && b.role === "body") || (a.role === "body" && b.role === "face");
-  if (faceBody) return Boolean(a.id) && a.id === b.id;
-  const heldBody = (a.role === "held" && b.role === "body") || (a.role === "body" && b.role === "held");
-  if (heldBody) {
-    const held = a.role === "held" ? a : b;
-    const body = a.role === "body" ? a : b;
-    return Boolean(held.hold) && held.hold === body.id;
+  const parts = new Set(["face", "body", "held"]);
+  if (parts.has(a.role) && parts.has(b.role)) {
+    const ka = actorKey(a);
+    const kb = actorKey(b);
+    if (ka && ka === kb) return true;
   }
   return false;
 }
@@ -986,6 +988,48 @@ function splitEnglishWords(source, rendered) {
   return hits;
 }
 
+/** 「第 4 页」 and Page N must stay on one rendered line. */
+function splitPageMarks(source, rendered) {
+  const marks = String(source || "").match(/第\s*\d+\s*页|Page\s+\d+/g) || [];
+  if (!marks.length) return [];
+  const lines = String(rendered || "").split("\n");
+  const hits = [];
+  const seen = new Set();
+  for (const mark of marks) {
+    const compact = mark.replace(/\s+/g, "");
+    if (seen.has(compact)) continue;
+    seen.add(compact);
+    if (lines.some((line) => line.replace(/\s+/g, "").includes(compact))) continue;
+    if (lines.join("").replace(/\s+/g, "").includes(compact)) hits.push(compact);
+  }
+  return hits;
+}
+
+function cardHasVisibleContent(node) {
+  const bg = hexOf(node.getData?.("stageBg"));
+  let ok = false;
+  const walk = (obj) => {
+    if (!obj || ok || obj.visible === false || obj.alpha < 0.2) return;
+    if (obj.type === "Image") {
+      const bounds = obj.getBounds?.();
+      if (bounds && bounds.width >= 8 && bounds.height >= 8) ok = true;
+    }
+    if (obj.type === "Text") {
+      const body = String(obj.text || "").replace(/\s+/g, "");
+      const bounds = obj.getBounds?.();
+      if (body && bounds && bounds.width >= 8 && bounds.height >= 8) {
+        const fg = hexOf(obj.getData?.("stageFg") || obj.style?.color);
+        const faint = fg && contrastRatio(fg, "#ffffff") < 1.2;
+        const weak = Boolean(bg && fg && contrastRatio(fg, bg) < 3);
+        if (!weak && !(faint && !bg)) ok = true;
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (node.list || []).forEach(walk);
+  return ok;
+}
+
 function unionOf(boxes) {
   let x0 = Infinity;
   let y0 = Infinity;
@@ -1004,7 +1048,7 @@ function unionOf(boxes) {
 /** Faces, labels, signs, and cards inside a RAG picture. Held paper may cover its own body. */
 function collectRagStageHits(scene, origin) {
   const key = String(scene.sys?.settings?.key || "");
-  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, ratio: 1, height: 0 };
+  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, ratio: 1, height: 0 };
   if (!key.startsWith("Rag") || key === "RagTitle" || key === "RagEnd") return [];
   const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
   if (!scheme) return [];
@@ -1021,6 +1065,7 @@ function collectRagStageHits(scene, origin) {
   let tiny = 0;
   let contrast = 0;
   let words = 0;
+  let empty = 0;
   const phone = !isWidePcTutor();
   const minFont = phone ? 12 : 13;
   for (const box of boxes) {
@@ -1043,6 +1088,27 @@ function collectRagStageHits(scene, origin) {
       words += 1;
       if (hits.length < 8) hits.push(["stage-word", word]);
     }
+    for (const mark of splitPageMarks(source, box.node.text)) {
+      words += 1;
+      if (hits.length < 8) hits.push(["stage-word", mark]);
+    }
+  }
+  for (const box of boxes) {
+    if (box.role !== "card" || !box.node) continue;
+    if (cardHasVisibleContent(box.node)) continue;
+    empty += 1;
+    if (hits.length < 8) hits.push(["stage-empty", box.id || box.sample]);
+  }
+  const lifted = boxes.filter((box) => box.node?.getData?.("stageLift"));
+  if (lifted.length) {
+    const peers = boxes.filter((box) => box.role === "card" && String(box.id || "").startsWith("many-") && !box.node?.getData?.("stageLift"));
+    for (const card of lifted) {
+      const floor = peers.length ? Math.min(...peers.map((peer) => peer.y)) : card.y + card.h + 12;
+      if (card.y + card.h > floor - 8) {
+        overlaps += 1;
+        if (hits.length < 8) hits.push(["stage-lift", card.id || "picked"]);
+      }
+    }
   }
   for (let i = 0; i < boxes.length; i += 1) {
     for (let j = i + 1; j < boxes.length; j += 1) {
@@ -1060,6 +1126,10 @@ function collectRagStageHits(scene, origin) {
   const ratio = height / Math.max(1, window.innerHeight || 1);
   let short = 0;
   if (phone && scene.phase === 2 && ratio < 0.35) {
+    short = 1;
+    hits.push(["stage-short", ratio.toFixed(3), String(Math.round(height))]);
+  }
+  if (!phone && (scene.phase === 1 || scene.phase === 2) && ratio + 0.005 < 0.5) {
     short = 1;
     hits.push(["stage-short", ratio.toFixed(3), String(Math.round(height))]);
   }
@@ -1083,7 +1153,7 @@ function collectRagStageHits(scene, origin) {
     if (cast.length) {
       const tallest = Math.max(...cast.map((box) => box.h));
       const frac = tallest / height;
-      if (frac + 0.005 < 0.28) {
+      if (frac + 0.005 < 0.32) {
         actors = 1;
         hits.push(["stage-actor", frac.toFixed(3), String(Math.round(tallest))]);
       }
@@ -1098,6 +1168,7 @@ function collectRagStageHits(scene, origin) {
     actors,
     contrast,
     words,
+    empty,
     ratio,
     height: Math.round(height),
   };

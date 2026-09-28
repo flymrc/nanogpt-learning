@@ -1,5 +1,5 @@
 import { playSfx } from "../audio/sound.js";
-import { getLang, t } from "../i18n/locale.js";
+import { getCourse, getLang, t } from "../i18n/locale.js";
 import { isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker, markCaption } from "./components.js";
 import { ctaCeiling, keepStageAboveCta, layerBottom } from "./lesson.js";
@@ -76,6 +76,10 @@ export function ragExpectedArt() {
 }
 
 function ceilingOf(scene, stage) {
+  const btn = scene.frame?.nextBtn;
+  const bounds = btn?.getBounds?.();
+  const packed = isWidePcTutor() && getCourse() === "rag" && (scene.phase === 1 || scene.phase === 2) && bounds?.height > 2;
+  if (packed) return Math.min(stage.bottom - 2, bounds.top - 12);
   return Math.min(stage.bottom - 2, ctaCeiling(scene.frame) - 4);
 }
 
@@ -211,6 +215,83 @@ function cardFact(item) {
   return (withDigit || parts[0] || "").trim();
 }
 
+const HANDBOOK_TITLE = {
+  zh: {
+    1: "欢迎",
+    2: "入住",
+    3: "退房",
+    4: "早饭",
+    5: "晚饭",
+    6: "游泳池",
+    7: "大浴场",
+    8: "无线网",
+    9: "停车",
+    10: "毛巾",
+    11: "行李",
+    12: "失物招领",
+  },
+  ja: {
+    1: "Welcome",
+    2: "Check-in",
+    3: "Checkout",
+    4: "Breakfast",
+    5: "Dinner",
+    6: "Swimming pool",
+    7: "Big bath",
+    8: "Wi-Fi",
+    9: "Parking",
+    10: "Towels",
+    11: "Bags",
+    12: "Lost and found",
+  },
+};
+
+function handbookTitle(page, fallback = "") {
+  const lang = getLang() === "ja" ? "ja" : "zh";
+  return HANDBOOK_TITLE[lang][Number(page)] || fallback || "";
+}
+
+function pageCardText(item) {
+  const page = item?.page ?? "";
+  const title = handbookTitle(page, item?.title || "");
+  return title ? `Page ${page}\n${title}` : `Page ${page}`;
+}
+
+function protectWrap(scene, line, size, maxW) {
+  const tokens = [];
+  const masked = String(line || "").replace(/第\s*\d+\s*页|Page\s+\d+|\d+\s*ページ/g, (token) => {
+    const key = `⟦${tokens.length}⟧`;
+    tokens.push(token);
+    return key;
+  });
+  let wrapped = wrapBody(scene, masked, size, maxW);
+  tokens.forEach((token, index) => {
+    wrapped = wrapped.split(`⟦${index}⟧`).join(token);
+  });
+  return wrapped;
+}
+
+/** Break after punctuation. 「第 4 页」 and Page N stay on one line. */
+function wrapAtPhrases(scene, raw, size, maxW) {
+  const text = String(raw || "");
+  if (!text) return "";
+  const chunks = text.split(/(?<=[：，。、！？；:])/u).filter((part) => part.length);
+  if (chunks.length <= 1) return protectWrap(scene, text, size, maxW);
+  const lines = [];
+  let current = "";
+  for (const chunk of chunks) {
+    const trial = current ? `${current}${chunk}` : chunk;
+    if (current && textWidth(scene, trial, size) > maxW) {
+      lines.push(current.replace(/\s+$/u, ""));
+      current = chunk.replace(/^\s+/u, "");
+    } else {
+      current = trial;
+    }
+  }
+  if (current) lines.push(current.replace(/\s+$/u, ""));
+  return lines.map((line) => (textWidth(scene, line, size) <= maxW + 1 ? line : protectWrap(scene, line, size, maxW))).join("\n");
+}
+
 function wrapBody(scene, raw, size, maxW) {
   const text = String(raw ?? "");
   if (!text) return "";
@@ -219,12 +300,36 @@ function wrapBody(scene, raw, size, maxW) {
   return wrapToWidth(scene, text, size, maxW);
 }
 
-function fitLabel(scene, parent, x, y, raw, { maxW, maxH = 400, size = 16, min, color, bg, originX = 0.5, originY = 0.5, align = "center" } = {}) {
+function fitLabel(scene, parent, x, y, raw, { maxW, maxH = 400, size = 16, min, color, bg, originX = 0.5, originY = 0.5, align = "center", locked = false } = {}) {
   const source0 = String(raw ?? "");
   let source = source0;
   const floor = Math.max(stageMinFont(), min || 0);
   let font = Math.max(floor, size);
-  const node = scene.add.text(x, y, "", uiText(font, { color, align })).setOrigin(originX, originY);
+  const ink = color || C.text;
+  const node = scene.add.text(x, y, "", uiText(font, { color: ink, align })).setOrigin(originX, originY);
+  if (locked) {
+    const applyLocked = (n) => {
+      node.setFontSize(n);
+      node.setText(source);
+    };
+    applyLocked(font);
+    let guard = 0;
+    while (guard < 28 && font > floor && (node.height > maxH + 0.5 || node.width > maxW + 1)) {
+      guard += 1;
+      font -= 1;
+      applyLocked(font);
+    }
+    if (node.height > maxH + 0.5 || node.width > maxW + 1) {
+      const fit = Math.min(1, maxW / Math.max(1, node.width), maxH / Math.max(1, node.height));
+      if (font * fit + 0.05 >= floor) node.setScale(Math.min(1, fit));
+    }
+    node.setData("source", source);
+    node.setData("wrapWidth", maxW);
+    if (bg) node.setData("stageBg", bg);
+    node.setData("stageFg", ink);
+    parent.add(node);
+    return node;
+  }
   const apply = (n, value) => {
     node.setFontSize(n);
     node.setText(wrapBody(scene, value, n, maxW));
@@ -264,7 +369,7 @@ function fitLabel(scene, parent, x, y, raw, { maxW, maxH = 400, size = 16, min, 
   node.setData("source", source);
   node.setData("wrapWidth", maxW);
   if (bg) node.setData("stageBg", bg);
-  if (color) node.setData("stageFg", color);
+  node.setData("stageFg", ink);
   parent.add(node);
   return node;
 }
@@ -412,29 +517,30 @@ function castFrame(w, h) {
   const bottom = h / 2 - margin;
   const inner = Math.max(20, bottom - top);
   const front = Math.min(pc ? 22 : 16, Math.max(8, inner * 0.055));
-  const chipH = Math.min(pc ? 40 : 26, Math.max(16, inner * (pc ? 0.1 : 0.09)));
+  const chipH = Math.min(pc ? 40 : 28, Math.max(pc ? 30 : 26, inner * (pc ? 0.1 : 0.09)));
   const gap = Math.min(8, Math.max(4, inner * 0.02));
   const desk = bottom - front;
   const chipBottom = desk - gap;
   const chipTop = chipBottom - chipH;
   const feet = chipTop - gap;
-  const target = h * (pc ? 0.34 : 0.3);
-  const minCard = Math.max(24, inner * (pc ? 0.18 : 0.16));
-  const cardGap = Math.min(12, Math.max(4, inner * 0.02));
-  let visual = Math.min(target, Math.max(inner * 0.28, feet - top - minCard - cardGap));
-  if (feet - visual - cardGap < top + minCard) visual = Math.max(inner * 0.28, feet - top - minCard - cardGap);
-  let cardTop = top + 2;
+  const actorFloor = h * (pc ? 0.34 : 0.26);
+  const cardFloor = Math.max(pc ? 72 : 40, inner * (pc ? 0.24 : 0.18));
+  const cardGap = Math.min(12, Math.max(6, inner * 0.02));
+  const roomForActor = feet - top - cardFloor - cardGap;
+  let visual = actorFloor;
+  if (roomForActor > visual) visual = Math.min(h * (pc ? 0.4 : 0.32), roomForActor);
+  if (feet - visual - cardGap < top + 40) visual = Math.max(pc ? h * 0.33 : h * 0.24, feet - top - 40 - cardGap);
   let cardBottom = feet - visual - cardGap;
+  let cardTop = top + 2;
   let cardH = cardBottom - cardTop;
   const cardCap = h * (pc ? 0.42 : 0.36);
   if (cardH > cardCap) {
-    visual = Math.min(feet - top - cardGap - cardCap, Math.max(visual, target));
-    cardBottom = feet - visual - cardGap;
-    cardH = cardBottom - cardTop;
-    if (cardH > cardCap) {
-      cardTop = cardBottom - cardCap;
-      cardH = cardCap;
-    }
+    cardTop = cardBottom - cardCap;
+    cardH = cardCap;
+  }
+  if (cardH < 24) {
+    cardH = 24;
+    cardTop = cardBottom - cardH;
   }
   return { pc, margin, top, bottom, desk, front, chipH, chipTop, chipBottom, feet, visual, cardTop, cardBottom, cardH };
 }
@@ -509,10 +615,15 @@ function makeBubble(scene, card, x, y, w, h, text) {
   return box;
 }
 
+function fillHex(fill) {
+  return `#${(Number(fill) & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
 function makeSlip(scene, card, w, h, fill, lines) {
   const box = scene.add.container(0, 0);
   box.setData("width", w);
   box.setData("height", h);
+  box.setData("stageBg", fillHex(fill));
   const g = scene.add.graphics();
   g.fillStyle(fill, 1);
   g.fillRoundedRect(-w / 2, -h / 2, w, h, 12);
@@ -1023,21 +1134,25 @@ function paintShareFlat(scene, card, g, w, h, boards, step, font) {
   });
 }
 
-function paintLobbyFrame(g, w, top, bottom, desk) {
+function paintWindow(g, x, y, winW, winH) {
+  g.fillStyle(0xb7e3fb, 1);
+  g.fillRoundedRect(x, y, winW, winH, 12);
+  g.lineStyle(3, C.stroke, 1);
+  g.strokeRoundedRect(x, y, winW, winH, 12);
+  g.fillStyle(C.sun, 1);
+  g.fillCircle(x + winW * 0.72, y + winH * 0.35, Math.min(14, winH * 0.2));
+}
+
+function paintLobbyFrame(g, w, top, bottom, desk, { window = true } = {}) {
   const left = -w / 2 + 8;
   const width = w - 16;
   const wallH = Math.max(8, desk - top);
   g.fillStyle(0xf6e4cf, 1);
   g.fillRoundedRect(left, top, width, wallH, 16);
-  if (w >= 640 && wallH > 78) {
+  if (window && w >= 640 && wallH > 78) {
     const winW = Math.min(120, w * 0.16);
     const winH = Math.min(70, wallH - 20);
-    g.fillStyle(0xb7e3fb, 1);
-    g.fillRoundedRect(left + 12, top + 10, winW, winH, 12);
-    g.lineStyle(3, C.stroke, 1);
-    g.strokeRoundedRect(left + 12, top + 10, winW, winH, 12);
-    g.fillStyle(C.sun, 1);
-    g.fillCircle(left + 12 + winW * 0.72, top + 10 + winH * 0.35, Math.min(14, winH * 0.2));
+    paintWindow(g, left + 12, top + 10, winW, winH);
   }
   g.fillStyle(0xf0d2a8, 1);
   g.fillRoundedRect(left, desk - 5, width, 10, 5);
@@ -1048,42 +1163,74 @@ function paintLobbyFrame(g, w, top, bottom, desk) {
   g.strokeRoundedRect(left, desk + 6, width, frontH, 12);
 }
 
+function placeTakeCard(scene, card, x, y, slipW, slipH, fill, text, id, { fromY = y, lift = false } = {}) {
+  const raw = String(text || "");
+  const maxW = Math.max(24, slipW - 12);
+  const maxH = Math.max(18, slipH - 8);
+  let font = Math.min(isWidePcTutor() ? 20 : 16, Math.max(stageMinFont(), Math.floor(slipH * 0.34)));
+  const probe = scene.add.text(0, 0, raw, uiText(font, { align: "center" })).setVisible(false);
+  while (font > stageMinFont() && (probe.width > maxW + 1 || probe.height > maxH + 0.5)) {
+    font -= 1;
+    probe.setFontSize(font);
+  }
+  probe.destroy();
+  const bg = fillHex(fill);
+  const slip = makeSlip(scene, card, slipW, slipH, fill, [
+    {
+      text: raw,
+      opts: {
+        maxW,
+        maxH,
+        size: font,
+        min: font,
+        color: C.text,
+        bg,
+        locked: true,
+      },
+    },
+  ]);
+  placeFly(scene, slip, x, y, x, fromY);
+  markBox(slip, "card", { id, w: slipW, h: slipH });
+  if (lift) slip.setData("stageLift", 1);
+  return slip;
+}
+
 function paintTake(scene, card, g, w, h, spec, step) {
   const lang = getLang() === "ja";
-  const font = cardFont();
   const pc = isWidePcTutor();
-  const tight = h < 220;
-  const margin = tight ? 4 : 8;
+  const margin = 6;
   const top = -h / 2 + margin;
   const bottom = h / 2 - margin;
   const inner = Math.max(20, bottom - top);
-  const front = Math.min(pc ? 24 : 18, Math.max(tight ? 6 : 8, inner * (tight ? 0.04 : 0.05)));
-  const chipH = Math.min(pc ? 40 : 26, Math.max(tight ? 14 : (pc ? 28 : 22), tight ? inner * 0.12 : font + 10));
+  const front = Math.min(pc ? 16 : 12, Math.max(8, inner * 0.04));
+  const chipH = Math.min(pc ? 36 : 28, Math.max(pc ? 30 : 26, inner * 0.08));
+  const chipGap = 16;
   const desk = bottom - front;
-  const chipGap = tight ? 3 : 8;
   const chipTop = desk - chipGap - chipH;
   const feet = chipTop - chipGap;
   const one = spec.one || {};
   const many = (spec.many || []).slice(0, 3);
-  const rows = Math.max(1, many.length);
-  const stacked = w < 560;
-  const slack = tight ? 3 : 8;
-  const bannerH = !tight && step >= 3 ? Math.min(pc ? 44 : 30, Math.max(font + 8, inner * (pc ? 0.1 : 0.08))) : 0;
-  const rowH = tight ? Math.max(16, font + 2) : font + (pc ? 16 : 10);
-  const wantCards = (bannerH ? bannerH + slack : 0) + (stacked ? rows * (rowH + slack) : rowH + slack);
-  const targetVisual = h * (pc ? 0.32 : tight ? 0.24 : 0.28);
-  const maxVisual = feet - top - wantCards - (tight ? 4 : 16);
-  let s = Math.max(2, Math.min(targetVisual, maxVisual) / 3.87);
-  const leftX = stacked ? -w * 0.22 : -w * 0.28;
-  const rightX = stacked ? w * 0.22 : w * 0.28;
-  if (Math.abs(rightX - leftX) < s * 2.3 + 8) s = Math.max(2, (Math.abs(rightX - leftX) - 8) / 2.3);
+  const showSheet = step >= 3;
+  const showLift = step >= 2;
+  const actorFloor = h * (pc ? 0.34 : 0.26);
+  let s = actorFloor / 3.87;
+  const leftX = -w * (w < 560 ? 0.2 : 0.24);
+  const rightX = w * (w < 560 ? 0.2 : 0.24);
+  const castSpan = Math.abs(rightX - leftX);
+  if (castSpan < s * 2.3 + 8) s = Math.max(2, (castSpan - 8) / 2.3);
   const faceY = feet - 1.59 * s;
   const actorTop = faceY - s * 2.28;
   paintLobbyFrame(g, w, top, bottom, desk);
   const blue = addActor(scene, card, leftX, faceY, s, "blue", "blue");
   addActor(scene, card, rightX, faceY, s, "gold", "gold");
-  const castSpan = Math.abs(rightX - leftX);
-  const chipW = Math.min(140, Math.max(32, castSpan - (tight ? 10 : 16)));
+  if (step === 1) {
+    blue.setAngle(-16);
+    if (scene.__ragAnimate) {
+      blue.setAngle(0);
+      trackTween(scene, { targets: blue, angle: -16, duration: 140, yoyo: true, repeat: 3, onComplete: () => blue.setAngle(-16) });
+    }
+  }
+  const chipW = Math.min(140, Math.max(56, Math.min(castSpan * 0.38, s * 3.1)));
   const chipY = chipTop + chipH / 2;
   [
     ["blue", leftX, lang ? "さがす" : "找"],
@@ -1092,69 +1239,92 @@ function paintTake(scene, card, g, w, h, spec, step) {
     addNameChip(scene, card, x, chipY, text, { id, ink: ROLE_INK[id], chipW, chipH });
   });
   addZone(scene, card, 0, desk, w - 20, 8, "desk");
-  if (step === 1 && scene.__ragAnimate) {
-    trackTween(scene, { targets: blue, angle: 8, duration: 90, yoyo: true, repeat: 3, onComplete: () => blue.setAngle(0) });
-  }
-  let areaTop = top + 2;
-  if (bannerH) {
-    const carry = spec.carry ?? one.page;
-    const bannerW = Math.min(w - 24, pc ? Math.max(320, w * 0.62) : 280);
-    const sheet = makeSlip(scene, card, bannerW, bannerH, 0xfff1d2, [
-      { text: `Page ${carry}  ?`, opts: { maxW: bannerW - 16, maxH: bannerH - 6, size: font, color: C.muted } },
-    ]);
-    sheet.setPosition(0, areaTop + bannerH / 2);
-    markBox(sheet, "card", { id: "carry", w: bannerW, h: bannerH });
-    areaTop += bannerH + 6;
-  }
-  const areaBottom = Math.min(actorTop - 4, faceY - s * 2.4 - 4);
-  const areaH = Math.max(0, areaBottom - areaTop);
-  const carryNote = tight && step >= 3 ? `Page ${spec.carry ?? one.page} ?\n` : "";
-  const oneText = step === 1
-    ? `${one.title || ""}\nPage ${one.page ?? ""}\n✗`
-    : `${carryNote}${one.title || ""}\nPage ${one.page ?? ""}\n${one.score ?? ""}`;
-  if (!stacked) {
-    const count = 1 + many.length;
-    const gap = 8;
-    const colW = Math.max(48, (w - 24 - gap * (count - 1)) / count);
-    const slipH = Math.min(areaH, pc ? Math.max(tight ? 28 : 72, Math.min(120, h * 0.18)) : (tight ? 28 : 72));
-    const y = areaTop + slipH / 2;
-    const start = -((count - 1) * (colW + gap)) / 2;
-    const oneBox = makeSlip(scene, card, colW, slipH, 0xfffdf8, [
-      { text: oneText, opts: { maxW: colW - 12, maxH: slipH - 8, size: font } },
-    ]);
-    oneBox.setPosition(start, y);
-    markBox(oneBox, "card", { id: "one", w: colW, h: slipH });
+
+  const regionTop = top + 4;
+  const regionBottom = Math.max(regionTop + 36, actorTop - 8);
+  const regionH = regionBottom - regionTop;
+  const narrow = w < 640;
+  const sheetH = showSheet ? Math.min(narrow ? 44 : 52, Math.max(32, regionH * (narrow ? 0.22 : 0.26))) : 0;
+  const sheetGap = showSheet ? 6 : 0;
+  const rowRoom = Math.max(32, regionH - sheetH - sheetGap);
+  const liftGap = showLift ? 14 : 0;
+  if (narrow) {
+    const count = Math.max(1, many.length);
+    const stackGap = 6;
+    const slipH = Math.max(
+      28,
+      Math.min(48, (rowRoom - (showLift ? liftGap : 0) - stackGap * (count - 1)) / (count + (showLift ? 1 : 0))),
+    );
+    const manyW = Math.min(w * 0.44, Math.max(108, (w - 36) * 0.48));
+    const oneW = Math.min(w * 0.4, Math.max(96, w - manyW - 40));
+    const manyX = Math.min(w / 2 - 8 - manyW / 2, rightX + manyW * 0.15);
+    const oneX = Math.max(-w / 2 + 8 + oneW / 2, Math.min(leftX, manyX - manyW / 2 - 12 - oneW / 2));
+    const stackTop = regionTop + (showLift ? slipH + liftGap : 0);
+    const stackH = count * slipH + stackGap * (count - 1);
+    placeTakeCard(scene, card, oneX, stackTop + stackH / 2, oneW, Math.min(stackH, rowRoom), 0xfffdf8, pageCardText(one), "one");
     many.forEach((item, index) => {
-      const picked = step >= 2 && item.page === spec.pick;
-      const x = start + (index + 1) * (colW + gap);
-      const slip = makeSlip(scene, card, colW, slipH, picked ? 0xffe08a : 0xfffdf8, [
-        { text: `${item.title || ""}  ${item.score}`, opts: { maxW: colW - 12, maxH: slipH - 8, size: font } },
-      ]);
-      placeFly(scene, slip, x, y, x, y + 8);
-      markBox(slip, "card", { id: `many-${item.page}`, w: colW, h: slipH });
-      if (picked) popIn(scene, slip);
+      const picked = showLift && item.page === spec.pick;
+      const y = stackTop + slipH / 2 + index * (slipH + stackGap);
+      const slip = placeTakeCard(
+        scene,
+        card,
+        manyX,
+        picked ? regionTop + slipH / 2 : y,
+        manyW,
+        slipH,
+        picked ? 0xffe08a : 0xfffdf8,
+        pageCardText(item),
+        `many-${item.page}`,
+        { fromY: y + 8, lift: picked },
+      );
+      if (picked && scene.__ragAnimate) popIn(scene, slip);
     });
-    return;
+  } else {
+    const slipBudget = showLift ? Math.max(24, rowRoom - liftGap) : rowRoom;
+    const slipH = showLift
+      ? Math.min(84, slipBudget / 2)
+      : Math.min(110, Math.max(32, slipBudget * 0.9));
+    const rowY = regionTop + (showLift ? slipH + liftGap : 0) + slipH / 2;
+    const oneW = Math.min(w * 0.22, Math.max(120, castSpan * 0.34));
+    placeTakeCard(scene, card, leftX, rowY, oneW, slipH, 0xfffdf8, pageCardText(one), "one");
+    const gap = 12;
+    const oneRight = leftX + oneW / 2;
+    const rightEdge = w / 2 - 10;
+    const count = Math.max(1, many.length);
+    const manyRoom = Math.max(48, rightEdge - oneRight - 16);
+    let manyW = Math.min(156, (manyRoom - gap * (count - 1)) / count);
+    if (count * manyW + gap * (count - 1) > manyRoom) manyW = Math.max(72, (manyRoom - gap * (count - 1)) / count);
+    const groupLeft = oneRight + 16;
+    const origin = groupLeft + manyW / 2 + ((count - 1) * (manyW + gap)) / 2;
+    many.forEach((item, index) => {
+      const picked = showLift && item.page === spec.pick;
+      const x = origin + (index - (count - 1) / 2) * (manyW + gap);
+      const y = picked ? rowY - slipH - liftGap : rowY;
+      const slip = placeTakeCard(
+        scene,
+        card,
+        x,
+        y,
+        manyW,
+        slipH,
+        picked ? 0xffe08a : 0xfffdf8,
+        pageCardText(item),
+        `many-${item.page}`,
+        { fromY: rowY + 10, lift: picked },
+      );
+      if (picked && scene.__ragAnimate) popIn(scene, slip);
+    });
   }
-  const colW = Math.min(w * 0.42, (w - 28) / 2);
-  const oneH = Math.min(areaH, Math.max(rowH, areaH * 0.9));
-  const oneBox = makeSlip(scene, card, colW, oneH, 0xfffdf8, [
-    { text: oneText, opts: { maxW: colW - 12, maxH: oneH - 8, size: font } },
-  ]);
-  oneBox.setPosition(leftX, areaTop + oneH / 2);
-  markBox(oneBox, "card", { id: "one", w: colW, h: oneH });
-  const share = (areaH - 4 * Math.max(0, rows - 1)) / rows;
-  const slipH = Math.min(rowH + 6, Math.max(8, share));
-  many.forEach((item, index) => {
-    const picked = step >= 2 && item.page === spec.pick;
-    const y = areaTop + slipH / 2 + index * (slipH + 4);
-    const slip = makeSlip(scene, card, colW, slipH, picked ? 0xffe08a : 0xfffdf8, [
-      { text: `${item.title || ""}  ${item.score}`, opts: { maxW: colW - 12, maxH: slipH - 6, size: font } },
-    ]);
-    placeFly(scene, slip, rightX, y, rightX, y + 6);
-    markBox(slip, "card", { id: `many-${item.page}`, w: colW, h: slipH });
-    if (picked) popIn(scene, slip);
-  });
+
+  if (showSheet) {
+    const carry = spec.carry ?? one.page;
+    const carryTitle = handbookTitle(carry);
+    const carryText = carryTitle ? `Page ${carry}  ${carryTitle}  ?` : `Page ${carry}  ?`;
+    const sheetW = Math.min(w - 24, Math.max(narrow ? 180 : 240, w * 0.46));
+    const sheetY = regionTop + rowRoom + sheetGap + sheetH / 2;
+    const sheet = placeTakeCard(scene, card, 0, Math.min(sheetY, regionBottom - sheetH / 2), sheetW, sheetH, 0xfff1d2, carryText, "carry", { fromY: sheetY + 12 });
+    if (scene.__ragAnimate) popIn(scene, sheet);
+  }
 }
 
 function paintHatCompare(scene, card, g, w, h, spec, step) {
@@ -1362,23 +1532,39 @@ function parkReject(sheet, rejectW, rejectH, bounds) {
   };
 }
 
+function blankSheet(lang) {
+  return lang ? "＿ページ（＿）に よると：＿＿＿＿" : "根据第 ＿ 页（＿）：＿＿＿＿";
+}
+
+function citeCopy(spec, step, lang) {
+  const mode = citeMode(spec);
+  if (mode === "sheet" && step === 0) return blankSheet(lang);
+  if (mode === "sheet") return spec.line || "";
+  const body = spec.line || "";
+  const head = spec.page && mode !== "idk" ? `Page ${spec.page}` : "";
+  return head ? `${head}\n${body}` : body;
+}
+
 function paintCite(scene, card, g, w, h, spec, step) {
   const mode = citeMode(spec);
   const lang = getLang() === "ja";
   const frame = castFrame(w, h);
-  paintLobbyFrame(g, w, frame.top, frame.bottom, frame.desk);
-  let s = Math.max(2, frame.visual / 3.87);
-  const ratio = mode === "sheet" ? 0.55 : mode === "idk" ? 0.58 : 0.42;
-  let sheetW = w * ratio;
-  const actorNeed = s * 2.6 + 20;
-  if (frame.margin + actorNeed + sheetW + frame.margin > w) {
-    s = Math.max(2, Math.min(s, (w * 0.3) / 2.6));
-    sheetW = Math.min(sheetW, w - frame.margin * 2 - s * 2.6 - 20);
-  }
-  const actorX = -w / 2 + frame.margin + s * 1.2;
+  paintLobbyFrame(g, w, frame.top, frame.bottom, frame.desk, { window: false });
+  const gap = Math.max(28, Math.min(48, Math.round(w * 0.045)));
+  let s = Math.max(frame.visual / 3.87, (h * (frame.pc ? 0.34 : 0.26)) / 3.87);
+  const minSheet = Math.max(160, w * 0.36);
+  const maxS = (w - frame.margin * 2 - gap - minSheet) / 2.6;
+  if (maxS > 2) s = Math.min(s, maxS);
+  const writerSpan = s * 2.5;
+  let sheetW = Math.min(w * (mode === "sheet" ? 0.48 : mode === "idk" ? 0.5 : 0.4), w - frame.margin * 2 - writerSpan - gap);
+  sheetW = Math.max(120, sheetW);
+  const group = writerSpan + gap + sheetW;
+  const origin = -group / 2;
+  const actorX = origin + writerSpan / 2;
+  const sheetLeft = origin + writerSpan + gap;
   const faceY = frame.feet - 1.59 * s;
   const writer = addActor(scene, card, actorX, faceY, s, "gold", "gold");
-  const chipW = Math.max(frame.pc ? 72 : 56, Math.min(140, Math.max(s * 3.2, frame.chipH * 2.4)));
+  const chipW = Math.max(frame.pc ? 72 : 56, Math.min(writerSpan - 8, 140));
   addNameChip(scene, card, actorX, frame.chipTop + frame.chipH / 2, lang ? "書く" : "写", {
     id: "gold",
     ink: ROLE_INK.gold,
@@ -1386,21 +1572,37 @@ function paintCite(scene, card, g, w, h, spec, step) {
     chipH: frame.chipH,
   });
   addZone(scene, card, 0, frame.desk, w - 20, 8, "desk");
-  const sheetLeft = Math.max(actorX + s * 1.45 + 16, actorX + chipW / 2 + 12);
-  const sheetRightMax = w / 2 - frame.margin;
-  sheetW = Math.max(72, Math.min(sheetW, sheetRightMax - sheetLeft));
   const lobbyTop = frame.top + 4;
   const lobbyBottom = frame.chipTop - 8;
   const lobbyH = Math.max(24, lobbyBottom - lobbyTop);
-  let sheetH = Math.min(lobbyH * (mode === "mark" ? 0.62 : 0.78), h * (mode === "sheet" ? 0.58 : 0.62));
-  sheetH = Math.max(Math.min(lobbyH, h * 0.36), sheetH);
+  let sheetH = Math.min(lobbyH * (mode === "mark" ? 0.62 : 0.72), h * (mode === "sheet" ? 0.5 : 0.55));
+  sheetH = Math.max(Math.min(lobbyH, h * 0.34), Math.min(sheetH, lobbyH));
   let sheetTop = lobbyTop + (lobbyH - sheetH) / 2;
   let sheetBottom = sheetTop + sheetH;
   if (sheetBottom > lobbyBottom) {
     sheetBottom = lobbyBottom;
-    sheetTop = sheetBottom - sheetH;
+    sheetTop = Math.max(lobbyTop, sheetBottom - sheetH);
+    sheetH = sheetBottom - sheetTop;
+  }
+  const winW = Math.min(108, w * 0.14);
+  const winH = Math.min(64, Math.max(36, lobbyH * 0.28));
+  const writerLeft = actorX - writerSpan / 2;
+  const sheetRight = sheetLeft + sheetW;
+  const pockets = [
+    { x: -w / 2 + 14, y: lobbyTop + 4 },
+    { x: w / 2 - 14 - winW, y: lobbyTop + 4 },
+  ];
+  for (const pocket of pockets) {
+    const clearWriter = pocket.x + winW <= writerLeft - 8;
+    const clearSheet = pocket.x >= sheetRight + 8;
+    const onStage = pocket.x >= -w / 2 + 8 && pocket.y + winH <= lobbyBottom - 4;
+    if (onStage && winW >= 64 && (clearWriter || clearSheet)) {
+      paintWindow(g, pocket.x, pocket.y, winW, winH);
+      break;
+    }
   }
   const paper = scene.add.container(sheetLeft + sheetW / 2, sheetTop + sheetH / 2);
+  paper.setData("stageBg", "#fffdf8");
   markBox(paper, "card", { id: "sheet", w: sheetW, h: sheetH });
   const pg = scene.add.graphics();
   pg.fillStyle(0xfffdf8, 1);
@@ -1409,24 +1611,34 @@ function paintCite(scene, card, g, w, h, spec, step) {
   pg.strokeRoundedRect(-sheetW / 2, -sheetH / 2, sheetW, sheetH, 16);
   paper.add(pg);
   card.add(paper);
-  let body = spec.line || "";
-  if (mode === "sheet" && step === 0) body = lang ? "＿ページ（＿）に よると：＿＿＿＿" : "根据第 ＿ 页（＿）：＿＿＿＿";
-  const head = spec.page && mode !== "idk" ? `Page ${spec.page}` : "";
-  const copy = head ? `${head}\n${body}` : body;
-  const maxType = frame.pc ? Math.min(26, Math.max(20, Math.round(sheetH * 0.16))) : Math.max(cardFont(), 15);
+  const copy = citeCopy(spec, step, lang);
+  const maxType = frame.pc ? Math.min(26, Math.max(18, Math.round(sheetH * 0.16))) : Math.max(cardFont(), 15);
   const ink = mode === "idk" && step >= 1 ? "#9e2430" : C.text;
-  const font = chooseFont(scene, copy, sheetW - 28, sheetH - 24, { max: maxType, min: stageMinFont() });
-  fitLabel(scene, paper, 0, 0, copy, {
-    maxW: sheetW - 28,
-    maxH: sheetH - 24,
+  const textW = sheetW - 32;
+  const textH = sheetH - 28;
+  let font = maxType;
+  let wrapped = wrapAtPhrases(scene, copy, font, textW);
+  while (font > stageMinFont()) {
+    const block = textBlock(scene, wrapped, font, textW);
+    if (block.height <= textH + 0.5 && block.width <= textW + 1) break;
+    font -= 1;
+    wrapped = wrapAtPhrases(scene, copy, font, textW);
+  }
+  fitLabel(scene, paper, 0, 0, wrapped, {
+    maxW: textW,
+    maxH: textH,
     size: font,
     min: font,
     color: ink,
     bg: CHIP_BG,
+    locked: true,
   });
+  const label = paper.list?.find((child) => child.type === "Text");
+  if (label) label.setData("source", copy);
   if (mode === "idk" && step >= 1 && scene.__ragAnimate) {
     trackTween(scene, { targets: writer, angle: 7, duration: 90, yoyo: true, repeat: 3, onComplete: () => writer.setAngle(0) });
   }
+  if (mode === "sheet" && step === 1 && scene.__ragAnimate) popIn(scene, paper);
   if (mode === "sheet" && step >= 2) {
     const rejectW = Math.min(132, Math.max(frame.pc ? 96 : 78, w * 0.12));
     const rejectH = Math.max(frame.pc ? 40 : 30, stageMinFont() + 16);
@@ -1448,7 +1660,7 @@ function paintCite(scene, card, g, w, h, spec, step) {
       { left: sheetLeft, right: sheetLeft + sheetW, top: sheetTop, bottom: sheetBottom },
       rejectW,
       rejectH,
-      { right: w / 2 - frame.margin, desk: frame.desk, top: frame.top, actorRight: actorX + s * 1.2 },
+      { right: w / 2 - frame.margin, desk: frame.desk, top: frame.top, actorRight: actorX + writerSpan / 2 },
     );
     bounceBack(scene, reject, spot.x, spot.y, paper.x, paper.y);
     markBox(reject, "card", { id: "reject", w: rejectW, h: rejectH });
@@ -1603,7 +1815,9 @@ function paintSign(scene, card, g, w, h, spec, step) {
   const floor = h / 2 - 6 - subH;
   const signBottom = signTop + bh;
   const room = Math.max(8, floor - signBottom - 6);
-  let s = Math.min((pc ? h * 0.32 : Math.min(h * 0.26, 86)) / 2.67, w * (pc ? 0.14 : 0.08), room / 4.2);
+  let s = Math.min((pc ? h * 0.36 : Math.min(h * 0.26, 86)) / 2.67, w * (pc ? 0.16 : 0.08), room / 4.2);
+  const signFloor = (pc ? h * 0.33 : h * 0.22) / 2.67;
+  if (s < signFloor && room / 4.2 >= signFloor * 0.9) s = Math.min(signFloor, room / 4.2);
   if (!(s > 1)) s = 2;
   let faceY = signBottom + s * 2.4 + 4;
   const faceLimit = floor - 4 - s * 1.7;
@@ -1618,7 +1832,20 @@ function paintSign(scene, card, g, w, h, spec, step) {
     const slipH = Math.min(32, Math.max(font + 4, s));
     const faceHalf = s * 1.2;
     [-1, 1].forEach((side, index) => {
-      const slip = makeSlip(scene, card, slipW, slipH, index ? C.gold : C.blue, []);
+      const slipFill = index ? C.gold : C.blue;
+      const slip = makeSlip(scene, card, slipW, slipH, slipFill, [
+        {
+          text: "本",
+          opts: {
+            maxW: slipW - 8,
+            maxH: slipH - 6,
+            size: Math.max(stageMinFont(), Math.min(16, slipH - 8)),
+            min: stageMinFont(),
+            color: "#3b2a2e",
+            bg: index ? "#ffc43d" : "#5eb3ff",
+          },
+        },
+      ]);
       const minX = faceHalf + slipW / 2 + 8;
       const maxX = w / 2 - 8 - slipW / 2;
       const x = side * Math.max(8, Math.min(maxX, Math.max(minX, w * 0.32)));
@@ -1907,7 +2134,7 @@ export function drawRagArt(scene, stage, page, { phase = 0 } = {}) {
   const phone = !isWidePcTutor();
   const ceiling = ceilingOf(scene, stage);
   const capSize = phone ? 16 : 20;
-  const capSlot = phone ? 22 : 34;
+  const capSlot = phone ? 22 : (typeof window !== "undefined" && window.innerHeight < 720 ? 18 : 28);
   const block = STICKER_SHADOW_Y + CAPTION_CLEAR + capSlot;
   const room = Math.max(48, ceiling - stage.top - 2);
   const height = Math.max(56, room - block);
