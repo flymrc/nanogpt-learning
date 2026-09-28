@@ -1457,10 +1457,13 @@ async function assertHomeLang(page) {
   );
 }
 
+let freshSeq = 0;
+
 async function openFresh(page, url) {
-  // A hash-only goto stays on the current document. Deep links are full loads.
-  await page.goto(url, { waitUntil: "commit", timeout: 60000 });
-  await page.reload({ waitUntil: "load", timeout: 60000 });
+  // A hash-only goto stays on the current document. A new query forces a full load.
+  const next = new URL(url);
+  next.searchParams.set("_e2e", `${Date.now()}-${freshSeq += 1}`);
+  await page.goto(next.toString(), { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", null, { timeout: 45000 });
 }
 
