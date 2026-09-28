@@ -9,7 +9,9 @@ import Level4Scene from "./scenes/Level4Scene.js";
 import Level5Scene from "./scenes/Level5Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
+import { JA } from "./i18n/ja.js";
 import { setLang, toggleLang } from "./i18n/locale.js";
+import { ZH } from "./i18n/zh.js";
 import { applyChromeCopy, bindVoiceNote } from "./ui/chrome.js";
 import { mountCatalog } from "./ui/catalog.js";
 import { mountGuide } from "./ui/guide.js";
@@ -97,15 +99,31 @@ function applyGameSize(game) {
   game.scene.getScenes(true).forEach((scene) => syncRetinaCamera(scene, css.w, css.h, dpr));
 }
 
+function fontSample(...packs) {
+  const chars = new Set();
+  for (const pack of packs) {
+    for (const value of Object.values(pack)) {
+      if (typeof value !== "string") continue;
+      for (const ch of value) {
+        if (ch.trim()) chars.add(ch);
+      }
+    }
+  }
+  return [...chars].join("");
+}
+
 async function boot() {
   if (document.fonts?.ready) {
+    const zhSample = fontSample(ZH);
+    const jaSample = fontSample(JA);
+    const both = fontSample(ZH, JA);
     const loads = document.fonts.load
       ? [
-          document.fonts.load('700 32px "Noto Sans JP"', "字次少ジーくんホーム組"),
-          document.fonts.load('500 28px "Noto Sans JP"', "まえを見てつぎをあてる"),
-          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"', "小G学写字首页"),
-          document.fonts.load('500 28px "Noto Sans SC"', "小G学写字首页请组"),
-          document.fonts.load('700 32px "Noto Sans SC"', "小G学写字"),
+          document.fonts.load('700 32px "Noto Sans JP"', jaSample),
+          document.fonts.load('500 28px "Noto Sans JP"', jaSample),
+          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"', zhSample),
+          document.fonts.load('500 28px "Noto Sans SC"', both),
+          document.fonts.load('700 32px "Noto Sans SC"', both),
           document.fonts.load('700 32px "Fredoka"', "All First"),
           document.fonts.load('500 28px "Noto Sans Symbols 2"', "␣↵□○"),
           document.fonts.load('500 28px "Noto Emoji"', "🍌🍎🔴🔵⭐"),
@@ -113,7 +131,7 @@ async function boot() {
       : [];
     await Promise.race([
       Promise.all([document.fonts.ready, ...loads]),
-      new Promise((resolve) => window.setTimeout(resolve, 2000)),
+      new Promise((resolve) => window.setTimeout(resolve, 8000)),
     ]);
   }
 

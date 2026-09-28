@@ -100,16 +100,19 @@ function applyKinsoku(lines, widthOf, maxWidth) {
     let rest = line;
     while (out.length && out[out.length - 1] !== "" && rest && KINSOKU_HEAD.includes(rest[0])) {
       const prev = out[out.length - 1];
-      const prevChars = [...prev];
       const joined = prev + rest[0];
-      if (widthOf && prevChars.length > 1 && widthOf(joined) > maxWidth) {
-        const last = prevChars.pop();
-        out[out.length - 1] = prevChars.join("");
-        rest = last + rest;
+      if (!widthOf || widthOf(joined) <= maxWidth) {
+        out[out.length - 1] = joined;
+        rest = rest.slice(1);
         continue;
       }
-      out[out.length - 1] = joined;
-      rest = rest.slice(1);
+      const chars = [...prev];
+      let take = 1;
+      while (take < chars.length && KINSOKU_HEAD.includes(chars[chars.length - take])) take += 1;
+      if (take >= chars.length) break;
+      out[out.length - 1] = chars.slice(0, chars.length - take).join("");
+      rest = chars.slice(chars.length - take).join("") + rest;
+      break;
     }
     if (rest || line === "") out.push(rest);
   }
