@@ -4,6 +4,7 @@ import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, P
 import { ragPagesFor } from "../i18n/rag/skeleton.js";
 import { chapterList, t } from "../i18n/locale.js";
 import { openGuide } from "./guide.js";
+import { clearLessonRoute } from "./route.js";
 
 const BEAT_COUNTS = {
   Level1: LEVEL1_BEATS.length,
@@ -289,6 +290,7 @@ export function goHub() {
   if (!scene) return;
   closeCatalog();
   closeChapterSheet();
+  clearLessonRoute();
   if (scene.sys.settings.key === "Home") return;
   scene.scene.start("Home");
 }

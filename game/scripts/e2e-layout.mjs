@@ -1652,7 +1652,11 @@ async function assertHomeLang(page) {
   if (stored !== "ja") throw new Error(`lang dropped in tutorial ${stored}`);
   await page.click("#home-toggle");
   await page.waitForFunction(
-    () => window.__nanoGPTState?.().scene === "Home" && document.documentElement.lang === "ja" && window.__nanoGPTHubCopy?.().home === "ホーム",
+    () => window.__nanoGPTState?.().scene === "Home"
+      && document.documentElement.lang === "ja"
+      && window.__nanoGPTHubCopy?.().home === "ホーム"
+      && !location.hash
+      && !sessionStorage.getItem("nanogpt-lesson"),
     { timeout: 15000 },
   );
   await page.evaluate(() => localStorage.setItem("nanogpt-lang", "ja"));
