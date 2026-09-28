@@ -95,6 +95,34 @@ function firstSentence(text) {
   return (cut || cleanText).trim();
 }
 
+/** Producer tables sit after the kid page. They must not become lesson copy. */
+function kidOnly(text) {
+  return String(text || "")
+    .split(/\n---\n/)[0]
+    .split(/\n###\s*附/)[0]
+    .split(/\n（出典/)[0]
+    .trim();
+}
+
+function shareBoards(data, qid) {
+  const q = question(data, "word_match", qid);
+  const hot = new Set(Object.keys(data.word_match.question_word_shares[qid] || {}));
+  return q.top3
+    .filter((row) => row.score_x100 > 0)
+    .map((row) => ({
+      page: row.page,
+      title: row.title,
+      score: row.score_x100,
+      words: Object.entries(data.word_match.card_word_shares[String(row.page)] || {})
+        .map(([text, share]) => ({
+          text,
+          share: Math.round(Number(share) * 1000) / 1000,
+          hot: hot.has(text),
+        }))
+        .sort((a, b) => b.share - a.share),
+    }));
+}
+
 function shortArt(text, lang) {
   const line = firstSentence(text);
   if (lang === "ja") return line.split(/\s+/).slice(0, 10).join(" ");
@@ -183,6 +211,7 @@ function packFacts(data) {
       pages: pair.pages,
       score: pair.score_x100,
     })),
+    shareCheckout: shareBoards(data, "q2_checkout"),
     q: {
       breakfastWord: grab("word_match", "q1_breakfast"),
       checkoutWord: grab("word_match", "q2_checkout"),
@@ -206,7 +235,7 @@ function pictureFor(id, lang, facts) {
   const q = facts.q;
   const breakfastCard = facts.cards.find((card) => card.page === 4);
   const poolCard = facts.cards.find((card) => card.page === 6);
-  const cards = facts.cards.map((card) => ({ page: card.page, title: card.title }));
+  const cards = facts.cards.map((card) => ({ page: card.page, title: card.title, text: card.text }));
   if (id.endsWith("-sum")) return { kind: "rules", lines: [] };
   if (id.endsWith("-rev")) return { kind: "stars", n: 3 };
   const table = {
@@ -219,14 +248,19 @@ function pictureFor(id, lang, facts) {
     "r1-p6": { kind: "flow", steps: lang === "ja" ? ["本を 見る", "こたえる"] : ["先查手册", "再回答"] },
     "r1-p7": { kind: "swap", oldLine: facts.old.text, newLine: breakfastCard.text },
     "r1-p8": { kind: "cite", page: 4, line: lang === "ja" ? "Page 4" : "第4页" },
-    "r1-p9": { kind: "hats" },
+    "r1-p9": {
+      kind: "hats",
+      page: 4,
+      line: breakfastCard.text,
+      question: lang === "ja" ? "朝ごはんは 何時？" : "早饭是几点？",
+    },
     "r2-intro": { kind: "pair", left: { title: lang === "ja" ? "大きな はこ" : "大箱子", body: lang === "ja" ? "みつけにくい" : "不好找" }, right: { title: lang === "ja" ? "小さな はこ" : "小格子", body: lang === "ja" ? "すぐ" : "一下就找到" } },
     "r2-p1": { kind: "cards", items: cards },
     "r2-p2": { kind: "big", words: facts.wholeWords },
     "r2-p3": { kind: "cards", items: cards, cut: true },
     "r2-p4": { kind: "counts", min: facts.countMin, max: facts.countMax, focus: facts.cards.find((card) => card.page === 3).words },
     "r2-p5": { kind: "cards", items: cards, labeled: true },
-    "r2-p6": { kind: "pair", left: { title: lang === "ja" ? "It is open…" : "夏天开放…", body: lang === "ja" ? "それ？" : "什么开放？" }, right: { title: "Page 6", body: poolCard.title } },
+    "r2-p6": { kind: "pair", left: { title: lang === "ja" ? "It is open" : "夏天开放", body: lang === "ja" ? "それ？" : "什么开放？" }, right: { title: "Page 6", body: poolCard.title } },
     "r2-p7": { kind: "flow", steps: lang === "ja" ? ["100語", "1くぎり"] : ["100个词", "切一段"] },
     "r2-p8": { kind: "sign", title: lang === "ja" ? "カードばこ" : "卡片盒", sub: lang === "ja" ? "12まい" : "12张" },
     "r2-p9": { kind: "pair", left: { title: lang === "ja" ? "カードの 字" : "卡片上的字", body: lang === "ja" ? "読める・直せる" : "能看能改" }, right: { title: lang === "ja" ? "きおく" : "记忆", body: lang === "ja" ? "1文 直せない" : "改不了一句" } },
@@ -235,7 +269,7 @@ function pictureFor(id, lang, facts) {
     "r3-p2": { kind: "chips", chips: lang === "ja"
       ? [{ text: "What", on: false }, { text: "time", on: true }, { text: "is", on: false }, { text: "checkout", on: true }]
       : [{ text: "几点", on: false }, { text: "退房", on: true }] },
-    "r3-p3": { kind: "bars", items: visibleBars(q.checkoutWord.items) },
+    "r3-p3": { kind: "shares", boards: facts.shareCheckout },
     "r3-p4": q.swimWord.zero ? { kind: "zeros", n: 12 } : { kind: "bars", items: visibleBars(q.swimWord.items) },
     "r3-p5": { kind: "address", n: facts.address },
     "r3-p6": { kind: "bars", items: visibleBars(q.swim.items) },
@@ -261,9 +295,17 @@ function pictureFor(id, lang, facts) {
     "r5-p9": { kind: "rules", lines: [] },
   };
   if (lang === "ja") {
-    table["r5-p1"] = { kind: "bars", items: visibleBars(q.breakfastWord.items), hair: true };
-    table["r5-p2"] = { kind: "bars", items: q.breakfastWord.items };
-    table["r5-p3"] = { kind: "pair", left: { title: lang === "ja" ? "朝ごはん" : "", body: `Page ${q.breakfast.items[0].page} · ${q.breakfast.items[0].score}` }, right: { title: "park", body: q.park.zero ? "0" : `Page ${q.park.items[0].page} · ${q.park.items[0].score}` } };
+    const wordTop = q.breakfastWord.items;
+    const rightPage = q.breakfast.items[0].page;
+    table["r5-p1"] = { kind: "bars", items: visibleBars(wordTop), hair: true };
+    table["r5-p2"] = {
+      kind: "take",
+      one: wordTop[0],
+      many: wordTop,
+      pick: wordTop.find((item) => item.page === rightPage)?.page ?? wordTop[0].page,
+      carry: wordTop[0].page,
+    };
+    table["r5-p3"] = { kind: "pair", left: { title: "朝ごはん", body: `Page ${q.breakfast.items[0].page} · ${q.breakfast.items[0].score}` }, right: { title: "park", body: q.park.zero ? "0" : `Page ${q.park.items[0].page} · ${q.park.items[0].score}` } };
   } else {
     table["r5-p1"] = { kind: "zeros", n: 12 };
     table["r5-p2"] = { kind: "pair", left: { title: "停车", body: `第${q.park.items[0].page}页 · ${q.park.items[0].score}` }, right: { title: "游泳", body: `第${q.swim.items[0].page}页 · ${q.swim.items[0].score}` } };
@@ -275,7 +317,7 @@ function pictureFor(id, lang, facts) {
 }
 
 function pageCopy(section, lang) {
-  const blocks = section.blocks;
+  const blocks = Object.fromEntries(Object.entries(section.blocks).map(([key, value]) => [key, kidOnly(value)]));
   if (section.kind === "sum") {
     const points = linesOf(section.body).slice(0, 3);
     while (points.length < 3) points.push(points[0] || "まとめ");
@@ -626,6 +668,14 @@ for (const word of banned) {
   if (joined.includes(word)) throw new Error(`reintroduced ${word}`);
 }
 if (!joined.includes("我没找到分数过线的卡片")) throw new Error("round-5 template missing");
+for (const [lang, built] of [["zh", zhBuilt], ["ja", jaBuilt]]) {
+  for (const [key, value] of Object.entries(built.pack)) {
+    const text = String(value);
+    if (text.includes("→") || text.includes("…") || text.includes("⋯")) {
+      throw new Error(`kid glyph ${lang} ${key}`);
+    }
+  }
+}
 if (!Object.values(jaBuilt.pack).join("\n").includes("I don't know") && !jaBuilt.pages.some((page) => JSON.stringify(page.picture).includes("I don't know"))) {
   const jaJoined = JSON.stringify(jaBuilt.pages);
   if (!jaJoined.includes("I don't know")) throw new Error("english template missing from pictures");

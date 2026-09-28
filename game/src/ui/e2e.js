@@ -155,6 +155,7 @@ function assertLessonLayout(scene) {
   for (const hit of readHits) overlaps.push(hit);
   for (const hit of collectCopyHits(scene)) overlaps.push(hit);
   for (const hit of collectCaptionHits(scene, origin)) overlaps.push(hit);
+  for (const hit of collectRagTextHits(scene, origin)) overlaps.push(hit);
   for (const hit of collectTopBarHits()) overlaps.push(hit);
   if (scene.sys?.settings?.key === "Home") {
     for (const hit of collectHomeCopyHits(scene, origin)) overlaps.push(hit);
@@ -844,6 +845,56 @@ function collectCopyHits(scene) {
       hits.push(...glyphProblems(getComputedStyle(el).fontFamily, body, lang, String(role).slice(0, 40)));
     }
   }
+  return hits;
+}
+
+function flatCopy(value) {
+  return String(value || "").replace(/\s+/g, "");
+}
+
+/** RAG pages wrap. A text object must not end in an ellipsis or spill out of its card. */
+function collectRagTextHits(scene, origin) {
+  const key = scene.sys?.settings?.key || "";
+  if (!String(key).startsWith("Rag")) return [];
+  const hits = [];
+  const lang = String(document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh";
+  const walk = (obj) => {
+    if (!obj || obj.active === false || obj.visible === false || obj.alpha < 0.2) return;
+    if (obj.type === "Text") {
+      const body = String(obj.text || "");
+      const trimmed = body.trim();
+      if (/[…⋯]$/.test(trimmed) || trimmed.endsWith("...")) hits.push(["rag-ellipsis", trimmed.slice(-18)]);
+      const source = obj.getData?.("source");
+      if (source && flatCopy(source) !== flatCopy(body)) hits.push(["rag-clipped", String(source).slice(0, 28)]);
+      if (lang === "ja" && String(source || "").includes(" ")) {
+        const wrapWidth = Number(obj.getData?.("wrapWidth")) || obj.width;
+        const tooWide = (phrase) => phraseWiderThan(obj, phrase, wrapWidth);
+        for (const hit of phraseSplitHits(source, body, tooWide)) hits.push(["rag-phrase", hit[0], hit[1] || "", hit[2] || ""]);
+      }
+      const parent = obj.parentContainer;
+      const hostW = parent?.getData?.("width");
+      const hostH = parent?.getData?.("height");
+      if (hostW > 8 && hostH > 8 && parent.getWorldTransformMatrix) {
+        const matrix = parent.getWorldTransformMatrix();
+        const host = {
+          x: origin.x + matrix.tx - hostW / 2,
+          y: origin.y + matrix.ty - hostH / 2,
+          w: hostW,
+          h: hostH,
+        };
+        const bounds = obj.getBounds?.();
+        if (bounds && bounds.width > 1 && bounds.height > 1) {
+          const box = { x: origin.x + bounds.x, y: origin.y + bounds.y, w: bounds.width, h: bounds.height };
+          if (box.x < host.x - 4 || box.y < host.y - 4 || box.x + box.w > host.x + host.w + 4 || box.y + box.h > host.y + host.h + 4) {
+            hits.push(["rag-clipped", trimmed.slice(0, 18)]);
+          }
+        }
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  if (window.__nanoGPTCard?.truncated) hits.push(["rag-ellipsis", "card"]);
   return hits;
 }
 

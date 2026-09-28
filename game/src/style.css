@@ -916,11 +916,12 @@ html.is-pc .voice-note {
   left: 16px;
   bottom: 10px;
   z-index: 18;
-  max-width: min(420px, calc(50% - 200px));
+  max-width: min(520px, calc(50% - 180px));
   width: max-content;
   height: auto;
+  font-size: 16px;
   line-height: 1.35;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border: 2px solid #3b2a2e;
   border-radius: 8px;
   background: rgba(255, 248, 238, 0.94);

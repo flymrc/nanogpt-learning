@@ -356,10 +356,16 @@ export const RAG_PAGES = [
       "visual": "rag",
       "locales": {
         "zh": {
-          "kind": "hats"
+          "kind": "hats",
+          "page": 4,
+          "line": "早饭时间是早上6:30到9:30，在二楼的餐厅吃。",
+          "question": "早饭是几点？"
         },
         "ja": {
-          "kind": "hats"
+          "kind": "hats",
+          "page": 4,
+          "line": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+          "question": "朝ごはんは 何時？"
         }
       }
     },
@@ -518,51 +524,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "欢迎"
+              "title": "欢迎",
+              "text": "欢迎来到星星酒店！前台24小时都有人。有什么问题，都可以问我们。"
             },
             {
               "page": 2,
-              "title": "入住"
+              "title": "入住",
+              "text": "下午3:00开始可以入住。请到前台告诉我们你的名字。"
             },
             {
               "page": 3,
-              "title": "退房"
+              "title": "退房",
+              "text": "退房时间是上午11:00。请把房间钥匙还给前台。"
             },
             {
               "page": 4,
-              "title": "早饭"
+              "title": "早饭",
+              "text": "早饭时间是早上6:30到9:30，在二楼的餐厅吃。"
             },
             {
               "page": 5,
-              "title": "晚饭"
+              "title": "晚饭",
+              "text": "晚饭时间是晚上6:00到9:00，在二楼的餐厅吃。"
             },
             {
               "page": 6,
-              "title": "游泳池"
+              "title": "游泳池",
+              "text": "游泳池在屋顶上。夏天开放，时间是上午10:00到下午6:00。"
             },
             {
               "page": 7,
-              "title": "大浴场"
+              "title": "大浴场",
+              "text": "大浴场在一楼，开放时间是下午5:00到晚上11:00。"
             },
             {
               "page": 8,
-              "title": "无线网"
+              "title": "无线网",
+              "text": "每个房间都能免费上无线网（Wi-Fi）。密码印在你的房卡上。"
             },
             {
               "page": 9,
-              "title": "停车"
+              "title": "停车",
+              "text": "停车场就在酒店旁边。停一晚要1000日元。"
             },
             {
               "page": 10,
-              "title": "毛巾"
+              "title": "毛巾",
+              "text": "多要的毛巾和枕头都是免费的。用房间里的电话打给前台就行。"
             },
             {
               "page": 11,
-              "title": "行李"
+              "title": "行李",
+              "text": "入住以前、退房以后，都可以把行李放在前台，我们帮你看着。"
             },
             {
               "page": 12,
-              "title": "失物招领"
+              "title": "失物招领",
+              "text": "东西丢了，请问前台。捡到的东西我们会保管一个月。"
             }
           ]
         },
@@ -571,51 +589,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "Welcome"
+              "title": "Welcome",
+              "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything."
             },
             {
               "page": 2,
-              "title": "Check-in"
+              "title": "Check-in",
+              "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk."
             },
             {
               "page": 3,
-              "title": "Checkout"
+              "title": "Checkout",
+              "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk."
             },
             {
               "page": 4,
-              "title": "Breakfast"
+              "title": "Breakfast",
+              "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor."
             },
             {
               "page": 5,
-              "title": "Dinner"
+              "title": "Dinner",
+              "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor."
             },
             {
               "page": 6,
-              "title": "Swimming pool"
+              "title": "Swimming pool",
+              "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer."
             },
             {
               "page": 7,
-              "title": "Big bath"
+              "title": "Big bath",
+              "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM."
             },
             {
               "page": 8,
-              "title": "Wi-Fi"
+              "title": "Wi-Fi",
+              "text": "Free Wi-Fi works in every room. The password is printed on your room key card."
             },
             {
               "page": 9,
-              "title": "Parking"
+              "title": "Parking",
+              "text": "The parking lot is next to the hotel. Parking costs 1,000 yen per night."
             },
             {
               "page": 10,
-              "title": "Towels"
+              "title": "Towels",
+              "text": "Extra towels and pillows are free. Call the front desk from the phone in your room."
             },
             {
               "page": 11,
-              "title": "Bags"
+              "title": "Bags",
+              "text": "We can keep your bags at the front desk before check-in and after checkout."
             },
             {
               "page": 12,
-              "title": "Lost and found"
+              "title": "Lost and found",
+              "text": "If you lose something, ask the front desk. We keep lost things for one month."
             }
           ]
         }
@@ -682,51 +712,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "欢迎"
+              "title": "欢迎",
+              "text": "欢迎来到星星酒店！前台24小时都有人。有什么问题，都可以问我们。"
             },
             {
               "page": 2,
-              "title": "入住"
+              "title": "入住",
+              "text": "下午3:00开始可以入住。请到前台告诉我们你的名字。"
             },
             {
               "page": 3,
-              "title": "退房"
+              "title": "退房",
+              "text": "退房时间是上午11:00。请把房间钥匙还给前台。"
             },
             {
               "page": 4,
-              "title": "早饭"
+              "title": "早饭",
+              "text": "早饭时间是早上6:30到9:30，在二楼的餐厅吃。"
             },
             {
               "page": 5,
-              "title": "晚饭"
+              "title": "晚饭",
+              "text": "晚饭时间是晚上6:00到9:00，在二楼的餐厅吃。"
             },
             {
               "page": 6,
-              "title": "游泳池"
+              "title": "游泳池",
+              "text": "游泳池在屋顶上。夏天开放，时间是上午10:00到下午6:00。"
             },
             {
               "page": 7,
-              "title": "大浴场"
+              "title": "大浴场",
+              "text": "大浴场在一楼，开放时间是下午5:00到晚上11:00。"
             },
             {
               "page": 8,
-              "title": "无线网"
+              "title": "无线网",
+              "text": "每个房间都能免费上无线网（Wi-Fi）。密码印在你的房卡上。"
             },
             {
               "page": 9,
-              "title": "停车"
+              "title": "停车",
+              "text": "停车场就在酒店旁边。停一晚要1000日元。"
             },
             {
               "page": 10,
-              "title": "毛巾"
+              "title": "毛巾",
+              "text": "多要的毛巾和枕头都是免费的。用房间里的电话打给前台就行。"
             },
             {
               "page": 11,
-              "title": "行李"
+              "title": "行李",
+              "text": "入住以前、退房以后，都可以把行李放在前台，我们帮你看着。"
             },
             {
               "page": 12,
-              "title": "失物招领"
+              "title": "失物招领",
+              "text": "东西丢了，请问前台。捡到的东西我们会保管一个月。"
             }
           ],
           "cut": true
@@ -736,51 +778,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "Welcome"
+              "title": "Welcome",
+              "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything."
             },
             {
               "page": 2,
-              "title": "Check-in"
+              "title": "Check-in",
+              "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk."
             },
             {
               "page": 3,
-              "title": "Checkout"
+              "title": "Checkout",
+              "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk."
             },
             {
               "page": 4,
-              "title": "Breakfast"
+              "title": "Breakfast",
+              "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor."
             },
             {
               "page": 5,
-              "title": "Dinner"
+              "title": "Dinner",
+              "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor."
             },
             {
               "page": 6,
-              "title": "Swimming pool"
+              "title": "Swimming pool",
+              "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer."
             },
             {
               "page": 7,
-              "title": "Big bath"
+              "title": "Big bath",
+              "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM."
             },
             {
               "page": 8,
-              "title": "Wi-Fi"
+              "title": "Wi-Fi",
+              "text": "Free Wi-Fi works in every room. The password is printed on your room key card."
             },
             {
               "page": 9,
-              "title": "Parking"
+              "title": "Parking",
+              "text": "The parking lot is next to the hotel. Parking costs 1,000 yen per night."
             },
             {
               "page": 10,
-              "title": "Towels"
+              "title": "Towels",
+              "text": "Extra towels and pillows are free. Call the front desk from the phone in your room."
             },
             {
               "page": 11,
-              "title": "Bags"
+              "title": "Bags",
+              "text": "We can keep your bags at the front desk before check-in and after checkout."
             },
             {
               "page": 12,
-              "title": "Lost and found"
+              "title": "Lost and found",
+              "text": "If you lose something, ask the front desk. We keep lost things for one month."
             }
           ],
           "cut": true
@@ -852,51 +906,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "欢迎"
+              "title": "欢迎",
+              "text": "欢迎来到星星酒店！前台24小时都有人。有什么问题，都可以问我们。"
             },
             {
               "page": 2,
-              "title": "入住"
+              "title": "入住",
+              "text": "下午3:00开始可以入住。请到前台告诉我们你的名字。"
             },
             {
               "page": 3,
-              "title": "退房"
+              "title": "退房",
+              "text": "退房时间是上午11:00。请把房间钥匙还给前台。"
             },
             {
               "page": 4,
-              "title": "早饭"
+              "title": "早饭",
+              "text": "早饭时间是早上6:30到9:30，在二楼的餐厅吃。"
             },
             {
               "page": 5,
-              "title": "晚饭"
+              "title": "晚饭",
+              "text": "晚饭时间是晚上6:00到9:00，在二楼的餐厅吃。"
             },
             {
               "page": 6,
-              "title": "游泳池"
+              "title": "游泳池",
+              "text": "游泳池在屋顶上。夏天开放，时间是上午10:00到下午6:00。"
             },
             {
               "page": 7,
-              "title": "大浴场"
+              "title": "大浴场",
+              "text": "大浴场在一楼，开放时间是下午5:00到晚上11:00。"
             },
             {
               "page": 8,
-              "title": "无线网"
+              "title": "无线网",
+              "text": "每个房间都能免费上无线网（Wi-Fi）。密码印在你的房卡上。"
             },
             {
               "page": 9,
-              "title": "停车"
+              "title": "停车",
+              "text": "停车场就在酒店旁边。停一晚要1000日元。"
             },
             {
               "page": 10,
-              "title": "毛巾"
+              "title": "毛巾",
+              "text": "多要的毛巾和枕头都是免费的。用房间里的电话打给前台就行。"
             },
             {
               "page": 11,
-              "title": "行李"
+              "title": "行李",
+              "text": "入住以前、退房以后，都可以把行李放在前台，我们帮你看着。"
             },
             {
               "page": 12,
-              "title": "失物招领"
+              "title": "失物招领",
+              "text": "东西丢了，请问前台。捡到的东西我们会保管一个月。"
             }
           ],
           "labeled": true
@@ -906,51 +972,63 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "title": "Welcome"
+              "title": "Welcome",
+              "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything."
             },
             {
               "page": 2,
-              "title": "Check-in"
+              "title": "Check-in",
+              "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk."
             },
             {
               "page": 3,
-              "title": "Checkout"
+              "title": "Checkout",
+              "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk."
             },
             {
               "page": 4,
-              "title": "Breakfast"
+              "title": "Breakfast",
+              "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor."
             },
             {
               "page": 5,
-              "title": "Dinner"
+              "title": "Dinner",
+              "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor."
             },
             {
               "page": 6,
-              "title": "Swimming pool"
+              "title": "Swimming pool",
+              "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer."
             },
             {
               "page": 7,
-              "title": "Big bath"
+              "title": "Big bath",
+              "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM."
             },
             {
               "page": 8,
-              "title": "Wi-Fi"
+              "title": "Wi-Fi",
+              "text": "Free Wi-Fi works in every room. The password is printed on your room key card."
             },
             {
               "page": 9,
-              "title": "Parking"
+              "title": "Parking",
+              "text": "The parking lot is next to the hotel. Parking costs 1,000 yen per night."
             },
             {
               "page": 10,
-              "title": "Towels"
+              "title": "Towels",
+              "text": "Extra towels and pillows are free. Call the front desk from the phone in your room."
             },
             {
               "page": 11,
-              "title": "Bags"
+              "title": "Bags",
+              "text": "We can keep your bags at the front desk before check-in and after checkout."
             },
             {
               "page": 12,
-              "title": "Lost and found"
+              "title": "Lost and found",
+              "text": "If you lose something, ask the front desk. We keep lost things for one month."
             }
           ],
           "labeled": true
@@ -983,7 +1061,7 @@ export const RAG_PAGES = [
         "zh": {
           "kind": "pair",
           "left": {
-            "title": "夏天开放…",
+            "title": "夏天开放",
             "body": "什么开放？"
           },
           "right": {
@@ -994,7 +1072,7 @@ export const RAG_PAGES = [
         "ja": {
           "kind": "pair",
           "left": {
-            "title": "It is open…",
+            "title": "It is open",
             "body": "それ？"
           },
           "right": {
@@ -1374,42 +1452,227 @@ export const RAG_PAGES = [
       "visual": "rag",
       "locales": {
         "zh": {
-          "kind": "bars",
-          "items": [
+          "kind": "shares",
+          "boards": [
             {
               "page": 3,
-              "score": 35,
               "title": "退房",
-              "hot": true
+              "score": 35,
+              "words": [
+                {
+                  "text": "还给",
+                  "share": 0.41,
+                  "hot": false
+                },
+                {
+                  "text": "钥匙",
+                  "share": 0.41,
+                  "hot": false
+                },
+                {
+                  "text": "11",
+                  "share": 0.352,
+                  "hot": false
+                },
+                {
+                  "text": "上午",
+                  "share": 0.352,
+                  "hot": false
+                },
+                {
+                  "text": "退房",
+                  "share": 0.352,
+                  "hot": true
+                },
+                {
+                  "text": "房间",
+                  "share": 0.311,
+                  "hot": false
+                },
+                {
+                  "text": "时间",
+                  "share": 0.279,
+                  "hot": false
+                },
+                {
+                  "text": "00",
+                  "share": 0.253,
+                  "hot": false
+                },
+                {
+                  "text": "前台",
+                  "share": 0.231,
+                  "hot": false
+                }
+              ]
             },
             {
               "page": 11,
-              "score": 31,
               "title": "行李",
-              "hot": false
+              "score": 31,
+              "words": [
+                {
+                  "text": "以前",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "以后",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "帮",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "放在",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "看着",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "行李",
+                  "share": 0.358,
+                  "hot": false
+                },
+                {
+                  "text": "入住",
+                  "share": 0.308,
+                  "hot": false
+                },
+                {
+                  "text": "退房",
+                  "share": 0.308,
+                  "hot": true
+                },
+                {
+                  "text": "前台",
+                  "share": 0.202,
+                  "hot": false
+                }
+              ]
             }
           ]
         },
         "ja": {
-          "kind": "bars",
-          "items": [
+          "kind": "shares",
+          "boards": [
             {
               "page": 3,
-              "score": 59,
               "title": "Checkout",
-              "hot": true
+              "score": 59,
+              "words": [
+                {
+                  "text": "11",
+                  "share": 0.418,
+                  "hot": false
+                },
+                {
+                  "text": "checkout",
+                  "share": 0.418,
+                  "hot": true
+                },
+                {
+                  "text": "key",
+                  "share": 0.418,
+                  "hot": false
+                },
+                {
+                  "text": "time",
+                  "share": 0.418,
+                  "hot": true
+                },
+                {
+                  "text": "room",
+                  "share": 0.369,
+                  "hot": false
+                },
+                {
+                  "text": "00",
+                  "share": 0.3,
+                  "hot": false
+                },
+                {
+                  "text": "desk",
+                  "share": 0.274,
+                  "hot": false
+                }
+              ]
             },
             {
               "page": 11,
-              "score": 36,
               "title": "Bags",
-              "hot": false
+              "score": 36,
+              "words": [
+                {
+                  "text": "bags",
+                  "share": 0.598,
+                  "hot": false
+                },
+                {
+                  "text": "check",
+                  "share": 0.514,
+                  "hot": false
+                },
+                {
+                  "text": "checkout",
+                  "share": 0.514,
+                  "hot": true
+                },
+                {
+                  "text": "desk",
+                  "share": 0.337,
+                  "hot": false
+                }
+              ]
             },
             {
               "page": 2,
-              "score": 28,
               "title": "Check-in",
-              "hot": false
+              "score": 28,
+              "words": [
+                {
+                  "text": "starts",
+                  "share": 0.464,
+                  "hot": false
+                },
+                {
+                  "text": "tell",
+                  "share": 0.464,
+                  "hot": false
+                },
+                {
+                  "text": "check",
+                  "share": 0.399,
+                  "hot": false
+                },
+                {
+                  "text": "time",
+                  "share": 0.399,
+                  "hot": true
+                },
+                {
+                  "text": "pm",
+                  "share": 0.316,
+                  "hot": false
+                },
+                {
+                  "text": "00",
+                  "share": 0.287,
+                  "hot": false
+                },
+                {
+                  "text": "desk",
+                  "share": 0.262,
+                  "hot": false
+                }
+              ]
             }
           ]
         }
@@ -2503,8 +2766,14 @@ export const RAG_PAGES = [
           }
         },
         "ja": {
-          "kind": "bars",
-          "items": [
+          "kind": "take",
+          "one": {
+            "page": 3,
+            "score": 27,
+            "title": "Checkout",
+            "hot": true
+          },
+          "many": [
             {
               "page": 3,
               "score": 27,
@@ -2523,7 +2792,9 @@ export const RAG_PAGES = [
               "title": "Check-in",
               "hot": false
             }
-          ]
+          ],
+          "pick": 4,
+          "carry": 3
         }
       }
     },

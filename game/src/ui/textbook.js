@@ -1,5 +1,5 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
-import { t } from "../i18n/locale.js";
+import { getCourse, getLang, t } from "../i18n/locale.js";
 import { syncPseudo } from "./pseudo.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
@@ -7,7 +7,7 @@ import { lessonRhythm } from "./layout.js";
 import { installLayoutProbe } from "./e2e.js";
 import { artBandReserve } from "./page-art.js";
 import { ctaCeiling, keepStageAboveCta, layerBottom, placeLessonCta } from "./lesson.js";
-import { C, uiText, wrapToWidth } from "./theme.js";
+import { C, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
 let bookMounted = false;
 
@@ -205,6 +205,50 @@ function cardCopy(beat, phase) {
   return { shown: body, reveal: null };
 }
 
+function wrapCard(scene, body, font, wrap, { phrases = false } = {}) {
+  if (phrases && getLang() === "ja") return wrapAtBreaks(scene, body, font, wrap, cardStyle);
+  return wrapToWidth(scene, body, font, wrap, cardStyle);
+}
+
+function fitComplete(scene, body, size, minSize, wrap, maxTextH, { keep = false } = {}) {
+  let source = String(body || "").trim();
+  let font = size;
+  const measure = (value, n) => {
+    const wrapped = wrapCard(scene, value, n, wrap, { phrases: true });
+    const probe = scene.add.text(0, 0, wrapped, cardStyle(n)).setVisible(false);
+    const height = probe.height;
+    probe.destroy();
+    return { wrapped, font: n, height, source: value, truncated: false };
+  };
+  let fit = measure(source, font);
+  let guard = 0;
+  while (fit.height > maxTextH && guard < 40) {
+    guard += 1;
+    if (font > minSize) {
+      font -= 1;
+      fit = measure(source, font);
+      continue;
+    }
+    if (keep) break;
+    const sentences = source.split(/(?<=[。！？])/u).map((part) => part.trim()).filter(Boolean);
+    if (sentences.length > 1) {
+      source = sentences.slice(0, -1).join("");
+      font = size;
+      fit = measure(source, font);
+      continue;
+    }
+    const lines = source.split("\n").filter((line) => line.trim());
+    if (lines.length > 1) {
+      source = lines.slice(0, -1).join("\n");
+      font = size;
+      fit = measure(source, font);
+      continue;
+    }
+    break;
+  }
+  return fit;
+}
+
 function fitPlain(scene, body, size, minSize, wrap, maxTextH) {
   let font = size;
   let wrapped = wrapToWidth(scene, body, font, wrap, cardStyle);
@@ -275,19 +319,29 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
   const phone = !isWidePcTutor();
+  const rag = beat?.course === "rag" || getCourse() === "rag";
   const cardTop = (top ?? stage.top) + rhythm;
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
   const copy = cardCopy(beat, phase);
-  const preferred = phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
+  const preferred = rag
+    ? (phone ? Math.min(stage.h * 0.26, 128) : Math.min(stage.h * 0.24, 150))
+    : phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
   const available = stage.bottom - cardTop - rhythm;
   const yielded = available - Math.max(0, reserve);
   const maxH = Math.min(preferred, Math.max(48, yielded));
   const chrome = 40;
   const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
-  const shownFit = fitPlain(scene, copy.shown, startSize, 13, wrap, maxTextH);
-  const revealFit = copy.reveal ? fitPlain(scene, copy.reveal, startSize, 13, wrap, maxTextH) : null;
+  const fit = rag ? fitComplete : fitPlain;
+  const shownFit = rag
+    ? fitComplete(scene, copy.shown, startSize, 11, wrap, maxTextH, { keep: true })
+    : fit(scene, copy.shown, startSize, 13, wrap, maxTextH);
+  const revealFit = copy.reveal
+    ? (rag
+      ? fitComplete(scene, copy.reveal, startSize, 11, wrap, maxTextH, { keep: true })
+      : fit(scene, copy.reveal, startSize, 13, wrap, maxTextH))
+    : null;
   const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);
   const textH = Math.max(shownFit.height, revealFit?.height || 0);
   const contentH = chrome + textH;
@@ -303,7 +357,11 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const textX = -width / 2 + 22;
   const textY = -height / 2 + 28;
   const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
+  const textRoom = Math.max(16, height - 36);
+  if (rag && text.height > textRoom) text.setScale(textRoom / text.height);
   text.setData("kind", "phase-card-text");
+  text.setData("source", shownFit.source || copy.shown);
+  text.setData("wrapWidth", wrap);
   box.add([g, stripe, title]);
   const lineCount = Math.max(1, shownFit.wrapped.split("\n").length);
   paintBookMarks(scene, box, shownFit.wrapped, font, textX, textY, text.height / lineCount);

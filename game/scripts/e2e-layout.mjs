@@ -1797,12 +1797,7 @@ async function jumpRag(page, key, beat, phase, name) {
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (name.startsWith("rag-mobile")) {
     const card = await page.evaluate(() => window.__nanoGPTCard || null);
-    if (card?.truncated) {
-      const shown = card.shown || "";
-      if (!shown.includes("点整页") && !shown.includes("ページで全部")) {
-        throw new Error(`rag card truncated without ellipsis ${name}`);
-      }
-    }
+    if (card?.truncated) throw new Error(`rag card truncated ${name}`);
   }
   if (!result?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
   const shot = ragShotFor(

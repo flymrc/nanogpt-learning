@@ -1,4 +1,4 @@
-import { t } from "../i18n/locale.js";
+import { getCourse, getLang, t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
@@ -6,7 +6,7 @@ import { syncHubChrome } from "./chrome.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop, planLessonHeader } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
-import { C, displayText, uiText, wrapToWidth } from "./theme.js";
+import { C, displayText, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
 export function makeLessonFrame(scene, { level, total, title, startLabel } = {}) {
   syncHubChrome(scene.sys.settings.key);
@@ -20,8 +20,11 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
   else addChrome(scene, { level, total, title, shell });
 
   const rhythm = lessonRhythm(v);
-  const purposeMin = phone ? 60 : v.h < 560 ? 48 : 64;
-  const purposeH = clamp(Math.round((phone ? 68 : v.short ? 70 : v.compact ? 76 : 82) * v.uiScale), purposeMin, phone ? 76 : 88);
+  const rag = getCourse() === "rag";
+  const purposeMin = phone ? (rag ? 108 : 60) : v.h < 560 ? 48 : rag ? 88 : 64;
+  const purposeMax = phone ? (rag ? 136 : 76) : rag ? 112 : 88;
+  const purposeWant = rag ? (phone ? 124 : 100) : phone ? 68 : v.short ? 70 : v.compact ? 76 : 82;
+  const purposeH = clamp(Math.round(purposeWant * v.uiScale), purposeMin, purposeMax);
   const purposeBand = band(v.left, shell.content.top, v.innerW, purposeH);
   const stageTop = purposeBand.bottom + rhythm;
   const stageBand = band(v.left, stageTop, v.innerW, Math.max(80, shell.content.bottom - stageTop));
@@ -166,16 +169,26 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     const detail = extra.detail ? ` · ${extra.detail}` : "";
     step.setText(`${index + 1} / ${total}${detail}`);
     step.setY(rowY);
+    const ragLesson = getCourse() === "rag";
+    const ja = getLang() === "ja";
+    const wrap = (value, font, width) => (ragLesson && ja
+      ? wrapAtBreaks(scene, value, font, width, displayText)
+      : wrapToWidth(scene, value, font, width, displayText));
     const gap = 12;
     const stepLeft = rect.w / 2 - 12 - hang - step.width;
     const fullW = Math.max(80, rect.w - 40 - (phone ? 0 : hang));
     const clearW = Math.max(80, stepLeft - (-rect.w / 2 + 26) - gap);
-    const maxW = Math.min(fullW, clearW);
-    let size = Math.max(phone ? 15 : 18, Math.round(rect.h * 0.26));
+    const maxW = ragLesson ? Math.max(80, rect.w - 48) : Math.min(fullW, clearW);
+    let size = Math.max(phone ? 15 : 18, Math.round(rect.h * (ragLesson ? 0.16 : 0.26)));
+    if (ragLesson) {
+      purpose.setOrigin(0, 0);
+      purpose.setPosition(-rect.w / 2 + 26, rowY + 16);
+    }
     purpose.setFontSize(size);
-    purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
+    purpose.setText(wrap(text, size, maxW));
+    const maxTextH = ragLesson ? rect.h / 2 - purpose.y - 8 : rect.h * 0.5;
     const crowded = () => {
-      const tall = purpose.height > rect.h * 0.5;
+      const tall = purpose.height > maxTextH;
       const wide = purpose.width > maxW + 1;
       const p = purpose.getBounds();
       const s = step.getBounds();
@@ -187,20 +200,10 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     while (crowded() && size > 13) {
       size -= 1;
       purpose.setFontSize(size);
-      purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
+      purpose.setText(wrap(text, size, maxW));
     }
-    // A long めあて (chapter 5 threshold, Japanese) can stay taller than the
-    // banner after the font floor. Drop wrapped lines until the banner box
-    // stays clear of the tabs. The full line remains on the phase card.
-    let clipGuard = 0;
-    while (purpose.height > rect.h * 0.5 && clipGuard < 6) {
-      const lines = String(purpose.text || "").split("\n");
-      if (lines.length <= 1) break;
-      lines.pop();
-      const body = lines.join("\n").replace(/…$/, "").trimEnd();
-      purpose.setText(body ? `${body}…` : "…");
-      clipGuard += 1;
-    }
+    purpose.setData("source", text);
+    purpose.setData("wrapWidth", maxW);
     purpose.setAlpha(0);
     window.__nanoGPTPurposeAlpha = () => purpose.alpha;
     window.__nanoGPTBannerSettled = false;
