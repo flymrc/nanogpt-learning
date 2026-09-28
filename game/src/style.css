@@ -1,3 +1,13 @@
+html {
+  --font-display: "ZCOOL QingKe HuangYou", "Noto Sans SC", "Noto Sans Symbols 2", "Noto Emoji", sans-serif;
+  --font-ui: "Noto Sans SC", "Noto Sans Symbols 2", "Noto Emoji", sans-serif;
+}
+
+html[lang="ja"] {
+  --font-display: "Noto Sans JP", "Noto Sans SC", "Noto Sans Symbols 2", "Noto Emoji", sans-serif;
+  --font-ui: "Noto Sans JP", "Noto Sans SC", "Noto Sans Symbols 2", "Noto Emoji", sans-serif;
+}
+
 html,
 body {
   margin: 0;
@@ -7,11 +17,19 @@ body {
   height: 100dvh;
   min-height: 100svh;
   background: #f3ebe0;
+  font-family: var(--font-ui);
   overflow: hidden;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
 }
 
 #app-layout {
@@ -164,7 +182,7 @@ html.is-mobile #tutor-dock {
 
 .tutor-block p {
   margin: 0;
-  font-family: "Noto Sans SC", "PingFang SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -246,7 +264,7 @@ html.is-pc #mobile-chrome {
   border-radius: 14px;
   background: #ff7a85;
   color: #3b2a2e;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", sans-serif;
+  font-family: var(--font-display);
   font-size: 16px;
   line-height: 28px;
   text-align: center;
@@ -263,7 +281,7 @@ html.is-pc #mobile-chrome {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", sans-serif;
+  font-family: var(--font-display);
   font-size: 20px;
   color: #3b2a2e;
 }
@@ -322,7 +340,7 @@ html.is-mobile #pc-chrome {
   background: #fff8ee;
   color: #3b2a2e;
   box-shadow: 4px 6px 0 rgba(59, 42, 46, 0.2);
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
@@ -498,7 +516,7 @@ html.is-mobile .lesson-book-card {
 
 .lesson-book-head h2 {
   margin: 0;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
 }
 
@@ -532,7 +550,7 @@ html.is-mobile #pseudo-overlay {
   border-radius: 22px;
   box-shadow: 6px 8px 0 rgba(59, 42, 46, 0.2);
   color: #3b2a2e;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
 }
 
 html.is-mobile .pseudo-card {
@@ -552,7 +570,7 @@ html.is-mobile .pseudo-card {
 
 .pseudo-head h2 {
   margin: 0;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-display);
   font-size: 24px;
 }
 
@@ -573,7 +591,7 @@ html.is-mobile .pseudo-card {
 .pseudo-block p,
 .pseudo-block pre {
   margin: 0;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
   font-size: 15px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -617,7 +635,7 @@ html.is-mobile .notes-card {
   border-radius: 22px;
   box-shadow: 6px 8px 0 rgba(59, 42, 46, 0.2);
   color: #3b2a2e;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
 }
 
 .notes-head {
@@ -630,7 +648,7 @@ html.is-mobile .notes-card {
 
 .notes-head h2 {
   margin: 0;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-display);
   font-size: 26px;
 }
 
@@ -690,7 +708,7 @@ html.is-mobile .notes-card {
 
 .notes-detail-term {
   margin: 0 0 4px;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-display);
   font-size: 22px;
 }
 
@@ -784,7 +802,7 @@ html.has-game-cursor * {
   gap: 18px;
   background: #f3ebe0;
   color: #3b2a2e;
-  font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+  font-family: var(--font-ui);
   pointer-events: none;
 }
 
@@ -819,22 +837,49 @@ html.has-game-cursor * {
 
 .voice-note {
   margin: 0;
-  height: 18px;
-  line-height: 18px;
+  box-sizing: border-box;
+  height: auto;
+  min-height: 18px;
+  line-height: 1.35;
   font-size: 12px;
   font-weight: 700;
+  font-family: var(--font-ui);
   color: #8b6b5c;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
   pointer-events: none;
 }
 
 #voice-line {
   display: block;
-  overflow: hidden;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.voice-word {
   white-space: nowrap;
-  text-overflow: ellipsis;
+}
+
+.voice-word.is-breakable {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+html.is-mobile[data-scene="home"] #mobile-chrome {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+html.is-mobile[data-scene="home"] #mobile-title,
+html.is-mobile[data-scene="home"] #mobile-badge {
+  display: none !important;
+}
+
+html.is-mobile[data-scene="home"] .mobile-chrome__actions {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 .voice-note.is-missing {
@@ -848,18 +893,49 @@ html.is-mobile .voice-note {
   min-width: 0;
 }
 
+html.is-mobile[data-scene="home"] .voice-note {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  flex: none;
+  width: auto;
+  max-width: none;
+  min-width: 0;
+  z-index: 18;
+  height: auto;
+  padding: 4px 10px;
+  border: 2px solid #3b2a2e;
+  border-radius: 8px;
+  background: rgba(255, 248, 238, 0.94);
+  box-sizing: border-box;
+}
+
 html.is-pc .voice-note {
   position: absolute;
   left: 16px;
   bottom: 10px;
   z-index: 18;
-  max-width: min(240px, 26vw);
-  height: 22px;
-  line-height: 22px;
-  padding: 0 8px;
+  max-width: min(420px, calc(50% - 200px));
+  width: max-content;
+  height: auto;
+  line-height: 1.35;
+  padding: 4px 10px;
   border: 2px solid #3b2a2e;
   border-radius: 8px;
   background: rgba(255, 248, 238, 0.94);
+}
+
+html.is-pc[data-scene="home"] .voice-note {
+  max-width: calc(100% - 32px);
+  width: max-content;
+  height: auto;
+  line-height: 1.35;
+  left: calc(16px * var(--hub-scale, 1));
+  bottom: calc(10px * var(--hub-scale, 1));
+  font-size: calc(12px * var(--hub-scale, 1));
+  padding: calc(4px * var(--hub-scale, 1)) calc(10px * var(--hub-scale, 1));
+  border-radius: calc(8px * var(--hub-scale, 1));
 }
 
 .sheet-overlay {
@@ -900,7 +976,7 @@ html.is-pc .voice-note {
 .sheet-head h2,
 .sheet-card h2 {
   margin: 0;
-  font-family: "ZCOOL QingKe HuangYou", "Fredoka", "Noto Sans SC", "Noto Sans JP", sans-serif;
+  font-family: var(--font-display);
   font-size: 28px;
 }
 
@@ -938,7 +1014,7 @@ html.is-pc .voice-note {
   border-radius: 12px;
   background: #ffc43d;
   border: 3px solid #3b2a2e;
-  font-family: "Fredoka", "Noto Sans JP", sans-serif;
+  font-family: "Fredoka", var(--font-ui);
   font-size: 18px;
   line-height: 30px;
   text-align: center;
@@ -1025,4 +1101,51 @@ html.is-pc .voice-note {
     padding: 0 6px;
     font-size: 12px;
   }
+}
+
+html[lang="ja"] .mobile-chrome__title,
+html[lang="ja"] .mobile-chrome__badge,
+html[lang="ja"] h2,
+html[lang="ja"] .notes-detail-term {
+  font-weight: 700;
+}
+
+/* Lesson phones: two equal rows of four. A lone mute button is not a row. */
+html.is-mobile[data-scene="lesson"] #mobile-chrome {
+  align-items: center;
+  row-gap: 6px;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px;
+}
+
+html.is-mobile[data-scene="lesson"] .mobile-chrome__title {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  text-align: center;
+  font-size: 16px;
+  line-height: 1.2;
+}
+
+html.is-mobile[data-scene="lesson"] .mobile-chrome__actions {
+  flex: 1 0 100%;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  justify-content: stretch;
+}
+
+html.is-mobile[data-scene="lesson"] #mobile-actions .hud-toggle,
+html.is-mobile[data-scene="lesson"] #mobile-actions .notes-toggle,
+html.is-mobile[data-scene="lesson"] #mobile-actions .book-toggle,
+html.is-mobile[data-scene="lesson"] #mobile-actions .pseudo-toggle,
+html.is-mobile[data-scene="lesson"] #mobile-actions .mute-toggle {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }

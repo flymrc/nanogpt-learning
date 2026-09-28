@@ -2,12 +2,14 @@ import { t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
+import { syncHubChrome } from "./chrome.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop, planLessonHeader } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
 import { C, displayText, uiText, wrapToWidth } from "./theme.js";
 
 export function makeLessonFrame(scene, { level, total, title, startLabel } = {}) {
+  syncHubChrome(scene.sys.settings.key);
   const phone = !isWidePcTutor();
   const headerPlan = phone ? null : planLessonHeader(scene, title);
   const shell = makeShell(scene, phone ? { header: false, footerH: 84 } : { headerH: headerPlan.headerH });

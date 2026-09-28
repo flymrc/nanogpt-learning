@@ -3,10 +3,12 @@ import { narrateBeat } from "../audio/narrate.js";
 import { TITLE_BEAT } from "../data/beats.js";
 import { chapterList, localizeBeat, t } from "../i18n/locale.js";
 import { consumePendingSheet, pickChapter } from "../ui/catalog.js";
+import { syncHubChrome } from "../ui/chrome.js";
 import { syncPseudo } from "../ui/pseudo.js";
+import { rememberLesson } from "../ui/route.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addRobot, addSpeechBubble } from "../ui/mascot.js";
-import { addFooterCta, addMuteToggle, bindAdvance, clearPcHudStack, createButton, makeCharTile, markCaption, paintBackdrop } from "../ui/components.js";
+import { addFooterCta, addMuteToggle, bindAdvance, clearPcHudStack, createButton, makeCharTile, markCaption, paintBackdrop, planLessonHeader } from "../ui/components.js";
 import { CAPTION_CLEAR, STICKER_SHADOW_Y, fitMeasure, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { installLayoutProbe } from "../ui/e2e.js";
 import { maybeShowGuide } from "../ui/guide.js";
@@ -24,9 +26,11 @@ export default class TitleScene extends Phaser.Scene {
       return;
     }
 
+    syncHubChrome("Title");
     const phone = !isWidePcTutor();
     clearPcHudStack();
-    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
+    const headerPlan = phone ? null : planLessonHeader(this, t("appTitle"));
+    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: headerPlan.headerH });
     const v = shell.v;
     paintBackdrop(this);
     if (phone) syncMobileChrome({ title: t("appTitle") });
@@ -75,6 +79,7 @@ export default class TitleScene extends Phaser.Scene {
     emitTutor(titleBeat);
     syncPseudo(titleBeat);
     this.frame = { nextBtn: this.startBtn, stage: { list: [] } };
+    rememberLesson("Title", 0, 0);
     const pending = consumePendingSheet(this);
     if (!pending) maybeShowGuide();
     installLayoutProbe(this);

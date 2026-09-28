@@ -6,6 +6,7 @@
  * Also fails on local sticker collisions: tile/chip vs caption, chip vs chip,
  * chips under the minimum size, and placeholder tiles stacked on the first chip.
  * Big-band checks alone missed that class (caption on the Second tiles, ellipsis on S).
+ * Home is extra: 390×844, 1024×522, 1024×640, 1440×900, 1920×1080, zh and ja.
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -60,7 +61,10 @@ async function ready(page) {
   await page.goto(BASE, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
   await page.evaluate(() => document.fonts?.ready);
-  await page.waitForTimeout(600);
+  // Boot finishes with a delayed start of Home. A jump issued during that
+  // window is replaced by Home, and the speech checks never see Level1.
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 45000 });
+  await page.waitForTimeout(200);
 }
 
 async function assertVo(page, key, beat) {
@@ -101,9 +105,16 @@ async function waitTutor(page) {
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
 }
 
-async function jumpAndAssert(page, key, beat, phase, name) {
+async function jumpLanded(page, key, beat, phase) {
   await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
-  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForFunction(([k, b, p]) => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === k && state.beat === b && state.phase === p && typeof window.__nanoGPTAssertLayout === "function";
+  }, [key, beat, phase], { timeout: 15000 });
+}
+
+async function jumpAndAssert(page, key, beat, phase, name) {
+  await jumpLanded(page, key, beat, phase);
   await page.waitForTimeout(450);
   await assertVo(page, key, beat);
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
@@ -164,10 +175,30 @@ async function openPseudoShot(page, key, beat, phase, file) {
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const tip = await page.evaluate(readPseudo);
+  const pseudoLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!pseudoLayout?.ok) {
+    throw new Error(`pseudo layout ${file || key} ${JSON.stringify({ overlaps: pseudoLayout?.overlaps })}`);
+  }
   if (file) await page.screenshot({ path: file });
   await page.click("#pseudo-close");
   await page.waitForTimeout(120);
   return tip;
+}
+
+async function enterNanoTutorial(page) {
+  await page.waitForFunction(() => {
+    const scene = window.__nanoGPTState?.().scene;
+    return scene === "Home" || scene === "Title" || (typeof scene === "string" && /^Level[1-5]$/.test(scene)) || scene === "End";
+  }, { timeout: 20000 });
+  const scene = await page.evaluate(() => window.__nanoGPTState?.().scene);
+  if (scene !== "Home") return;
+  await page.waitForFunction(() => typeof window.__nanoGPTOpenTutorial === "function", { timeout: 20000 });
+  await page.evaluate(() => window.__nanoGPTOpenTutorial());
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Title" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(250);
 }
 
 async function dismissGuide(page, label) {
@@ -253,7 +284,18 @@ async function assertLang(page, label) {
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const pseudo = await page.evaluate(() => document.getElementById("pseudo-does")?.textContent || "");
+  const pseudoLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!pseudoLayout?.ok) {
+    throw new Error(`ja pseudo layout ${label} ${JSON.stringify({ overlaps: pseudoLayout?.overlaps })}`);
+  }
   await page.click("#pseudo-close");
+  await page.click("#notes-toggle");
+  await page.waitForTimeout(200);
+  const jaGlossary = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!jaGlossary?.ok) {
+    throw new Error(`ja glossary ${label} ${JSON.stringify({ overlaps: jaGlossary?.overlaps })}`);
+  }
+  await page.click("#notes-close");
   if (!pseudo.includes("マス")) throw new Error(`ja pseudo ${pseudo}`);
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 2));
   await page.waitForTimeout(350);
@@ -295,8 +337,7 @@ async function assertLang(page, label) {
     ];
     for (const [key, beat] of jobs) {
       for (const phase of [0, 2]) {
-        await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
-        await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+        await jumpLanded(page, key, beat, phase);
         await page.waitForTimeout(350);
         await assertVo(page, key, beat);
         const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
@@ -326,6 +367,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
   await page.evaluate(() => document.fonts?.ready);
   await page.waitForTimeout(300);
+  await enterNanoTutorial(page);
   const guideShown = await dismissGuide(page, label);
   await waitTutor(page);
   await assertVo(page, "Title", 0);
@@ -361,12 +403,20 @@ async function runViewport(label, pageOpts, { allPhases }) {
     titles: document.querySelectorAll("#tutor-book .tutor-block").length,
   }));
   await page.screenshot({ path: `${OUT}/${label}-book.png` });
+  const bookLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!bookLayout?.ok) {
+    throw new Error(`book ${label} ${JSON.stringify({ overlaps: bookLayout?.overlaps, overflows: bookLayout?.overflows })}`);
+  }
   await page.click("#lesson-book-close");
   await page.waitForTimeout(150);
   await page.click("#notes-toggle");
   await page.waitForTimeout(250);
   const notesOpen = await page.evaluate(() => !document.getElementById("notes-overlay")?.hidden);
   await page.screenshot({ path: `${OUT}/${label}-glossary.png` });
+  const glossary = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!glossary?.ok) {
+    throw new Error(`glossary ${label} ${JSON.stringify({ overlaps: glossary?.overlaps, overflows: glossary?.overflows })}`);
+  }
   await page.click("#notes-close");
 
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 2));
@@ -414,6 +464,8 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const pseudoMask = await page.evaluate(readPseudo);
+  const maskLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!maskLayout?.ok) throw new Error(`pseudo mask ${label} ${JSON.stringify(maskLayout?.overlaps)}`);
   await page.screenshot({ path: `${OUT}/${label}-pseudo-attn.png` });
   await page.click("#pseudo-close");
 
@@ -425,6 +477,8 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const pseudoTrain = await page.evaluate(readPseudo);
+  const trainPseudoLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!trainPseudoLayout?.ok) throw new Error(`pseudo train ${label} ${JSON.stringify(trainPseudoLayout?.overlaps)}`);
   await page.screenshot({ path: `${OUT}/${label}-pseudo-train.png` });
   await page.click("#pseudo-close");
 
@@ -436,6 +490,8 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.click("#pseudo-toggle");
   await page.waitForTimeout(200);
   const pseudoSample = await page.evaluate(readPseudo);
+  const samplePseudoLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!samplePseudoLayout?.ok) throw new Error(`pseudo sample ${label} ${JSON.stringify(samplePseudoLayout?.overlaps)}`);
   await page.screenshot({ path: `${OUT}/${label}-pseudo-sample.png` });
   await page.click("#pseudo-close");
 
@@ -601,7 +657,7 @@ async function assertJaSpeech(browser) {
 async function pageWithJaVoice(browser) {
   const page = await openSpeechPage(browser, { mode: "ja", label: "mobile" });
   await page.click("#lang-toggle");
-  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.waitForFunction(() => document.documentElement.lang === "ja" && window.__nanoGPTState?.().scene === "Home");
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1" && window.__nanoGPTState?.().beat === 0);
   await page.waitForTimeout(200);
@@ -667,17 +723,18 @@ async function pageWithJaVoice(browser) {
 async function pageWithoutJaVoice(browser, label) {
   const page = await openSpeechPage(browser, { mode: "none", label });
   await page.click("#lang-toggle");
-  await page.waitForFunction(() => document.documentElement.lang === "ja");
+  await page.waitForFunction(() => document.documentElement.lang === "ja" && window.__nanoGPTState?.().scene === "Home");
   await page.evaluate(() => window.__nanoGPTJump("Level1", 0, 0));
   await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Level1");
   await page.waitForFunction(() => {
-    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak");
+    // Home may already have spoken Chinese before the toggle. The missing-voice
+    // check is the later Japanese utterance, not the first speak in the log.
+    const hit = (window.__nanoGPTSpeechLog || []).find((entry) => entry.op === "speak" && entry.lang === "ja-JP");
     const note = document.getElementById("voice-note");
     const tip = note?.getAttribute("aria-label") || note?.title || "";
     const line = document.getElementById("voice-line")?.textContent || "";
     return Boolean(
       hit &&
-        hit.lang === "ja-JP" &&
         !hit.voice &&
         note?.dataset.missing === "1" &&
         tip.includes("Chrome") &&
@@ -1323,11 +1380,284 @@ const pc1024 = await runViewport(
   { allPhases: false },
 );
 
+function homeShot(lang, width, height) {
+  return `/opt/cursor/artifacts/home/home-${lang}-${width}x${height}.png`;
+}
+
+function lessonShot(lang, width, height) {
+  return `/opt/cursor/artifacts/home/lesson-${lang}-${width}x${height}.png`;
+}
+
+function home2Shot(name) {
+  return `/opt/cursor/artifacts/home2/${name}.png`;
+}
+
+const HOME3_SHOTS = new Set([
+  "zh-1440x900",
+  "ja-1440x900",
+  "zh-1920x1080",
+  "ja-1920x1080",
+  "zh-1024x640",
+  "ja-390x844",
+]);
+
+function home3Shot(lang, width, height) {
+  return `/opt/cursor/artifacts/home3/home-${lang}-${width}x${height}.png`;
+}
+
+async function waitHome(page, mobile) {
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Home" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  if (!mobile) {
+    await page.waitForFunction(() => {
+      const hidden = document.documentElement.dataset.tutor === "hidden";
+      const fitted = document.getElementById("tutor-canvas")?.dataset.fitted === "1";
+      return hidden || fitted;
+    }, { timeout: 30000 });
+  }
+  await page.waitForTimeout(mobile ? 250 : 500);
+}
+
+async function clickHubCard(page, id) {
+  const box = await page.evaluate((cardId) => {
+    const cards = window.__nanoGPTHubCards?.() || [];
+    return cards.find((card) => card.id === cardId) || null;
+  }, id);
+  if (!box) throw new Error(`missing hub card ${id}`);
+  await page.mouse.click(box.x + box.w / 2, box.y + box.h / 2);
+  return box;
+}
+
+async function assertHomeViewport(page, label, lang, mobile) {
+  await waitHome(page, mobile);
+  const layout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  const viewNow = page.viewportSize();
+  await page.screenshot({ path: homeShot(lang, viewNow.width, viewNow.height) });
+  if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 1920 && viewNow.height === 1080)) {
+    await page.screenshot({ path: home2Shot(`home-${lang}-${viewNow.width}x${viewNow.height}`) });
+  }
+  if (HOME3_SHOTS.has(`${lang}-${viewNow.width}x${viewNow.height}`)) {
+    await page.screenshot({ path: home3Shot(lang, viewNow.width, viewNow.height) });
+  }
+  if (!mobile && viewNow.height >= 900) {
+    const cardH = await page.evaluate(() => {
+      const cards = window.__nanoGPTHubCards?.() || [];
+      return Math.max(0, ...cards.map((card) => card.h || 0));
+    });
+    if (cardH < 280) throw new Error(`home cards stayed short ${lang} ${label} h=${cardH}`);
+  }
+  if (!layout?.ok) {
+    await page.screenshot({ path: `${OUT}/home-${label}-${lang}.png` });
+  }
+  if (!layout?.ok) {
+    throw new Error(`home layout ${lang} ${label} ${JSON.stringify({ overlaps: layout?.overlaps, overflows: layout?.overflows, orphans: layout?.orphans })}`);
+  }
+  const copy = await page.evaluate(() => window.__nanoGPTHubCopy?.() || {});
+  const cards = await page.evaluate(() => window.__nanoGPTHubCards?.() || []);
+  if (cards.length < 2) throw new Error(`home cards ${cards.length}`);
+  const rag = cards.find((card) => card.id === "rag");
+  const nano = cards.find((card) => card.id === "nanogpt");
+  if (!rag || rag.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
+  if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
+  if (lang === "ja") {
+    if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
+  } else if (copy.soon !== "准备中" || copy.home !== "首页") {
+    throw new Error(`zh home copy ${JSON.stringify(copy)}`);
+  }
+  if (mobile && layout.live2dOn) throw new Error("live2d on mobile home");
+  await page.evaluate(() => {
+    window.__nanoGPTHubLast = "";
+  });
+  await clickHubCard(page, "rag");
+  await page.waitForTimeout(250);
+  const afterRag = await page.evaluate(() => ({
+    scene: window.__nanoGPTState?.().scene,
+    last: window.__nanoGPTHubLast,
+  }));
+  if (afterRag.scene !== "Home" || afterRag.last !== "rag") {
+    throw new Error(`rag card navigated ${JSON.stringify(afterRag)}`);
+  }
+  await clickHubCard(page, "nanogpt");
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Title" && window.__nanoGPTState?.().pageId === "title",
+    { timeout: 15000 },
+  );
+  const homeBtn = await page.evaluate((expected) => {
+    const btn = document.getElementById("home-toggle");
+    const rect = btn?.getBoundingClientRect();
+    return {
+      text: btn?.textContent || "",
+      hidden: Boolean(btn?.hidden),
+      w: rect?.width || 0,
+      expected,
+    };
+  }, copy.home);
+  if (homeBtn.hidden || homeBtn.w < 8 || homeBtn.text !== homeBtn.expected) {
+    throw new Error(`home button ${JSON.stringify(homeBtn)}`);
+  }
+  const view = page.viewportSize();
+  if ((mobile && view.width === 390) || (!mobile && view.width === 1440 && view.height === 900)) {
+    await page.screenshot({ path: lessonShot(lang, view.width, view.height) });
+    await page.screenshot({ path: home2Shot(`lesson-${lang}-${view.width}x${view.height}`) });
+  }
+  if (lang === "ja" && ((mobile && view.width === 390) || (view.width === 1440 && view.height === 900))) {
+    await page.evaluate(() => window.__nanoGPTJump("Level3", 4, 2));
+    await page.waitForFunction(() => window.__nanoGPTState?.().pageId === "c3-p4", null, { timeout: 15000 });
+    await page.waitForTimeout(450);
+    const mid = await page.evaluate(() => window.__nanoGPTAssertLayout());
+    if (!mid?.ok) {
+      throw new Error(`caption page ${JSON.stringify({ overlaps: mid?.overlaps, overflows: mid?.overflows })}`);
+    }
+    await page.screenshot({ path: home2Shot(`lesson-ja-${view.width}x${view.height}-caption`) });
+  }
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  console.log(`ok home ${lang} ${label}`);
+}
+
+async function assertHomeLang(page) {
+  await page.evaluate(() => window.__nanoGPTSetLang("zh"));
+  await waitHome(page, true);
+  await page.click("#lang-toggle");
+  await page.waitForFunction(
+    () => document.documentElement.lang === "ja" && localStorage.getItem("nanogpt-lang") === "ja" && window.__nanoGPTHubCopy?.().soon === "準備中",
+    { timeout: 15000 },
+  );
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  await clickHubCard(page, "nanogpt");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Title" && document.documentElement.lang === "ja", { timeout: 15000 });
+  const stored = await page.evaluate(() => localStorage.getItem("nanogpt-lang"));
+  if (stored !== "ja") throw new Error(`lang dropped in tutorial ${stored}`);
+  await page.click("#home-toggle");
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Home" && document.documentElement.lang === "ja" && window.__nanoGPTHubCopy?.().home === "ホーム",
+    { timeout: 15000 },
+  );
+  await page.evaluate(() => localStorage.setItem("nanogpt-lang", "ja"));
+  const langErrors = [];
+  page.on("pageerror", (err) => langErrors.push(String(err?.message || err)));
+  await page.reload({ waitUntil: "load" });
+  try {
+    await page.waitForFunction(
+      () => window.__nanoGPTState?.().scene === "Home" && localStorage.getItem("nanogpt-lang") === "ja" && document.documentElement.lang === "ja",
+      null,
+      { timeout: 45000 },
+    );
+  } catch (err) {
+    const state = await page.evaluate(() => ({
+      href: location.href,
+      scene: window.__nanoGPTState?.()?.scene || "",
+      lang: document.documentElement.lang,
+      stored: localStorage.getItem("nanogpt-lang"),
+      jump: typeof window.__nanoGPTJump,
+      active: window.__nanoGPTGame?.scene?.getScenes?.(true)?.map((scene) => scene.sys.settings.key) || [],
+    })).catch((failure) => ({ eval: String(failure) }));
+    throw new Error(`home lang reload ${JSON.stringify({ state, langErrors })} ${err.message}`);
+  }
+}
+
+let freshSeq = 0;
+
+async function openFresh(page, url) {
+  // A hash-only goto stays on the current document. A new query forces a full load.
+  const next = new URL(url);
+  next.searchParams.set("_e2e", `${Date.now()}-${freshSeq += 1}`);
+  await page.goto(next.toString(), { waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", null, { timeout: 45000 });
+}
+
+async function assertHomeDeepLinks(page) {
+  await page.evaluate(() => sessionStorage.removeItem("nanogpt-lesson"));
+  await openFresh(page, `${BASE}#Level2/1/2`);
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}?scene=Level1&beat=2&phase=1`);
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level1" && state.beat === 2 && state.phase === 1;
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}#Level4/3/2`);
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}#Level4`);
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
+  }, null, { timeout: 30000 });
+  await openFresh(page, BASE);
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", null, { timeout: 30000 });
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 2, 1));
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level5" && state.beat === 2 && state.phase === 1;
+  }, null, { timeout: 15000 });
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home" && !location.hash && !location.search.includes("scene="), null, { timeout: 15000 });
+  console.log("ok home deeplink");
+}
+
+async function assertHomeHub(browser) {
+  mkdirSync("/opt/cursor/artifacts/home", { recursive: true });
+  mkdirSync("/opt/cursor/artifacts/home2", { recursive: true });
+  mkdirSync("/opt/cursor/artifacts/home3", { recursive: true });
+  const sizes = [
+    { label: "mobile", width: 390, height: 844, mobile: true },
+    { label: "pc1024x522", width: 1024, height: 522, mobile: false },
+    { label: "pc1024", width: 1024, height: 640, mobile: false },
+    { label: "pc1440", width: 1440, height: 900, mobile: false },
+    { label: "pc1920", width: 1920, height: 1080, mobile: false },
+  ];
+  for (const size of sizes) {
+    for (const lang of ["zh", "ja"]) {
+      const page = await browser.newPage({
+        viewport: { width: size.width, height: size.height },
+        deviceScaleFactor: 2,
+        isMobile: size.mobile,
+        hasTouch: size.mobile,
+        userAgent: size.mobile ? MOBILE_UA : undefined,
+      });
+      await page.addInitScript((next) => {
+        localStorage.setItem("nanogpt-lang", next);
+        localStorage.setItem("nanogpt-seen-guide", "1");
+        localStorage.setItem("nanogpt-game-muted", "1");
+      }, lang);
+      await ready(page);
+      await assertHomeViewport(page, size.label, lang, size.mobile);
+      if (size.label === "pc1440" && lang === "zh") await assertHomeDeepLinks(page);
+      await page.close();
+    }
+  }
+  const langPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: MOBILE_UA,
+  });
+  await langPage.addInitScript(() => {
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+  });
+  await ready(langPage);
+  await assertHomeLang(langPage);
+  await langPage.close();
+  console.log("ok home lang");
+  console.log("HOME_OK viewports=5 locales=2");
+  return { ok: true, viewports: sizes.length };
+}
+
 const live2dFit = await assertLive2dPanel(browser);
+const home = await assertHomeHub(browser);
 
 await browser.close();
 
-const summary = { mobile, pc, pc1024, speech };
+const summary = { mobile, pc, pc1024, speech, home };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
@@ -1362,7 +1692,8 @@ const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile
 const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
 const live2dOk = live2dFit?.ok === true;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk) {
+const homeOk = home?.ok === true;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -1380,6 +1711,8 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     speech,
     live2dOk,
     live2dFit,
+    homeOk,
+    home,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);

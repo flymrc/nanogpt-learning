@@ -233,8 +233,8 @@ export function watchResize(scene, { restart = false, persist } = {}) {
       if (dw < 28 && dh < 28 && !flipped) return;
       scene.registry.set("_viewSize", next);
       if (restart) {
-        persist?.();
-        scene.scene.restart();
+        const payload = persist?.();
+        scene.scene.restart(payload || undefined);
         return;
       }
       if (typeof scene.relayout === "function") {

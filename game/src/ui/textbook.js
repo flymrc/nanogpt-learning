@@ -185,7 +185,6 @@ function cardStyle(size, extra = {}) {
   return uiText(size, {
     align: "left",
     lineSpacing: 4,
-    fontFamily: '"Fredoka", "Noto Sans SC", "Noto Sans JP", "PingFang SC", sans-serif',
     ...extra,
   });
 }

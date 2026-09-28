@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import BootScene from "./scenes/BootScene.js";
+import HomeScene from "./scenes/HomeScene.js";
 import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
@@ -8,7 +9,9 @@ import Level4Scene from "./scenes/Level4Scene.js";
 import Level5Scene from "./scenes/Level5Scene.js";
 import EndScene from "./scenes/EndScene.js";
 import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
+import { JA } from "./i18n/ja.js";
 import { setLang, toggleLang } from "./i18n/locale.js";
+import { ZH } from "./i18n/zh.js";
 import { applyChromeCopy, bindVoiceNote } from "./ui/chrome.js";
 import { mountCatalog } from "./ui/catalog.js";
 import { mountGuide } from "./ui/guide.js";
@@ -55,7 +58,7 @@ const config = {
     roundPixels: false,
     powerPreference: "high-performance",
   },
-  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
+  scene: [BootScene, HomeScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
 };
 
 function applyOuterViewport() {
@@ -92,14 +95,43 @@ function applyGameSize(game) {
     canvas.style.width = `${css.w}px`;
     canvas.style.height = `${css.h}px`;
   }
+  game.scale.updateBounds();
   game.scene.getScenes(true).forEach((scene) => syncRetinaCamera(scene, css.w, css.h, dpr));
+}
+
+function fontSample(...packs) {
+  const chars = new Set();
+  for (const pack of packs) {
+    for (const value of Object.values(pack)) {
+      if (typeof value !== "string") continue;
+      for (const ch of value) {
+        if (ch.trim()) chars.add(ch);
+      }
+    }
+  }
+  return [...chars].join("");
 }
 
 async function boot() {
   if (document.fonts?.ready) {
+    const zhSample = fontSample(ZH);
+    const jaSample = fontSample(JA);
+    const both = fontSample(ZH, JA);
+    const loads = document.fonts.load
+      ? [
+          document.fonts.load('700 32px "Noto Sans JP"', jaSample),
+          document.fonts.load('500 28px "Noto Sans JP"', jaSample),
+          document.fonts.load('400 48px "ZCOOL QingKe HuangYou"', zhSample),
+          document.fonts.load('500 28px "Noto Sans SC"', both),
+          document.fonts.load('700 32px "Noto Sans SC"', both),
+          document.fonts.load('700 32px "Fredoka"', "All First"),
+          document.fonts.load('500 28px "Noto Sans Symbols 2"', "␣↵□○"),
+          document.fonts.load('500 28px "Noto Emoji"', "🍌🍎🔴🔵⭐"),
+        ]
+      : [];
     await Promise.race([
-      document.fonts.ready,
-      new Promise((resolve) => window.setTimeout(resolve, 2000)),
+      Promise.all([document.fonts.ready, ...loads]),
+      new Promise((resolve) => window.setTimeout(resolve, 8000)),
     ]);
   }
 
@@ -140,6 +172,11 @@ async function boot() {
     applyGameSize(game);
   };
   syncSize();
+  const chrome = document.getElementById("mobile-chrome");
+  if (chrome && typeof ResizeObserver !== "undefined") {
+    const observer = new ResizeObserver(() => syncSize());
+    observer.observe(chrome);
+  }
   game.scale.on("resize", () => {
     const css = cssViewportSize();
     const dpr = displayRatio();
@@ -154,7 +191,10 @@ async function boot() {
     game.registry.set("forceSpeak", true);
     const key = scene.sys.settings.key;
     if (/^Level[1-5]$/.test(key)) {
-      game.registry.set(`${key.toLowerCase()}.progress`, { beat: scene.beat || 0, phase: scene.phase || 0 });
+      const payload = { beat: scene.beat || 0, phase: scene.phase || 0 };
+      game.registry.set(`${key.toLowerCase()}.progress`, payload);
+      scene.scene.restart(payload);
+      return;
     }
     scene.scene.restart();
   };
@@ -193,7 +233,7 @@ async function boot() {
     if (typeof active.advance === "function") {
       active.advance();
     } else if (active.sys.settings.key === "Title") {
-      active.scene.start("Level1");
+      active.scene.start("Level1", { beat: 0, phase: 0 });
     } else if (active.sys.settings.key === "End") {
       active.scene.start("Title");
     }
@@ -210,13 +250,14 @@ async function boot() {
   };
 
   window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
-    if (key === "Level1") game.registry.set("level1.progress", { beat, phase });
-    if (key === "Level2") game.registry.set("level2.progress", { beat, phase });
-    if (key === "Level3") game.registry.set("level3.progress", { beat, phase });
-    if (key === "Level4") game.registry.set("level4.progress", { beat, phase });
-    if (key === "Level5") game.registry.set("level5.progress", { beat, phase });
+    const payload = { beat, phase };
+    if (key === "Level1") game.registry.set("level1.progress", payload);
+    if (key === "Level2") game.registry.set("level2.progress", payload);
+    if (key === "Level3") game.registry.set("level3.progress", payload);
+    if (key === "Level4") game.registry.set("level4.progress", payload);
+    if (key === "Level5") game.registry.set("level5.progress", payload);
     const active = game.scene.getScenes(true)[0];
-    active?.scene.start(key);
+    active?.scene.start(key, payload);
     return key;
   };
 }

@@ -47,7 +47,7 @@ export function clearPcHudStack() {
 function measurePcButtonRow() {
   const chrome = document.getElementById("pc-chrome");
   if (!chrome || chrome.hidden) return null;
-  const buttons = [...chrome.querySelectorAll("button")];
+  const buttons = [...chrome.querySelectorAll("button")].filter((btn) => !btn.hidden && btn.offsetWidth > 0);
   if (!buttons.length) return null;
   const gap = Number.parseFloat(getComputedStyle(chrome).columnGap) || 8;
   let width = 0;
@@ -257,14 +257,26 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
   container.setData("height", h);
   container.setData("shadow", true);
 
+  let labelSize = opts.fontSize ?? scaled(scene, 26);
   const text = scene.add
-    .text(0, caption ? -12 : -2, label, displayText(opts.fontSize ?? scaled(scene, 26), { color: opts.textColor ?? C.text }))
+    .text(0, caption ? -12 : -2, label, displayText(labelSize, { color: opts.textColor ?? C.text }))
     .setOrigin(0.5);
+  while (text.width > w - 18 && labelSize > 11) {
+    labelSize -= 1;
+    text.setFontSize(labelSize);
+  }
   const cap = caption
     ? scene.add
         .text(0, 16, caption, uiText(opts.captionSize ?? 14, { color: opts.captionColor ?? C.muted }))
         .setOrigin(0.5)
     : null;
+  if (cap) {
+    let capSize = opts.captionSize ?? 14;
+    while (cap.width > w - 18 && capSize > 10) {
+      capSize -= 1;
+      cap.setFontSize(capSize);
+    }
+  }
 
   container.add(cap ? [bg, text, cap] : [bg, text]);
   container.setSize(w, h);
@@ -722,9 +734,10 @@ export function rowPositions(count, y, tile, gap, viewW = 1280) {
 export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
   const stroke = opts.stroke ?? C.stroke;
   const sw = opts.lineWidth ?? 6;
+  const shadowScale = opts.shadowScale > 0 ? opts.shadowScale : 1;
   if (opts.shadow !== false) {
     g.fillStyle(C.stroke, 0.2);
-    g.fillRoundedRect(x + STICKER_SHADOW_X, y + STICKER_SHADOW_Y, w, h, r);
+    g.fillRoundedRect(x + STICKER_SHADOW_X * shadowScale, y + STICKER_SHADOW_Y * shadowScale, w, h, r);
   }
   g.fillStyle(fill, 1);
   g.lineStyle(sw, stroke, 1);

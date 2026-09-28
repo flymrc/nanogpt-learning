@@ -1,7 +1,8 @@
 import { t } from "../i18n/locale.js";
 import { isPcLayout } from "./mode.js";
 
-const HUD_IDS = ["back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
+const HUD_IDS = ["home-toggle", "back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
+const LESSON_CHROME = ["back-toggle", "catalog-toggle", "pseudo-toggle", "book-toggle", "notes-toggle"];
 
 export function applyChromeCopy() {
   const pc = isPcLayout();
@@ -13,6 +14,7 @@ export function applyChromeCopy() {
     el.title = label;
     el.setAttribute("aria-label", label);
   };
+  set("home-toggle", t("hub.home"));
   set("back-toggle", t("back"));
   set("catalog-toggle", t("catalog"));
   set("lang-toggle", pc ? t("lang") : t("langShort"), t("lang"));
@@ -56,6 +58,18 @@ export function applyChromeCopy() {
   return HUD_IDS;
 }
 
+/** Lesson tools stay in the tutorial. Home keeps language and mute. */
+export function syncHubChrome(sceneKey) {
+  document.documentElement.dataset.scene = sceneKey === "Home" ? "home" : "lesson";
+  const lesson = Boolean(sceneKey) && sceneKey !== "Home" && sceneKey !== "Boot";
+  for (const id of LESSON_CHROME) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !lesson;
+  }
+  const home = document.getElementById("home-toggle");
+  if (home) home.hidden = !lesson;
+}
+
 export function bindVoiceNote() {
   const note = document.getElementById("voice-note");
   if (!note || note.dataset.bound === "1") return;
@@ -71,13 +85,49 @@ export function bindVoiceNote() {
     }
     return line;
   };
+  const reflowCaption = (line) => {
+    const note = line?.parentElement;
+    if (!line) return;
+    const words = [...line.querySelectorAll(".voice-word")];
+    for (const word of words) word.classList.remove("is-breakable");
+    const limit = line.clientWidth || note?.clientWidth || 0;
+    if (limit < 8) return;
+    const lineOverflow = line.scrollWidth > limit + 1;
+    const noteOverflow = Boolean(note) && note.scrollWidth > note.clientWidth + 1;
+    if (!lineOverflow && !noteOverflow) return;
+    for (const word of words) {
+      const range = document.createRange();
+      range.selectNodeContents(word);
+      if (range.getBoundingClientRect().width > limit - 1) word.classList.add("is-breakable");
+    }
+  };
+  const fillLine = (line, shown) => {
+    line.replaceChildren();
+    for (const part of String(shown).split(/(\s+)/)) {
+      if (!part) continue;
+      if (/^\s+$/.test(part)) {
+        line.appendChild(document.createTextNode(part));
+        continue;
+      }
+      const word = document.createElement("span");
+      word.className = "voice-word";
+      word.textContent = part;
+      line.appendChild(word);
+    }
+    reflowCaption(line);
+  };
+  window.__nanoGPTReflowCaption = () => {
+    const line = document.getElementById("voice-line");
+    if (line) reflowCaption(line);
+  };
+  window.addEventListener("resize", () => window.__nanoGPTReflowCaption?.());
   window.addEventListener("nanogpt-narration", (event) => {
     const detail = event.detail || {};
     const text = String(detail.text || "").replace(/\s+/g, " ").trim();
     const ja = String(detail.lang || "").toLowerCase().startsWith("ja");
     const line = lineOf();
     if (!text) {
-      line.textContent = t("voiceIdle");
+      fillLine(line, t("voiceIdle"));
       note.classList.remove("is-missing");
       note.dataset.missing = "";
       note.dataset.live = "";
@@ -87,7 +137,7 @@ export function bindVoiceNote() {
     }
     const prefix = detail.kind === "pseudo" ? t("voicePseudo") : t("voiceBeat");
     const shown = `${prefix}${text}`;
-    line.textContent = shown;
+    fillLine(line, shown);
     note.dataset.live = "1";
     note.dataset.lang = detail.lang || "";
     note.dataset.source = detail.source || "";
@@ -105,6 +155,6 @@ export function bindVoiceNote() {
     note.removeAttribute("aria-label");
   });
   window.addEventListener("nanogpt-lang", () => {
-    if (!note.dataset.live) lineOf().textContent = t("voiceIdle");
+    if (!note.dataset.live) fillLine(lineOf(), t("voiceIdle"));
   });
 }

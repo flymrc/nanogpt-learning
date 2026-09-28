@@ -23,6 +23,26 @@ export function sceneProgressKey(sceneKey) {
   return null;
 }
 
+/**
+ * Beat to open. Scene start data wins over the registry: a second queued
+ * start() does not carry the registry value the first create() already removed,
+ * but Phaser keeps the data object from the start that is actually running.
+ */
+export function takeSceneProgress(scene, registryKey, maxBeat) {
+  const data = scene.sys?.settings?.data;
+  const fromData = data && Number.isFinite(Number(data.beat))
+    ? { beat: Number(data.beat), phase: Number(data.phase) || 0 }
+    : null;
+  const fromReg = scene.registry.get(registryKey);
+  if (fromReg) scene.registry.remove(registryKey);
+  const saved = fromData || fromReg;
+  if (!saved) return null;
+  return {
+    beat: Math.min(maxBeat, Math.max(0, Number(saved.beat) || 0)),
+    phase: Math.min(PHASE_COUNT - 1, Math.max(0, Number(saved.phase) || 0)),
+  };
+}
+
 export function activeScene() {
   return window.__nanoGPTGame?.scene?.getScenes?.(true)?.[0] || null;
 }
@@ -31,12 +51,13 @@ export function goScene(from, key, progress) {
   const scene = from || activeScene();
   if (!scene) return;
   const store = sceneProgressKey(key);
+  const payload = progress || (store ? { beat: 0, phase: 0 } : undefined);
   if (store) {
-    if (progress) scene.registry.set(store, progress);
+    if (progress) scene.registry.set(store, payload);
     else scene.registry.remove(store);
   }
   unlockAudio(scene);
-  scene.scene.start(key);
+  scene.scene.start(key, payload);
 }
 
 export function mountCatalog() {
@@ -60,6 +81,11 @@ export function mountCatalog() {
     event.preventDefault();
     event.stopPropagation();
     goBack();
+  });
+  document.getElementById("home-toggle")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    goHub();
   });
   close?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -114,6 +140,7 @@ export function mountCatalog() {
   window.__nanoGPTCatalog = () => chapterList();
   window.__nanoGPTPickChapter = (id) => pickChapter(id);
   window.__nanoGPTBack = () => goBack();
+  window.__nanoGPTHub = () => goHub();
   window.__nanoGPTHome = () => {
     const scene = activeScene();
     if (!scene) return;
@@ -244,6 +271,15 @@ export function pickChapter(id) {
   closeCatalog();
   closeChapterSheet();
   goScene(scene, chapter.scene, null);
+}
+
+export function goHub() {
+  const scene = activeScene();
+  if (!scene) return;
+  closeCatalog();
+  closeChapterSheet();
+  if (scene.sys.settings.key === "Home") return;
+  scene.scene.start("Home");
 }
 
 export function goBack() {
