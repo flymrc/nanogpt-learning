@@ -1457,37 +1457,44 @@ async function assertHomeLang(page) {
   );
 }
 
+async function openFresh(page, url) {
+  // A hash-only goto stays on the current document. Deep links are full loads.
+  await page.goto(url, { waitUntil: "commit", timeout: 60000 });
+  await page.reload({ waitUntil: "load", timeout: 60000 });
+  await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", null, { timeout: 45000 });
+}
+
 async function assertHomeDeepLinks(page) {
   await page.evaluate(() => sessionStorage.removeItem("nanogpt-lesson"));
-  await page.goto(`${BASE}#Level2/1/2`, { waitUntil: "load" });
+  await openFresh(page, `${BASE}#Level2/1/2`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
-  }, { timeout: 20000 });
-  await page.goto(`${BASE}?scene=Level1&beat=2&phase=1`, { waitUntil: "load" });
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}?scene=Level1&beat=2&phase=1`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level1" && state.beat === 2 && state.phase === 1;
-  }, { timeout: 20000 });
-  await page.goto(`${BASE}#Level4/3/2`, { waitUntil: "load" });
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}#Level4/3/2`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
-  }, { timeout: 20000 });
-  await page.goto(`${BASE}#Level4`, { waitUntil: "load" });
+  }, null, { timeout: 30000 });
+  await openFresh(page, `${BASE}#Level4`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
-  }, { timeout: 20000 });
-  await page.goto(BASE, { waitUntil: "load" });
-  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 20000 });
+  }, null, { timeout: 30000 });
+  await openFresh(page, BASE);
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", null, { timeout: 30000 });
   await page.evaluate(() => window.__nanoGPTJump("Level5", 2, 1));
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level5" && state.beat === 2 && state.phase === 1;
-  }, { timeout: 15000 });
+  }, null, { timeout: 15000 });
   await page.click("#home-toggle");
-  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home" && !location.hash && !location.search.includes("scene="), { timeout: 15000 });
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home" && !location.hash && !location.search.includes("scene="), null, { timeout: 15000 });
   console.log("ok home deeplink");
 }
 
