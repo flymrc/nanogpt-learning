@@ -931,7 +931,11 @@ html.is-pc[data-scene="home"] .voice-note {
   width: max-content;
   height: auto;
   line-height: 1.35;
-  padding: 4px 10px;
+  left: calc(16px * var(--hub-scale, 1));
+  bottom: calc(10px * var(--hub-scale, 1));
+  font-size: calc(12px * var(--hub-scale, 1));
+  padding: calc(4px * var(--hub-scale, 1)) calc(10px * var(--hub-scale, 1));
+  border-radius: calc(8px * var(--hub-scale, 1));
 }
 
 .sheet-overlay {

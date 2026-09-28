@@ -1386,6 +1386,19 @@ function home2Shot(name) {
   return `/opt/cursor/artifacts/home2/${name}.png`;
 }
 
+const HOME3_SHOTS = new Set([
+  "zh-1440x900",
+  "ja-1440x900",
+  "zh-1920x1080",
+  "ja-1920x1080",
+  "zh-1024x640",
+  "ja-390x844",
+]);
+
+function home3Shot(lang, width, height) {
+  return `/opt/cursor/artifacts/home3/home-${lang}-${width}x${height}.png`;
+}
+
 async function waitHome(page, mobile) {
   await page.waitForFunction(
     () => window.__nanoGPTState?.().scene === "Home" && typeof window.__nanoGPTAssertLayout === "function",
@@ -1418,6 +1431,9 @@ async function assertHomeViewport(page, label, lang, mobile) {
   await page.screenshot({ path: homeShot(lang, viewNow.width, viewNow.height) });
   if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 1920 && viewNow.height === 1080)) {
     await page.screenshot({ path: home2Shot(`home-${lang}-${viewNow.width}x${viewNow.height}`) });
+  }
+  if (HOME3_SHOTS.has(`${lang}-${viewNow.width}x${viewNow.height}`)) {
+    await page.screenshot({ path: home3Shot(lang, viewNow.width, viewNow.height) });
   }
   if (!mobile && viewNow.height >= 900) {
     const cardH = await page.evaluate(() => {
@@ -1568,6 +1584,7 @@ async function assertHomeDeepLinks(page) {
 async function assertHomeHub(browser) {
   mkdirSync("/opt/cursor/artifacts/home", { recursive: true });
   mkdirSync("/opt/cursor/artifacts/home2", { recursive: true });
+  mkdirSync("/opt/cursor/artifacts/home3", { recursive: true });
   const sizes = [
     { label: "mobile", width: 390, height: 844, mobile: true },
     { label: "pc1024x522", width: 1024, height: 522, mobile: false },

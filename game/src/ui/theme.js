@@ -148,11 +148,60 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
   return wrapped;
 }
 
-/** Lines that are a single leftover character after a wrap. A one-character string is not an orphan. */
+/** Punctuation does not count toward the visible length of a wrapped line. */
+function visibleCount(line) {
+  let count = 0;
+  for (const ch of String(line ?? "")) {
+    if (/\s/u.test(ch) || /\p{P}/u.test(ch)) continue;
+    count += 1;
+  }
+  return count;
+}
+
+/**
+ * Lines left over after a wrap. A one-character string is not an orphan.
+ * Any raw one-character line is. The last line is also an orphan when it
+ * has ≤2 visible characters (punctuation counts toward nothing), such as 「字。」.
+ */
 export function orphanLines(body) {
   const lines = String(body ?? "").split("\n");
   if (lines.length < 2) return [];
-  return lines.filter((line) => [...line.replace(/\s+/g, "")].length === 1);
+  const hits = [];
+  lines.forEach((line, index) => {
+    const compact = [...line.replace(/\s+/g, "")];
+    if (compact.length === 1 || (index === lines.length - 1 && visibleCount(line) <= 2)) hits.push(line);
+  });
+  return hits;
+}
+
+/** Pull glyphs onto a short last line until it is no longer an orphan, or the width runs out. */
+function rebalanceTail(lines, widthOf, maxWidth) {
+  const out = lines.slice();
+  let guard = 0;
+  while (out.length >= 2 && guard < 40) {
+    guard += 1;
+    const lastIdx = out.length - 1;
+    const last = out[lastIdx];
+    if (!last) break;
+    const compact = [...String(last).replace(/\s+/g, "")];
+    if (visibleCount(last) > 2 && compact.length !== 1) break;
+    const prevChars = [...out[lastIdx - 1]];
+    while (prevChars.length && /\s/u.test(prevChars[prevChars.length - 1])) prevChars.pop();
+    if (prevChars.length <= 1) break;
+    const moved = prevChars.pop();
+    while (prevChars.length && /\s/u.test(prevChars[prevChars.length - 1])) prevChars.pop();
+    const nextPrev = prevChars.join("");
+    const nextLast = `${moved}${String(last).replace(/^\s+/u, "")}`;
+    if (widthOf && widthOf(nextLast) > maxWidth) break;
+    if (!nextPrev) {
+      out.splice(lastIdx - 1, 1);
+      out[out.length - 1] = nextLast;
+      continue;
+    }
+    out[lastIdx - 1] = nextPrev;
+    out[lastIdx] = nextLast;
+  }
+  return out;
 }
 
 /**
@@ -207,7 +256,14 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText) {
     }
     lines.push(current);
   }
-  const wrapped = applyKinsoku(lines, widthOf, maxWidth).join("\n");
+  let next = applyKinsoku(lines, widthOf, maxWidth);
+  for (let pass = 0; pass < 3; pass += 1) {
+    const balanced = rebalanceTail(next, widthOf, maxWidth);
+    next = applyKinsoku(balanced, widthOf, maxWidth);
+    if (!orphanLines(next.join("\n")).length) break;
+    if (balanced.join("\n") === next.join("\n")) break;
+  }
+  const wrapped = next.join("\n");
   probe.destroy();
   return wrapped;
 }

@@ -734,9 +734,10 @@ export function rowPositions(count, y, tile, gap, viewW = 1280) {
 export function drawSticker(g, x, y, w, h, r, fill, opts = {}) {
   const stroke = opts.stroke ?? C.stroke;
   const sw = opts.lineWidth ?? 6;
+  const shadowScale = opts.shadowScale > 0 ? opts.shadowScale : 1;
   if (opts.shadow !== false) {
     g.fillStyle(C.stroke, 0.2);
-    g.fillRoundedRect(x + STICKER_SHADOW_X, y + STICKER_SHADOW_Y, w, h, r);
+    g.fillRoundedRect(x + STICKER_SHADOW_X * shadowScale, y + STICKER_SHADOW_Y * shadowScale, w, h, r);
   }
   g.fillStyle(fill, 1);
   g.lineStyle(sw, stroke, 1);

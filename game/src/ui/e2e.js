@@ -1,5 +1,6 @@
 import { isWidePcTutor } from "../tutor/bus.js";
 import { CAPTION_CLEAR, MIN_CHIP_H, MIN_CHIP_W, MIN_ID_FONT, STICKER_SHADOW_X, STICKER_SHADOW_Y } from "./layout.js";
+import { orphanLines } from "./theme.js";
 
 const PAD = 2;
 const PIECE_KINDS = new Set(["tile", "chip", "placeholder", "card", "hub-card"]);
@@ -899,7 +900,8 @@ function collectTopBarHits() {
 }
 
 /**
- * Home copy: one font per string, no one-character wrap, caption fully visible,
+ * Home copy: one font per string, no short last line on the title or description,
+ * button text inside its pill with padding, caption fully visible,
  * and the mobile chrome does not repeat the page title.
  */
 function collectHomeCopyHits(scene, origin) {
@@ -916,7 +918,11 @@ function collectHomeCopyHits(scene, origin) {
         (obj.list || []).forEach(walk);
         return;
       }
-      for (const line of orphanLinesFrom(body)) hits.push(["orphan-line", role, line]);
+      for (const line of orphanLines(body)) hits.push(["orphan-line", role, line]);
+      if (role === "card-action") {
+        const pillHit = pillPaddingHit(obj, origin);
+        if (pillHit) hits.push(pillHit);
+      }
       const covered = familyGlyphs(family, body);
       if (!covered.ok) {
         const sample = covered.missing.slice(0, 8).join("");
@@ -993,10 +999,31 @@ function collectHomeCopyHits(scene, origin) {
   return hits;
 }
 
-function orphanLinesFrom(body) {
-  const lines = String(body || "").split("\n");
-  if (lines.length < 2) return [];
-  return lines.filter((line) => [...line.replace(/\s+/g, "")].length === 1);
+/** Button label must sit inside its pill with padding on every side. */
+function pillPaddingHit(obj, origin) {
+  const pill = obj.getData?.("pill");
+  const id = obj.getData?.("cardId") || "action";
+  if (!pill || !(pill.w > 0) || !(pill.h > 0)) return ["pill-text", id, "missing"];
+  const parent = obj.parentContainer;
+  const m = parent?.getWorldTransformMatrix?.();
+  if (!m) return ["pill-text", id, "missing"];
+  const x = m.tx + pill.x * m.a + pill.y * m.c;
+  const y = m.ty + pill.x * m.b + pill.y * m.d;
+  const scaleX = Math.hypot(m.a, m.b) || 1;
+  const scaleY = Math.hypot(m.c, m.d) || 1;
+  const box = { x: origin.x + x, y: origin.y + y, w: pill.w * scaleX, h: pill.h * scaleY };
+  const b = obj.getBounds?.();
+  if (!b || b.width < 2 || b.height < 2) return ["pill-text", id, "missing"];
+  const text = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
+  const padX = 4;
+  const padY = 2;
+  const inside =
+    text.x >= box.x + padX - 0.75 &&
+    text.y >= box.y + padY - 0.75 &&
+    text.x + text.w <= box.x + box.w - padX + 0.75 &&
+    text.y + text.h <= box.y + box.h - padY + 0.75;
+  if (inside) return null;
+  return ["pill-text", id, Math.round(text.x - box.x), Math.round(box.x + box.w - (text.x + text.w)), Math.round(text.y - box.y), Math.round(box.y + box.h - (text.y + text.h))];
 }
 
 function collectOrphanOverlays(scene) {

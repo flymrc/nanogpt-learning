@@ -34,15 +34,28 @@ export default class HomeScene extends Phaser.Scene {
     if (phone) syncMobileChrome({ title: t("hub.title") });
     addMuteToggle(this);
     watchResize(this, { restart: true });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      document.documentElement.style.setProperty("--hub-scale", "1");
+    });
 
     narrateLine(this, t("hub.intro"), "beat");
-    const voicePad = measureVoicePad();
+    document.documentElement.style.setProperty("--hub-scale", "1");
     const titleProbe = fitBlock(this, t("hub.title"), v.innerW - 8, phone ? 96 : 80, phone ? 34 : 46, 20, hubDisplay);
     const introProbe = fitBlock(this, t("hub.intro"), v.innerW - 8, phone ? 72 : 56, phone ? 18 : 20, 13, (size) => hubUi(size, { color: C.muted }));
-    const plan = layoutHub(v, shell.content.top, shell.content.bottom - voicePad, TUTORIALS.length, {
+    const blocks = {
       titleH: titleProbe.height + 10,
       introH: introProbe.height + 6,
-    });
+    };
+    let voicePad = measureVoicePad();
+    let plan = layoutHub(v, shell.content.top, shell.content.bottom - voicePad, TUTORIALS.length, blocks);
+    for (let pass = 0; pass < 3; pass += 1) {
+      const nextScale = plan.scale > 1.001 ? plan.scale.toFixed(3) : "1";
+      document.documentElement.style.setProperty("--hub-scale", nextScale);
+      const grown = measureVoicePad();
+      if (Math.abs(grown - voicePad) <= 1) break;
+      voicePad = grown;
+      plan = layoutHub(v, shell.content.top, shell.content.bottom - voicePad, TUTORIALS.length, blocks);
+    }
     const titleFit = fitBlock(this, t("hub.title"), v.innerW - 8, Math.max(28, plan.slots.title.h - 2), plan.titleSize, 18, hubDisplay);
     const title = this.add
       .text(v.cx, plan.slots.title.cy, titleFit.body, hubDisplay(titleFit.size))
@@ -51,12 +64,13 @@ export default class HomeScene extends Phaser.Scene {
     title.setData("kind", "caption");
     title.setData("hubRole", "title");
 
+    const subSize = plan.scale > 1.001 ? Math.round((phone ? 18 : 20) * plan.scale) : phone ? 18 : 20;
     const introFit = fitBlock(
       this,
       t("hub.intro"),
       v.innerW - 8,
       Math.max(22, plan.slots.intro.h - 2),
-      phone ? 18 : 20,
+      subSize,
       13,
       (size) => hubUi(size, { color: C.muted }),
     );
@@ -105,12 +119,18 @@ function hubUi(size, extra = {}) {
   return uiText(size, { lineSpacing: 2, ...extra });
 }
 
+/** Row width of the 1024×640 home (two cards + the 16px gap). Larger screens zoom that row. */
+const REF_ROW = 757;
+const REF_CARD_W = (REF_ROW - 16) / 2;
+const REF_CARD_H = 210;
+
 function layoutHub(v, top, bottom, count, blocks) {
   const cols = v.innerW >= 720 ? Math.min(2, Math.max(1, count)) : 1;
   const rows = Math.ceil(count / Math.max(1, cols));
   const gap = 16;
   const cardGap = 16;
   const available = Math.max(120, bottom - top);
+  const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
   const measure = (s) => {
     const titleSize = Math.round(Math.min(92, (v.portrait ? 34 : 48) * s));
     const titleH = Math.max(32, Math.round(blocks.titleH * s));
@@ -123,18 +143,55 @@ function layoutHub(v, top, bottom, count, blocks) {
       { id: "cards", h: cardsH },
     ];
     const raw = titleH + introH + cardsH + gap * 2;
-    const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
     const cardW = (rowBudget - cardGap * (cols - 1)) / cols;
     return { h: raw, items, gap, cardH, cardW, cardGap, cols, rows, titleSize };
   };
+  const zoomMeasure = (s) => {
+    const zoomGap = 16 * s;
+    const titleSize = Math.round(48 * s);
+    const titleH = Math.round(blocks.titleH * s);
+    const introH = Math.round(blocks.introH * s);
+    const cardH = REF_CARD_H * s;
+    const cardW = REF_CARD_W * s;
+    const cardsH = rows * cardH + (rows - 1) * zoomGap;
+    const items = [
+      { id: "title", h: titleH },
+      { id: "intro", h: introH },
+      { id: "cards", h: cardsH },
+    ];
+    const raw = titleH + introH + cardsH + zoomGap * 2;
+    return { h: raw, items, gap: zoomGap, cardH, cardW, cardGap: zoomGap, cols, rows, titleSize };
+  };
   const base = measure(1);
-  // The lesson column can be nearly square on a wide screen (1160×1080) and
-  // still have a short stack floating in the middle. Grow on that PC area.
-  const roomy = v.w >= 700 && v.h >= 800 && base.h + 80 < available;
-  const cap = roomy ? Math.min(2.45, (base.h + (available - base.h) * 0.9) / Math.max(1, base.h)) : 1;
+  // Wide PC with two cards. A nearly square lesson (1920×1080) is still this
+  // row, not the phone stack. 390, 1024×522, and 1024×640 stay on measure(1).
+  const roomy = cols === 2 && v.w >= 700 && v.h >= 800 && base.h + 80 < available;
+  const place = (chosen) => {
+    const stacked = stackSlots(chosen.items, {
+      top,
+      bottom,
+      gap: chosen.gap,
+      justify: "center",
+    });
+    return { ...chosen, slots: stacked.slots };
+  };
+  if (roomy) {
+    const unit = zoomMeasure(1).h;
+    let s = Math.min(1.85, rowBudget / REF_ROW, available / Math.max(1, unit));
+    if (s > 1.001) {
+      let chosen = zoomMeasure(s);
+      let guard = 0;
+      while (chosen.h > available + 1 && s > 1.001 && guard < 6) {
+        s *= available / chosen.h;
+        chosen = zoomMeasure(s);
+        guard += 1;
+      }
+      if (s > 1.001 && chosen.h <= available + 1) return place({ ...chosen, scale: s });
+    }
+  }
   let chosen = null;
   for (let i = 0; i <= 48; i += 1) {
-    const s = cap - ((cap - 0.58) * i) / 48;
+    const s = 1 - ((1 - 0.58) * i) / 48;
     const plan = measure(s);
     if (plan.h <= available + 1) {
       chosen = { ...plan, scale: s };
@@ -142,13 +199,7 @@ function layoutHub(v, top, bottom, count, blocks) {
     }
   }
   if (!chosen) chosen = { ...measure(0.58), scale: 0.58 };
-  const stacked = stackSlots(chosen.items, {
-    top,
-    bottom,
-    gap: chosen.gap,
-    justify: "center",
-  });
-  return { ...chosen, slots: stacked.slots };
+  return place(chosen);
 }
 
 function fitLine(scene, str, maxW, size, min, styleFn) {
@@ -180,72 +231,90 @@ function fitBlock(scene, str, maxW, maxH, size, min, styleFn) {
 
 function buildCard(scene, spec, x, y, w, h, scale = 1) {
   const enabled = spec.status === "ready";
+  const u = scale > 1.001 ? scale : 1;
+  const px = (n) => (u === 1 ? n : n * u);
+  const font = (n) => (u === 1 ? n : Math.max(1, Math.round(n * u)));
   const card = scene.add.container(x, y);
   const plate = scene.add.graphics();
-  drawSticker(plate, -w / 2, -h / 2, w, h, 22, enabled ? C.surface : 0xfff4e4, { shadow: true, lineWidth: 6 });
+  drawSticker(plate, -w / 2, -h / 2, w, h, px(22), enabled ? C.surface : 0xfff4e4, {
+    shadow: true,
+    lineWidth: font(6),
+    shadowScale: u,
+  });
   card.add(plate);
-  const stripe = scene.add.rectangle(-w / 2 + 12, 0, 8, Math.max(24, h - 36), enabled ? C.coral : C.gold).setOrigin(0.5);
+  const stripe = scene.add.rectangle(-w / 2 + px(12), 0, px(8), Math.max(px(24), h - px(36)), enabled ? C.coral : C.gold).setOrigin(0.5);
   card.add(stripe);
 
-  const pad = 12;
+  const pad = px(12);
   const side = w >= 300 && h >= 148;
   const innerTop = -h / 2 + pad;
   const innerBottom = h / 2 - pad;
-  const innerLeft = -w / 2 + 22;
+  const innerLeft = -w / 2 + px(22);
   const innerRight = w / 2 - pad;
-  const columnH = Math.max(48, innerBottom - innerTop);
-  const columnW = Math.max(80, innerRight - innerLeft);
-  const artH = side ? columnH : Math.round(Math.min(columnH * 0.46, 112));
-  const artW = side ? Math.round(Math.min(artH * 0.98, columnW * 0.46, 168)) : columnW;
+  const columnH = Math.max(px(48), innerBottom - innerTop);
+  const columnW = Math.max(px(80), innerRight - innerLeft);
+  const artH = side ? columnH : Math.round(Math.min(columnH * 0.46, px(112)));
+  const artW = side ? Math.round(Math.min(artH * 0.98, columnW * 0.46, px(168))) : columnW;
   const art = {
     x: innerLeft,
     y: innerTop,
     w: artW,
     h: artH,
   };
-  if (spec.art === "desk") drawHotelDesk(card, art);
-  else drawTapeArt(scene, card, art, spec.id);
 
-  const textX = side ? art.x + art.w + 12 : innerLeft;
+  const textGap = px(side ? 12 : 8);
+  const textX = side ? art.x + art.w + px(12) : innerLeft;
   const textRight = innerRight;
-  const textW = Math.max(72, textRight - textX);
-  const textTop = side ? innerTop : art.y + art.h + 8;
-  const columnTextH = Math.max(36, innerBottom - textTop);
-  const actionH = 30;
-  const room = Math.max(24, columnTextH - actionH - 14);
-  const typeScale = Math.max(1, Math.min(1.85, scale));
-  const titleStart = Math.round((textW > 210 ? 30 : side ? 24 : 22) * typeScale);
-  const titleFit = fitBlock(scene, t(spec.titleKey), textW, Math.max(18, Math.floor(room * 0.62)), titleStart, 13, hubDisplay);
-  const blurbMax = Math.max(16, room - titleFit.height);
-  const blurbStart = Math.round((textW > 210 ? 18 : 16) * typeScale);
-  const blurbFit = fitBlock(scene, t(spec.blurbKey), textW, blurbMax, blurbStart, 12, (size) => hubUi(size, { color: C.muted }));
+  const textW = Math.max(px(72), textRight - textX);
+  const titleBlurbGap = px(6);
+  const blurbActionGap = px(8);
+  const titleBase = textW > px(210) ? 30 : side ? 24 : 22;
+  const blurbBase = textW > px(210) ? 18 : 16;
+  const padX = Math.round(11 * u);
+  const padY = Math.round(4 * u);
+  const action = t(spec.actionKey);
+  let actionSize = fitLine(scene, action, Math.max(px(48), textW - padX * 2), font(16), 12, (size) => hubUi(size, { color: C.textDark }));
+  const actionText = scene.add.text(0, 0, action, hubUi(actionSize)).setOrigin(0, 0.5);
+  while (actionText.width + padX * 2 > textW + 0.5 && actionSize > 12) {
+    actionSize -= 1;
+    actionText.setFontSize(actionSize);
+  }
+  const badgeW = Math.max(Math.round(72 * u), actionText.width + padX * 2);
+  const badgeH = Math.max(Math.round(28 * u), actionText.height + padY * 2);
+  const actionSlot = Math.max(px(30), badgeH);
+  const textTop0 = side ? innerTop : art.y + art.h + textGap;
+  const columnTextH = Math.max(px(36), innerBottom - textTop0);
+  const room = Math.max(px(24), columnTextH - actionSlot - px(14));
+  const titleFit = fitBlock(scene, t(spec.titleKey), textW, Math.max(font(18), room * 0.62), font(titleBase), 13, hubDisplay);
+  const blurbMax = Math.max(font(16), room - titleFit.height);
+  const blurbFit = fitBlock(scene, t(spec.blurbKey), textW, blurbMax, font(blurbBase), 12, (size) => hubUi(size, { color: C.muted }));
+  const blockH = titleFit.height + titleBlurbGap + blurbFit.height + blurbActionGap + actionSlot;
+  const groupH = side ? Math.max(art.h, blockH) : art.h + textGap + blockH;
+  const slack = Math.max(0, columnH - groupH);
+  const contentTop = innerTop + slack / 2;
+  art.y = contentTop + (side ? Math.max(0, (Math.max(art.h, blockH) - art.h) / 2) : 0);
+  if (spec.art === "desk") drawHotelDesk(card, art, u);
+  else drawTapeArt(scene, card, art, spec.id, u);
+  const textTop = side ? contentTop + Math.max(0, (Math.max(art.h, blockH) - blockH) / 2) : art.y + art.h + textGap;
   const title = scene.add.text(textX, textTop, titleFit.body, hubDisplay(titleFit.size)).setOrigin(0, 0);
   tagText(title, spec.id, "card-title");
   card.add(title);
+  const blurbTop = textTop + title.height + titleBlurbGap;
   const blurb = scene.add
-    .text(textX, textTop, blurbFit.body, hubUi(blurbFit.size, { color: C.muted }))
+    .text(textX, blurbTop, blurbFit.body, hubUi(blurbFit.size, { color: C.muted }))
     .setOrigin(0, 0);
   tagText(blurb, spec.id, "card-desc");
   card.add(blurb);
-  const blockH = title.height + 6 + blurb.height + 8 + actionH;
-  const blockTop = textTop + Math.max(0, (columnTextH - blockH) / 2);
-  title.setY(blockTop);
-  const blurbTop = blockTop + title.height + 6;
-  blurb.setY(blurbTop);
-
-  const action = t(spec.actionKey);
-  const actionSize = fitLine(scene, action, textW - 8, Math.round(16 * typeScale), 12, (size) => hubUi(size, { color: C.textDark }));
-  const actionText = scene.add.text(0, 0, action, hubUi(actionSize)).setOrigin(0, 0.5);
-  const badgeW = Math.min(textW, Math.max(72, actionText.width + 22));
-  const badgeH = 28;
   const badgeX = textX;
-  const badgeY = blurbTop + blurb.height + 8;
+  const badgeY = blurbTop + blurb.height + blurbActionGap + Math.max(0, (actionSlot - badgeH) / 2);
   const badge = scene.add.graphics();
-  drawSticker(badge, badgeX, badgeY, badgeW, badgeH, 10, enabled ? C.coral : C.gold, { shadow: false, lineWidth: 4 });
+  drawSticker(badge, badgeX, badgeY, badgeW, badgeH, px(10), enabled ? C.coral : C.gold, { shadow: false, lineWidth: font(4) });
   card.add(badge);
   actionText.setPosition(badgeX + (badgeW - actionText.width) / 2, badgeY + badgeH / 2);
+  actionText.setData("pill", { x: badgeX, y: badgeY, w: badgeW, h: badgeH });
   tagText(actionText, spec.id, "card-action");
   card.add(actionText);
+  card.bringToTop(actionText);
 
   card.setSize(w, h);
   card.setData("kind", "hub-card");
@@ -296,64 +365,68 @@ function tagText(obj, cardId, hubRole = "letter") {
   obj.setData("hubRole", hubRole);
 }
 
-function drawHotelDesk(card, art) {
+function drawHotelDesk(card, art, unit = 1) {
+  const u = unit > 1.001 ? unit : 1;
+  const px = (n) => (u === 1 ? n : n * u);
   const g = card.scene.add.graphics();
   const { x, y, w, h } = art;
   g.fillStyle(0xb7e4ff, 1);
-  g.fillRoundedRect(x + 4, y + 4, w - 8, h * 0.34, 8);
+  g.fillRoundedRect(x + px(4), y + px(4), w - px(8), h * 0.34, px(8));
   g.fillStyle(0xff7a85, 1);
-  g.fillRoundedRect(x + 2, y + 2, w - 4, Math.max(12, h * 0.16), 6);
+  g.fillRoundedRect(x + px(2), y + px(2), w - px(4), Math.max(px(12), h * 0.16), px(6));
   g.fillStyle(0xfff1d2, 1);
-  g.fillRoundedRect(x + 6, y + h * 0.22, w - 12, h * 0.28, 4);
+  g.fillRoundedRect(x + px(6), y + h * 0.22, w - px(12), h * 0.28, px(4));
   g.fillStyle(0xc9843a, 1);
-  g.fillRoundedRect(x, y + h * 0.55, w, h * 0.4, 8);
+  g.fillRoundedRect(x, y + h * 0.55, w, h * 0.4, px(8));
   g.fillStyle(0xe7b15d, 1);
-  g.fillRoundedRect(x + 6, y + h * 0.68, w - 12, Math.max(8, h * 0.1), 4);
-  const bellR = Math.max(6, Math.min(w, h) * 0.1);
+  g.fillRoundedRect(x + px(6), y + h * 0.68, w - px(12), Math.max(px(8), h * 0.1), px(4));
+  const bellR = Math.max(px(6), Math.min(w, h) * 0.1);
   g.fillStyle(0xffc43d, 1);
   g.fillCircle(x + w * 0.3, y + h * 0.52, bellR);
   g.fillStyle(0x3b2a2e, 1);
-  g.fillCircle(x + w * 0.3, y + h * 0.52 - bellR * 0.85, Math.max(2, bellR * 0.28));
-  const bw = Math.max(18, w * 0.28);
-  const bh = Math.max(26, h * 0.42);
+  g.fillCircle(x + w * 0.3, y + h * 0.52 - bellR * 0.85, Math.max(px(2), bellR * 0.28));
+  const bw = Math.max(px(18), w * 0.28);
+  const bh = Math.max(px(26), h * 0.42);
   const bx = x + w * 0.58;
-  const by = y + h * 0.55 - bh + 8;
+  const by = y + h * 0.55 - bh + px(8);
   g.fillStyle(0x5eb3ff, 1);
-  g.fillRoundedRect(bx, by, bw, bh, 3);
+  g.fillRoundedRect(bx, by, bw, bh, px(3));
   g.fillStyle(0xfffdf8, 1);
-  g.fillRoundedRect(bx + bw * 0.18, by + 3, bw * 0.7, bh - 6, 2);
-  g.lineStyle(3, 0x3b2a2e, 1);
-  g.strokeRoundedRect(bx, by, bw, bh, 3);
-  g.lineStyle(2, 0x8b6b5c, 1);
+  g.fillRoundedRect(bx + bw * 0.18, by + px(3), bw * 0.7, bh - px(6), px(2));
+  g.lineStyle(px(3), 0x3b2a2e, 1);
+  g.strokeRoundedRect(bx, by, bw, bh, px(3));
+  g.lineStyle(px(2), 0x8b6b5c, 1);
   g.beginPath();
-  g.moveTo(bx + bw * 0.42, by + 6);
-  g.lineTo(bx + bw * 0.42, by + bh - 6);
+  g.moveTo(bx + bw * 0.42, by + px(6));
+  g.lineTo(bx + bw * 0.42, by + bh - px(6));
   g.strokePath();
   card.add(g);
 }
 
-function drawTapeArt(scene, card, art, cardId) {
+function drawTapeArt(scene, card, art, cardId, unit = 1) {
+  const u = unit > 1.001 ? unit : 1;
+  const px = (n) => (u === 1 ? n : n * u);
   const g = scene.add.graphics();
   const { x, y, w, h } = art;
-  const tapeH = Math.max(36, Math.min(h * 0.92, w * 0.86));
+  const tapeH = Math.max(px(36), Math.min(h * 0.92, w * 0.86));
   const tapeY = y + (h - tapeH) / 2;
   g.fillStyle(0xfffdf8, 1);
-  g.fillRoundedRect(x, tapeY, w, tapeH, 12);
-  g.lineStyle(4, 0x3b2a2e, 1);
-  g.strokeRoundedRect(x, tapeY, w, tapeH, 12);
+  g.fillRoundedRect(x, tapeY, w, tapeH, px(12));
+  g.lineStyle(px(4), 0x3b2a2e, 1);
+  g.strokeRoundedRect(x, tapeY, w, tapeH, px(12));
   card.add(g);
   const glyphs = ["A", "l", "l"];
-  const cell = Math.min(tapeH - 16, (w - 20) / glyphs.length - 6, 40);
+  const cell = Math.min(tapeH - px(16), (w - px(20)) / glyphs.length - px(6), px(40));
   glyphs.forEach((ch, i) => {
-    const cx = x + w / 2 + (i - 1) * (cell + 6);
+    const cx = x + w / 2 + (i - 1) * (cell + px(6));
     const cy = tapeY + tapeH / 2;
     const tile = scene.add.graphics();
     tile.fillStyle(i === 2 ? 0xffc43d : 0xff8b94, 1);
-    tile.fillRoundedRect(cx - cell / 2, cy - cell / 2, cell, cell, 6);
-    tile.lineStyle(3, 0x3b2a2e, 1);
-    tile.strokeRoundedRect(cx - cell / 2, cy - cell / 2, cell, cell, 6);
+    tile.fillRoundedRect(cx - cell / 2, cy - cell / 2, cell, cell, px(6));
+    tile.lineStyle(px(3), 0x3b2a2e, 1);
+    tile.strokeRoundedRect(cx - cell / 2, cy - cell / 2, cell, cell, px(6));
     card.add(tile);
-    const label = scene.add.text(cx, cy, ch, monoText(Math.max(12, Math.round(cell * 0.42)))).setOrigin(0.5);
+    const label = scene.add.text(cx, cy, ch, monoText(Math.max(px(12), Math.round(cell * 0.42)))).setOrigin(0.5);
     tagText(label, cardId);
     card.add(label);
   });
