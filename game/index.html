@@ -61,6 +61,7 @@
             aria-expanded="false"
             aria-controls="notes-overlay"
             title="看不懂？"
+            hidden
           >
             看不懂？
           </button>
@@ -72,6 +73,7 @@
             aria-expanded="false"
             aria-controls="lesson-book-overlay"
             title="详细笔记"
+            hidden
           >
             详细笔记
           </button>
@@ -83,12 +85,14 @@
             aria-expanded="false"
             aria-controls="pseudo-overlay"
             title="伪代码"
+            hidden
           >
             伪代码
           </button>
           <button type="button" id="lang-toggle" class="hud-toggle" aria-label="日本語">日本語</button>
-          <button type="button" id="catalog-toggle" class="hud-toggle" aria-label="目录">目录</button>
-          <button type="button" id="back-toggle" class="hud-toggle" aria-label="返回">返回</button>
+          <button type="button" id="catalog-toggle" class="hud-toggle" hidden aria-label="目录">目录</button>
+          <button type="button" id="back-toggle" class="hud-toggle" hidden aria-label="返回">返回</button>
+          <button type="button" id="home-toggle" class="hud-toggle" hidden aria-label="首页">首页</button>
         </div>
         <p id="voice-note" class="voice-note">配音跟着这一课</p>
       <div id="game-shell">

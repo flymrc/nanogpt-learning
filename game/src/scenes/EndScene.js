@@ -4,6 +4,8 @@ import { syncPseudo } from "../ui/pseudo.js";
 import { narrateBeat } from "../audio/narrate.js";
 import { localizeBeat, t } from "../i18n/locale.js";
 import { retreatToPreviousChapter } from "../ui/catalog.js";
+import { syncHubChrome } from "../ui/chrome.js";
+import { rememberLesson } from "../ui/route.js";
 import { emitTutor } from "../tutor/bus.js";
 import {
   addMuteToggle,
@@ -11,6 +13,7 @@ import {
   drawSticker,
   clearPcHudStack,
   paintBackdrop,
+  planLessonHeader,
   showTooltip,
   spawnConfetti,
 } from "../ui/components.js";
@@ -27,9 +30,11 @@ export default class EndScene extends Phaser.Scene {
   }
 
   create() {
+    syncHubChrome("End");
     const phone = !isWidePcTutor();
     clearPcHudStack();
-    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: 56 });
+    const headerPlan = phone ? null : planLessonHeader(this, t("endTitle"));
+    const shell = makeShell(this, phone ? { header: false } : { twoRow: false, headerH: headerPlan.headerH });
     const v = shell.v;
     this.shell = shell;
     paintBackdrop(this);
@@ -41,6 +46,7 @@ export default class EndScene extends Phaser.Scene {
     narrateBeat(this, END_BEAT);
     emitTutor(endBeat);
     syncPseudo(endBeat);
+    rememberLesson("End", 0, 0);
 
     const plan = layoutEnd(v, shell);
     const hero = plan.slots.hero;

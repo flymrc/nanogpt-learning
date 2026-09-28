@@ -6,6 +6,7 @@
  * Also fails on local sticker collisions: tile/chip vs caption, chip vs chip,
  * chips under the minimum size, and placeholder tiles stacked on the first chip.
  * Big-band checks alone missed that class (caption on the Second tiles, ellipsis on S).
+ * Home is extra: 390×844, 1024×522, 1024×640, 1440×900, 1920×1080, zh and ja.
  */
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -170,6 +171,22 @@ async function openPseudoShot(page, key, beat, phase, file) {
   return tip;
 }
 
+async function enterNanoTutorial(page) {
+  await page.waitForFunction(() => {
+    const scene = window.__nanoGPTState?.().scene;
+    return scene === "Home" || scene === "Title" || (typeof scene === "string" && /^Level[1-5]$/.test(scene)) || scene === "End";
+  }, { timeout: 20000 });
+  const scene = await page.evaluate(() => window.__nanoGPTState?.().scene);
+  if (scene !== "Home") return;
+  await page.waitForFunction(() => typeof window.__nanoGPTOpenTutorial === "function", { timeout: 20000 });
+  await page.evaluate(() => window.__nanoGPTOpenTutorial());
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Title" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(250);
+}
+
 async function dismissGuide(page, label) {
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 20000 });
   const open = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === false);
@@ -326,6 +343,7 @@ async function runViewport(label, pageOpts, { allPhases }) {
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
   await page.evaluate(() => document.fonts?.ready);
   await page.waitForTimeout(300);
+  await enterNanoTutorial(page);
   const guideShown = await dismissGuide(page, label);
   await waitTutor(page);
   await assertVo(page, "Title", 0);
@@ -1323,11 +1341,210 @@ const pc1024 = await runViewport(
   { allPhases: false },
 );
 
+const HOME_SHOTS = {
+  "mobile-zh": "mobile-zh.png",
+  "mobile-ja": "mobile-ja.png",
+  "pc1440-zh": "pc1440-zh.png",
+  "pc1024x522-ja": "pc1024x522-ja.png",
+};
+
+async function waitHome(page, mobile) {
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Home" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  if (!mobile) {
+    await page.waitForFunction(() => {
+      const hidden = document.documentElement.dataset.tutor === "hidden";
+      const fitted = document.getElementById("tutor-canvas")?.dataset.fitted === "1";
+      return hidden || fitted;
+    }, { timeout: 30000 });
+  }
+  await page.waitForTimeout(mobile ? 250 : 500);
+}
+
+async function clickHubCard(page, id) {
+  const box = await page.evaluate((cardId) => {
+    const cards = window.__nanoGPTHubCards?.() || [];
+    return cards.find((card) => card.id === cardId) || null;
+  }, id);
+  if (!box) throw new Error(`missing hub card ${id}`);
+  await page.mouse.click(box.x + box.w / 2, box.y + box.h / 2);
+  return box;
+}
+
+async function assertHomeViewport(page, label, lang, mobile) {
+  await waitHome(page, mobile);
+  const layout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  const shot = HOME_SHOTS[`${label}-${lang}`];
+  if (shot || !layout?.ok) {
+    await page.screenshot({ path: shot ? `/opt/cursor/artifacts/home/${shot}` : `${OUT}/home-${label}-${lang}.png` });
+  }
+  if (!layout?.ok) {
+    throw new Error(`home layout ${lang} ${label} ${JSON.stringify({ overlaps: layout?.overlaps, overflows: layout?.overflows, orphans: layout?.orphans })}`);
+  }
+  const copy = await page.evaluate(() => window.__nanoGPTHubCopy?.() || {});
+  const cards = await page.evaluate(() => window.__nanoGPTHubCards?.() || []);
+  if (cards.length < 2) throw new Error(`home cards ${cards.length}`);
+  const rag = cards.find((card) => card.id === "rag");
+  const nano = cards.find((card) => card.id === "nanogpt");
+  if (!rag || rag.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
+  if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
+  if (lang === "ja") {
+    if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
+  } else if (copy.soon !== "准备中" || copy.home !== "首页") {
+    throw new Error(`zh home copy ${JSON.stringify(copy)}`);
+  }
+  if (mobile && layout.live2dOn) throw new Error("live2d on mobile home");
+  await page.evaluate(() => {
+    window.__nanoGPTHubLast = "";
+  });
+  await clickHubCard(page, "rag");
+  await page.waitForTimeout(250);
+  const afterRag = await page.evaluate(() => ({
+    scene: window.__nanoGPTState?.().scene,
+    last: window.__nanoGPTHubLast,
+  }));
+  if (afterRag.scene !== "Home" || afterRag.last !== "rag") {
+    throw new Error(`rag card navigated ${JSON.stringify(afterRag)}`);
+  }
+  await clickHubCard(page, "nanogpt");
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Title" && window.__nanoGPTState?.().pageId === "title",
+    { timeout: 15000 },
+  );
+  const homeBtn = await page.evaluate((expected) => {
+    const btn = document.getElementById("home-toggle");
+    const rect = btn?.getBoundingClientRect();
+    return {
+      text: btn?.textContent || "",
+      hidden: Boolean(btn?.hidden),
+      w: rect?.width || 0,
+      expected,
+    };
+  }, copy.home);
+  if (homeBtn.hidden || homeBtn.w < 8 || homeBtn.text !== homeBtn.expected) {
+    throw new Error(`home button ${JSON.stringify(homeBtn)}`);
+  }
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  console.log(`ok home ${lang} ${label}`);
+}
+
+async function assertHomeLang(page) {
+  await page.evaluate(() => window.__nanoGPTSetLang("zh"));
+  await waitHome(page, true);
+  await page.click("#lang-toggle");
+  await page.waitForFunction(
+    () => document.documentElement.lang === "ja" && localStorage.getItem("nanogpt-lang") === "ja" && window.__nanoGPTHubCopy?.().soon === "準備中",
+    { timeout: 15000 },
+  );
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  await clickHubCard(page, "nanogpt");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Title" && document.documentElement.lang === "ja", { timeout: 15000 });
+  const stored = await page.evaluate(() => localStorage.getItem("nanogpt-lang"));
+  if (stored !== "ja") throw new Error(`lang dropped in tutorial ${stored}`);
+  await page.click("#home-toggle");
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Home" && document.documentElement.lang === "ja" && window.__nanoGPTHubCopy?.().home === "ホーム",
+    { timeout: 15000 },
+  );
+  await page.evaluate(() => localStorage.setItem("nanogpt-lang", "ja"));
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "Home" && localStorage.getItem("nanogpt-lang") === "ja" && document.documentElement.lang === "ja",
+    { timeout: 20000 },
+  );
+}
+
+async function assertHomeDeepLinks(page) {
+  await page.evaluate(() => sessionStorage.removeItem("nanogpt-lesson"));
+  await page.goto(`${BASE}#Level2/1/2`, { waitUntil: "load" });
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
+  }, { timeout: 20000 });
+  await page.goto(`${BASE}?scene=Level1&beat=2&phase=1`, { waitUntil: "load" });
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level1" && state.beat === 2 && state.phase === 1;
+  }, { timeout: 20000 });
+  await page.goto(`${BASE}#Level4/3/2`, { waitUntil: "load" });
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
+  }, { timeout: 20000 });
+  await page.goto(`${BASE}#Level4`, { waitUntil: "load" });
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level4" && state.beat === 3 && state.phase === 2;
+  }, { timeout: 20000 });
+  await page.goto(BASE, { waitUntil: "load" });
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 20000 });
+  await page.evaluate(() => window.__nanoGPTJump("Level5", 2, 1));
+  await page.waitForFunction(() => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === "Level5" && state.beat === 2 && state.phase === 1;
+  }, { timeout: 15000 });
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home" && !location.hash && !location.search.includes("scene="), { timeout: 15000 });
+  console.log("ok home deeplink");
+}
+
+async function assertHomeHub(browser) {
+  mkdirSync("/opt/cursor/artifacts/home", { recursive: true });
+  const sizes = [
+    { label: "mobile", width: 390, height: 844, mobile: true },
+    { label: "pc1024x522", width: 1024, height: 522, mobile: false },
+    { label: "pc1024", width: 1024, height: 640, mobile: false },
+    { label: "pc1440", width: 1440, height: 900, mobile: false },
+    { label: "pc1920", width: 1920, height: 1080, mobile: false },
+  ];
+  for (const size of sizes) {
+    for (const lang of ["zh", "ja"]) {
+      const page = await browser.newPage({
+        viewport: { width: size.width, height: size.height },
+        deviceScaleFactor: 2,
+        isMobile: size.mobile,
+        hasTouch: size.mobile,
+        userAgent: size.mobile ? MOBILE_UA : undefined,
+      });
+      await page.addInitScript((next) => {
+        localStorage.setItem("nanogpt-lang", next);
+        localStorage.setItem("nanogpt-seen-guide", "1");
+        localStorage.setItem("nanogpt-game-muted", "1");
+      }, lang);
+      await ready(page);
+      await assertHomeViewport(page, size.label, lang, size.mobile);
+      if (size.label === "pc1440" && lang === "zh") await assertHomeDeepLinks(page);
+      await page.close();
+    }
+  }
+  const langPage = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: MOBILE_UA,
+  });
+  await langPage.addInitScript(() => {
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+  });
+  await ready(langPage);
+  await assertHomeLang(langPage);
+  await langPage.close();
+  console.log("ok home lang");
+  console.log("HOME_OK viewports=5 locales=2");
+  return { ok: true, viewports: sizes.length };
+}
+
 const live2dFit = await assertLive2dPanel(browser);
+const home = await assertHomeHub(browser);
 
 await browser.close();
 
-const summary = { mobile, pc, pc1024, speech };
+const summary = { mobile, pc, pc1024, speech, home };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
@@ -1362,7 +1579,8 @@ const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile
 const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
 const live2dOk = live2dFit?.ok === true;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk) {
+const homeOk = home?.ok === true;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -1380,6 +1598,8 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     speech,
     live2dOk,
     live2dFit,
+    homeOk,
+    home,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);

@@ -47,7 +47,7 @@ export function clearPcHudStack() {
 function measurePcButtonRow() {
   const chrome = document.getElementById("pc-chrome");
   if (!chrome || chrome.hidden) return null;
-  const buttons = [...chrome.querySelectorAll("button")];
+  const buttons = [...chrome.querySelectorAll("button")].filter((btn) => !btn.hidden && btn.offsetWidth > 0);
   if (!buttons.length) return null;
   const gap = Number.parseFloat(getComputedStyle(chrome).columnGap) || 8;
   let width = 0;

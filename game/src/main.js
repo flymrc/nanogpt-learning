@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import BootScene from "./scenes/BootScene.js";
+import HomeScene from "./scenes/HomeScene.js";
 import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
@@ -55,7 +56,7 @@ const config = {
     roundPixels: false,
     powerPreference: "high-performance",
   },
-  scene: [BootScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
+  scene: [BootScene, HomeScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
 };
 
 function applyOuterViewport() {
@@ -92,6 +93,7 @@ function applyGameSize(game) {
     canvas.style.width = `${css.w}px`;
     canvas.style.height = `${css.h}px`;
   }
+  game.scale.updateBounds();
   game.scene.getScenes(true).forEach((scene) => syncRetinaCamera(scene, css.w, css.h, dpr));
 }
 
@@ -140,6 +142,11 @@ async function boot() {
     applyGameSize(game);
   };
   syncSize();
+  const chrome = document.getElementById("mobile-chrome");
+  if (chrome && typeof ResizeObserver !== "undefined") {
+    const observer = new ResizeObserver(() => syncSize());
+    observer.observe(chrome);
+  }
   game.scale.on("resize", () => {
     const css = cssViewportSize();
     const dpr = displayRatio();

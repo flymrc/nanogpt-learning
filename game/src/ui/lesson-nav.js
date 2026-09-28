@@ -1,10 +1,12 @@
 import { narrateBeat, publishExpectedVo } from "../audio/narrate.js";
 import { PHASE_COUNT } from "../data/beats.js";
 import { localizeBeat, t } from "../i18n/locale.js";
+import { rememberLesson } from "./route.js";
 
 export function presentBeat(scene, raw, { speak } = {}) {
   const beat = localizeBeat(raw);
   scene.pageId = raw.id;
+  rememberLesson(scene.sys.settings.key, scene.beat || 0, scene.phase || 0);
   const force = Boolean(scene.registry.get("forceSpeak"));
   if (force) scene.registry.set("forceSpeak", false);
   const pageChanged = (scene.registry.get("spokenBeatId") || "") !== raw.id;

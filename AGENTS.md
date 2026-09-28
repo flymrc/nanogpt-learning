@@ -35,6 +35,8 @@ Use Playwright, Puppeteer, or screenshots. Two viewports, every time you change 
 | **390×844 mobile** | Walk **all 49 pages × all 5 sections** (目标 / 看看 / 做做 / 小结 / 试试, Japanese めあて / 見て / やって / まとめ / 確認). Counts: each chapter is an intro, then 9 / 9 / 7 / 7 / 7 pages, then a summary, so chapter 1 = 11, chapter 2 = 11, chapter 3 = 9, chapter 4 = 9, chapter 5 = 9, **245** mobile steps. `data-layout=mobile`. `#mobile-chrome` visible. HUD in `#mobile-actions`. `#tutor-dock` hidden. **No Live2D.** No floating `挪一格`. |
 | **1440×900 PC** | Smoke **all 49 pages** at least once (做一做 section is enough if slow). Lesson fills `#pc-stage`. Live2D is a fixed overlay on the viewport’s right, **forehead free**, no gray sidebar. The girl is 90% of the panel height and the lesson stays at least `min(1160, viewport − 334)`. |
 
+Home is the first screen at the site root. Also check it at **390×844, 1024×522, 1024×640, 1440×900, and 1920×1080**, in zh and ja: no overlaps, card text stays inside the cards, Live2D does not cover the cards, the nanoGPT card opens the chapter menu, **首页 / ホーム** returns, and the disabled RAG card does nothing. Deep links (`#Level2/1/2`, `?scene=`) and saved lesson progress still open the tutorial. This home pass is extra; the 245-step mobile walk and the 49 PC pages stay required.
+
 ### Overlap rule (zero intersecting interactive boxes)
 
 Bounding boxes of **header, purpose, tabs, body, tape/example (or row-stream / row-x / row-y), CTA** must **not intersect**.

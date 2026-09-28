@@ -61,6 +61,11 @@ export function mountCatalog() {
     event.stopPropagation();
     goBack();
   });
+  document.getElementById("home-toggle")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    goHub();
+  });
   close?.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -114,6 +119,7 @@ export function mountCatalog() {
   window.__nanoGPTCatalog = () => chapterList();
   window.__nanoGPTPickChapter = (id) => pickChapter(id);
   window.__nanoGPTBack = () => goBack();
+  window.__nanoGPTHub = () => goHub();
   window.__nanoGPTHome = () => {
     const scene = activeScene();
     if (!scene) return;
@@ -244,6 +250,15 @@ export function pickChapter(id) {
   closeCatalog();
   closeChapterSheet();
   goScene(scene, chapter.scene, null);
+}
+
+export function goHub() {
+  const scene = activeScene();
+  if (!scene) return;
+  closeCatalog();
+  closeChapterSheet();
+  if (scene.sys.settings.key === "Home") return;
+  scene.scene.start("Home");
 }
 
 export function goBack() {

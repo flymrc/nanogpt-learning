@@ -2,7 +2,7 @@ import { isWidePcTutor } from "../tutor/bus.js";
 import { CAPTION_CLEAR, MIN_CHIP_H, MIN_CHIP_W, MIN_ID_FONT, STICKER_SHADOW_X, STICKER_SHADOW_Y } from "./layout.js";
 
 const PAD = 2;
-const PIECE_KINDS = new Set(["tile", "chip", "placeholder", "card"]);
+const PIECE_KINDS = new Set(["tile", "chip", "placeholder", "card", "hub-card"]);
 const LABEL_KINDS = new Set(["caption", "label"]);
 
 function intersects(a, b) {
@@ -379,16 +379,34 @@ function collectLocalHits(scene, origin, cta, shell) {
 function collectReadabilityHits(scene, origin) {
   let card = null;
   const texts = [];
+  const hubCards = new Map();
+  const hubTexts = [];
   let step = null;
   const banners = [];
   const walk = (obj) => {
     if (!obj || obj.active === false || obj.visible === false) return;
     const kind = obj.getData?.("kind");
     if (kind === "phase-card") card = pieceBox(obj, origin);
+    if (kind === "hub-card") {
+      const box = pieceBox(obj, origin);
+      if (box) hubCards.set(obj.getData("cardId") || `hub-${hubCards.size}`, box);
+    }
     if ((kind === "phase-card-text" || kind === "phase-card-title") && obj.alpha > 0.2) {
       const b = obj.getBounds?.();
       if (b && b.width > 1 && b.height > 1) {
         texts.push({ x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height });
+      }
+    }
+    if (kind === "hub-card-text" && obj.alpha > 0.2) {
+      const b = obj.getBounds?.();
+      if (b && b.width > 1 && b.height > 1) {
+        hubTexts.push({
+          id: obj.getData("cardId"),
+          x: origin.x + b.x,
+          y: origin.y + b.y,
+          w: b.width,
+          h: b.height,
+        });
       }
     }
     if ((kind === "banner-step" || kind === "banner-kicker" || kind === "banner-purpose") && obj.alpha > 0.2) {
@@ -417,6 +435,23 @@ function collectReadabilityHits(scene, origin) {
       if (boxesOverlap(banner, step)) hits.push([banner.kind, "counter"]);
     }
   }
+  for (const text of hubTexts) {
+    const home = hubCards.get(text.id);
+    if (!home) {
+      hits.push(["hub-card-text", "orphan"]);
+      continue;
+    }
+    const right = home.x + (home.rawW || home.w);
+    const bottom = home.y + (home.rawH || home.h);
+    if (text.x < home.x - 1 || text.y < home.y - 1 || text.x + text.w > right + 1 || text.y + text.h > bottom + 1) {
+      hits.push(["hub-card-text", "outside"]);
+    }
+  }
+  for (const [id, home] of hubCards) {
+    const count = hubTexts.filter((text) => text.id === id).length;
+    if (count < 2) hits.push(["hub-card", "empty"]);
+    void home;
+  }
   return hits;
 }
 
@@ -441,6 +476,10 @@ function collectTutorTextHits(scene, origin) {
         const box = { x: origin.x + b.x, y: origin.y + b.y, w: b.width, h: b.height };
         if (strictHit(box, tutor)) hits.push(["phaser-text", "live2d", String(obj.text || "").slice(0, 24)]);
       }
+    }
+    if (obj.getData?.("kind") === "hub-card") {
+      const box = pieceBox(obj, origin);
+      if (box && strictHit(box, tutor)) hits.push(["hub-card", "live2d", String(obj.getData("cardId") || "")]);
     }
     (obj.list || []).forEach(walk);
   };

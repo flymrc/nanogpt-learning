@@ -1,7 +1,8 @@
 import { t } from "../i18n/locale.js";
 import { isPcLayout } from "./mode.js";
 
-const HUD_IDS = ["back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
+const HUD_IDS = ["home-toggle", "back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
+const LESSON_CHROME = ["back-toggle", "catalog-toggle", "pseudo-toggle", "book-toggle", "notes-toggle"];
 
 export function applyChromeCopy() {
   const pc = isPcLayout();
@@ -13,6 +14,7 @@ export function applyChromeCopy() {
     el.title = label;
     el.setAttribute("aria-label", label);
   };
+  set("home-toggle", t("hub.home"));
   set("back-toggle", t("back"));
   set("catalog-toggle", t("catalog"));
   set("lang-toggle", pc ? t("lang") : t("langShort"), t("lang"));
@@ -54,6 +56,17 @@ export function applyChromeCopy() {
   const note = document.getElementById("voice-note");
   if (note && !note.dataset.live) note.textContent = t("voiceIdle");
   return HUD_IDS;
+}
+
+/** Lesson tools stay in the tutorial. Home keeps language and mute. */
+export function syncHubChrome(sceneKey) {
+  const lesson = Boolean(sceneKey) && sceneKey !== "Home" && sceneKey !== "Boot";
+  for (const id of LESSON_CHROME) {
+    const el = document.getElementById(id);
+    if (el) el.hidden = !lesson;
+  }
+  const home = document.getElementById("home-toggle");
+  if (home) home.hidden = !lesson;
 }
 
 export function bindVoiceNote() {

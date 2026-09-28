@@ -24,8 +24,8 @@ export function applyLayoutMode() {
 
   const home = pc ? pcChrome : mobileActions;
   const order = pc
-    ? ["pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle", "lang-toggle", "catalog-toggle", "back-toggle"]
-    : ["back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
+    ? ["pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle", "lang-toggle", "catalog-toggle", "back-toggle", "home-toggle"]
+    : ["home-toggle", "back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
   if (home) {
     order.forEach((id) => {
       const btn = document.getElementById(id);

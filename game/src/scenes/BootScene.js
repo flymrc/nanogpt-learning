@@ -3,6 +3,8 @@ import { applyMute, preloadAudio, readMuted } from "../audio/sound.js";
 import { displayRatio } from "../ui/dpr.js";
 import { getView, hideBootSplash, makeShell, stackSlots, watchResize } from "../ui/layout.js";
 import { drawSticker } from "../ui/components.js";
+import { sceneProgressKey } from "../ui/catalog.js";
+import { readEntryTarget } from "../ui/route.js";
 import { t } from "../i18n/locale.js";
 import { C, displayText, uiText } from "../ui/theme.js";
 
@@ -44,7 +46,16 @@ export default class BootScene extends Phaser.Scene {
     applyMute(this.game, readMuted());
     this.sound.pauseOnBlur = true;
     this.game.registry.set("assetsReady", true);
-    this.time.delayedCall(220, () => this.scene.start("Title"));
+    const entry = readEntryTarget();
+    this.time.delayedCall(220, () => {
+      if (!entry) {
+        this.scene.start("Home");
+        return;
+      }
+      const store = sceneProgressKey(entry.scene);
+      if (store) this.registry.set(store, { beat: entry.beat, phase: entry.phase });
+      this.scene.start(entry.scene);
+    });
   }
 
   relayout() {
