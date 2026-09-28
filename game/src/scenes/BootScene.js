@@ -53,8 +53,9 @@ export default class BootScene extends Phaser.Scene {
         return;
       }
       const store = sceneProgressKey(entry.scene);
-      if (store) this.registry.set(store, { beat: entry.beat, phase: entry.phase });
-      this.scene.start(entry.scene);
+      const payload = { beat: entry.beat, phase: entry.phase };
+      if (store) this.registry.set(store, payload);
+      this.scene.start(entry.scene, payload);
     });
   }
 

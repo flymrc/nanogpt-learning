@@ -105,9 +105,16 @@ async function waitTutor(page) {
   await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
 }
 
-async function jumpAndAssert(page, key, beat, phase, name) {
+async function jumpLanded(page, key, beat, phase) {
   await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
-  await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+  await page.waitForFunction(([k, b, p]) => {
+    const state = window.__nanoGPTState?.();
+    return state?.scene === k && state.beat === b && state.phase === p && typeof window.__nanoGPTAssertLayout === "function";
+  }, [key, beat, phase], { timeout: 15000 });
+}
+
+async function jumpAndAssert(page, key, beat, phase, name) {
+  await jumpLanded(page, key, beat, phase);
   await page.waitForTimeout(450);
   await assertVo(page, key, beat);
   const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
@@ -330,8 +337,7 @@ async function assertLang(page, label) {
     ];
     for (const [key, beat] of jobs) {
       for (const phase of [0, 2]) {
-        await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
-        await page.waitForFunction(() => typeof window.__nanoGPTAssertLayout === "function", { timeout: 15000 });
+        await jumpLanded(page, key, beat, phase);
         await page.waitForTimeout(350);
         await assertVo(page, key, beat);
         const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
@@ -1530,11 +1536,26 @@ async function assertHomeLang(page) {
     { timeout: 15000 },
   );
   await page.evaluate(() => localStorage.setItem("nanogpt-lang", "ja"));
+  const langErrors = [];
+  page.on("pageerror", (err) => langErrors.push(String(err?.message || err)));
   await page.reload({ waitUntil: "load" });
-  await page.waitForFunction(
-    () => window.__nanoGPTState?.().scene === "Home" && localStorage.getItem("nanogpt-lang") === "ja" && document.documentElement.lang === "ja",
-    { timeout: 20000 },
-  );
+  try {
+    await page.waitForFunction(
+      () => window.__nanoGPTState?.().scene === "Home" && localStorage.getItem("nanogpt-lang") === "ja" && document.documentElement.lang === "ja",
+      null,
+      { timeout: 45000 },
+    );
+  } catch (err) {
+    const state = await page.evaluate(() => ({
+      href: location.href,
+      scene: window.__nanoGPTState?.()?.scene || "",
+      lang: document.documentElement.lang,
+      stored: localStorage.getItem("nanogpt-lang"),
+      jump: typeof window.__nanoGPTJump,
+      active: window.__nanoGPTGame?.scene?.getScenes?.(true)?.map((scene) => scene.sys.settings.key) || [],
+    })).catch((failure) => ({ eval: String(failure) }));
+    throw new Error(`home lang reload ${JSON.stringify({ state, langErrors })} ${err.message}`);
+  }
 }
 
 let freshSeq = 0;

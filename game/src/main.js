@@ -191,7 +191,10 @@ async function boot() {
     game.registry.set("forceSpeak", true);
     const key = scene.sys.settings.key;
     if (/^Level[1-5]$/.test(key)) {
-      game.registry.set(`${key.toLowerCase()}.progress`, { beat: scene.beat || 0, phase: scene.phase || 0 });
+      const payload = { beat: scene.beat || 0, phase: scene.phase || 0 };
+      game.registry.set(`${key.toLowerCase()}.progress`, payload);
+      scene.scene.restart(payload);
+      return;
     }
     scene.scene.restart();
   };
@@ -230,7 +233,7 @@ async function boot() {
     if (typeof active.advance === "function") {
       active.advance();
     } else if (active.sys.settings.key === "Title") {
-      active.scene.start("Level1");
+      active.scene.start("Level1", { beat: 0, phase: 0 });
     } else if (active.sys.settings.key === "End") {
       active.scene.start("Title");
     }
@@ -247,13 +250,14 @@ async function boot() {
   };
 
   window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
-    if (key === "Level1") game.registry.set("level1.progress", { beat, phase });
-    if (key === "Level2") game.registry.set("level2.progress", { beat, phase });
-    if (key === "Level3") game.registry.set("level3.progress", { beat, phase });
-    if (key === "Level4") game.registry.set("level4.progress", { beat, phase });
-    if (key === "Level5") game.registry.set("level5.progress", { beat, phase });
+    const payload = { beat, phase };
+    if (key === "Level1") game.registry.set("level1.progress", payload);
+    if (key === "Level2") game.registry.set("level2.progress", payload);
+    if (key === "Level3") game.registry.set("level3.progress", payload);
+    if (key === "Level4") game.registry.set("level4.progress", payload);
+    if (key === "Level5") game.registry.set("level5.progress", payload);
     const active = game.scene.getScenes(true)[0];
-    active?.scene.start(key);
+    active?.scene.start(key, payload);
     return key;
   };
 }

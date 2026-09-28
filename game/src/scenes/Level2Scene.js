@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { CHAPTER_COUNT, LEVEL1_BEATS, LEVEL2_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
 import { t } from "../i18n/locale.js";
-import { retreatToPreviousChapter } from "../ui/catalog.js";
+import { retreatToPreviousChapter, takeSceneProgress } from "../ui/catalog.js";
 import { ctaFor, presentBeat } from "../ui/lesson-nav.js";
 import { clearLayer, makeLessonFrame } from "../ui/lesson.js";
 import { drawPageArt } from "../ui/page-art.js";
@@ -27,14 +27,17 @@ export default class Level2Scene extends Phaser.Scene {
 
     watchResize(this, {
       restart: true,
-      persist: () => this.registry.set("level2.progress", { beat: this.beat, phase: this.phase }),
+      persist: () => {
+        const payload = { beat: this.beat, phase: this.phase };
+        this.registry.set("level2.progress", payload);
+        return payload;
+      },
     });
 
-    const saved = this.registry.get("level2.progress");
+    const saved = takeSceneProgress(this, "level2.progress", LEVEL2_BEATS.length - 1);
     if (saved) {
-      this.registry.remove("level2.progress");
-      this.beat = Math.min(LEVEL2_BEATS.length - 1, saved.beat || 0);
-      this.phase = Math.min(PHASE_COUNT - 1, saved.phase || 0);
+      this.beat = saved.beat;
+      this.phase = saved.phase;
       this.showBeat(this.beat, { instant: true, phase: this.phase });
     } else {
       this.showBeat(0);
@@ -50,7 +53,7 @@ export default class Level2Scene extends Phaser.Scene {
     }
     if (this.beat >= LEVEL2_BEATS.length - 1) {
       this.registry.remove("level2.progress");
-      this.scene.start("Level3");
+      this.scene.start("Level3", { beat: 0, phase: 0 });
       return;
     }
     this.beat += 1;
