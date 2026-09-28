@@ -324,22 +324,29 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0 } = 
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
   const copy = cardCopy(beat, phase);
-  const preferred = rag
-    ? (phone ? Math.min(stage.h * 0.26, 128) : Math.min(stage.h * 0.24, 150))
-    : phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
   const available = stage.bottom - cardTop - rhythm;
-  const yielded = available - Math.max(0, reserve);
-  const maxH = Math.min(preferred, Math.max(48, yielded));
+  // A fixed art reserve crushed every RAG card to 48px and scaled the
+  // instruction down to a blur. Short lines keep a readable size. The
+  // picture then fills whatever is left above the button.
+  const shortStage = !phone && (scene.frame?.v?.h || 900) < 760;
+  const pictureFloor = rag ? (phone ? 228 : shortStage ? 280 : 220) : 0;
+  const preferred = rag
+    ? Math.max(64, Math.min(phone ? stage.h * 0.4 : stage.h * 0.3, Math.max(64, available - pictureFloor)))
+    : phone ? Math.min(stage.h * 0.38, 188) : stage.h * 0.4;
+  const yielded = rag ? available - pictureFloor : available - Math.max(0, reserve);
+  const maxH = rag
+    ? Math.min(preferred, Math.max(56, yielded))
+    : Math.min(preferred, Math.max(48, yielded));
   const chrome = 40;
   const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
   const fit = rag ? fitComplete : fitPlain;
   const shownFit = rag
-    ? fitComplete(scene, copy.shown, startSize, 11, wrap, maxTextH, { keep: true })
+    ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: true })
     : fit(scene, copy.shown, startSize, 13, wrap, maxTextH);
   const revealFit = copy.reveal
     ? (rag
-      ? fitComplete(scene, copy.reveal, startSize, 11, wrap, maxTextH, { keep: true })
+      ? fitComplete(scene, copy.reveal, startSize, 13, wrap, maxTextH, { keep: true })
       : fit(scene, copy.reveal, startSize, 13, wrap, maxTextH))
     : null;
   const font = Math.min(shownFit.font, revealFit?.font || shownFit.font);

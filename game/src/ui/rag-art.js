@@ -270,10 +270,10 @@ function lobbySign(scene, card, w, h) {
 
 function castLayout(w, h, { bubbleAbove = false } = {}) {
   const bubbleH = bubbleAbove ? Math.min(78, h * 0.2) : 0;
-  const feet = h * 0.1;
-  const topLimit = bubbleAbove ? -h / 2 + bubbleH + 14 : -h / 2 + 18;
-  const available = Math.max(48, feet - topLimit);
-  const s = Math.max(20, Math.min(available / 3.55, (w * 0.46) / 3.2, h * 0.22));
+  const feet = bubbleAbove ? h * 0.08 : h * 0.3;
+  const topLimit = bubbleAbove ? -h / 2 + bubbleH + 14 : -h / 2 + 8;
+  const hatRoom = Math.max(40, feet - topLimit);
+  const s = Math.max(26, Math.min(hatRoom / 3.7, w * 0.16, h * 0.26));
   const y = feet - s * 1.45;
   return { s, y, feet, bubbleH };
 }
@@ -363,16 +363,18 @@ function paintCardGrid(scene, card, w, h, items) {
     g.fillStyle(index % 2 ? C.gold : C.teal, 1);
     g.fillRoundedRect(-shape.cellW / 2 + 4, -shape.cellH / 2 + 4, shape.cellW - 8, Math.max(16, shape.cellH * 0.22), 8);
     cell.add(g);
-    const headH = Math.max(16, shape.cellH * 0.28);
-    fitLabel(scene, cell, 0, -shape.cellH / 2 + 4 + headH / 2, `Page ${item.page}  ${item.title || ""}`.trim(), {
-      maxW: shape.cellW - 14,
-      maxH: headH - 6,
-      size: shape.cellH > 90 ? 15 : 13,
+    const headH = Math.min(shape.cellH * 0.4, Math.max(12, shape.cellH * 0.26));
+    fitLabel(scene, cell, 0, -shape.cellH / 2 + headH / 2, `Page ${item.page}  ${item.title || ""}`.trim(), {
+      maxW: shape.cellW - 10,
+      maxH: Math.max(8, headH - 4),
+      size: shape.cellH > 90 ? 15 : 12,
       color: "#3b2a2e",
     });
-    fitLabel(scene, cell, 0, -shape.cellH / 2 + headH + 6, item.text || "", {
-      maxW: shape.cellW - 12,
-      maxH: Math.max(12, shape.cellH - headH - 12),
+    const bodyTop = -shape.cellH / 2 + headH + 2;
+    const bodyH = Math.max(8, shape.cellH / 2 - 4 - bodyTop);
+    fitLabel(scene, cell, 0, bodyTop, item.text || "", {
+      maxW: shape.cellW - 10,
+      maxH: bodyH,
       size: shape.cellW > 160 ? 14 : 12,
       color: C.text,
       originY: 0,
@@ -450,9 +452,9 @@ function paintBars(scene, card, g, w, h, spec, step, { showLine = false } = {}) 
   const gap = Math.max(12, Math.min(36, w * 0.04));
   const barW = Math.max(36, Math.min(120, (w - 48 - gap * (n - 1)) / n));
   const rowW = n * barW + (n - 1) * gap;
-  const base = h / 2 - 46;
-  const top = -h / 2 + 28;
-  const span = Math.max(40, base - top);
+  const base = h / 2 - Math.min(46, h * 0.22);
+  const top = -h / 2 + Math.min(28, h * 0.16);
+  const span = Math.max(12, base - top);
   const axis = axisMax(spec, showLine);
   const grown = showLine || step >= 1 ? 1 : 0.35;
   const yOf = (score) => base - span * (Math.max(0, Math.min(axis, score)) / axis);
@@ -482,9 +484,9 @@ function paintBars(scene, card, g, w, h, spec, step, { showLine = false } = {}) 
       color: C.goldCss,
       originY: 1,
     });
-    fitLabel(scene, card, x, base + 6, item.title ? `${item.title}\nPage ${item.page}` : `Page ${item.page}`, {
-      maxW: barW + 28,
-      maxH: 36,
+    fitLabel(scene, card, x, base + 4, item.title ? `${item.title}\nPage ${item.page}` : `Page ${item.page}`, {
+      maxW: barW + 20,
+      maxH: Math.max(14, Math.min(32, h / 2 - base - 8)),
       size: 13,
       color: C.muted,
       originY: 0,
@@ -504,9 +506,9 @@ function paintBars(scene, card, g, w, h, spec, step, { showLine = false } = {}) 
     if (scene.__ragAnimate) {
       scene.tweens.add({ targets: line, alpha: 0.2, yoyo: true, repeat: 3, duration: 140 });
     }
-    fitLabel(scene, card, w / 2 - 36, y - 16, String(spec.meaningLine), {
+    fitLabel(scene, card, Math.min(w / 2 - 28, w / 2 - 8), Math.max(-h / 2 + 14, y - 14), String(spec.meaningLine), {
       maxW: 48,
-      maxH: 22,
+      maxH: 20,
       size: 18,
       color: C.coralCss,
     });
@@ -536,9 +538,9 @@ function paintShares(scene, card, g, w, h, spec, step) {
       color: C.text,
     });
     const words = board.words || [];
-    const top = -h / 2 + 54;
-    const bottom = h / 2 - 16;
-    const rowH = Math.max(16, (bottom - top) / Math.max(1, words.length));
+    const top = -h / 2 + Math.min(54, h * 0.34);
+    const bottom = h / 2 - 10;
+    const rowH = Math.max(8, (bottom - top) / Math.max(1, words.length));
     const maxShare = Math.max(0.2, ...words.map((word) => word.share || 0));
     words.forEach((word, wordIndex) => {
       const y = top + wordIndex * rowH;
@@ -665,7 +667,7 @@ function paintHats(scene, card, g, w, h, spec, step) {
   lobbySign(scene, card, w, h);
   const narrow = w < 640;
   const cast = castLayout(w, h, { bubbleAbove: false });
-  const gap = cast.s * 2.2;
+  const gap = Math.min(w * 0.3, Math.max(cast.s * 2.35, w * 0.22));
   const xs = [-gap, 0, gap];
   const guest = addActor(scene, card, xs[0], cast.y, cast.s * 0.92);
   const blue = addActor(scene, card, xs[1], cast.y, cast.s, "blue");
@@ -915,13 +917,18 @@ function paintSwap(scene, card, g, w, h, spec, step) {
 }
 
 function paintMemory(scene, card, g, w, h, spec) {
-  const s = Math.max(36, Math.min(h * 0.24, w * 0.16));
+  const s = Math.max(18, Math.min(h * 0.2, w * 0.14, (h * 0.5 - 28) / 1.5));
   g.fillStyle(0xfffdf8, 0.96);
-  g.fillCircle(0, 0, s * 2.1);
+  g.fillCircle(0, 0, Math.min(s * 2.1, h * 0.42));
   g.lineStyle(4, C.stroke, 1);
-  g.strokeCircle(0, 0, s * 2.1);
-  paintActor(g, 0, s * 0.15, s);
-  fitLabel(scene, card, 0, -s * 1.35, spec.line || "", { maxW: w * 0.7, maxH: 36, size: 22, color: C.goldCss });
+  g.strokeCircle(0, 0, Math.min(s * 2.1, h * 0.42));
+  paintActor(g, 0, s * 0.1, s);
+  fitLabel(scene, card, 0, Math.max(-h / 2 + 16, -s * 1.35), spec.line || "", {
+    maxW: w * 0.7,
+    maxH: 28,
+    size: 22,
+    color: C.goldCss,
+  });
 }
 
 function paintAddress(scene, card, g, w, h, spec) {
@@ -941,12 +948,27 @@ function paintAddress(scene, card, g, w, h, spec) {
 
 function paintBig(scene, card, g, w, h, spec) {
   paintLongPaper(scene, card, w, h * 0.72, { scissors: false, label: false });
-  fitLabel(scene, card, 0, h * 0.34, String(spec.words || ""), { maxW: w - 24, maxH: 56, size: 42, color: C.goldCss });
+  fitLabel(scene, card, 0, Math.min(h * 0.3, h / 2 - 22), String(spec.words || ""), {
+    maxW: w - 24,
+    maxH: Math.min(48, h * 0.24),
+    size: 42,
+    color: C.goldCss,
+  });
 }
 
-function paintCounts(scene, card, spec) {
-  fitLabel(scene, card, 0, -10, `${spec.min}–${spec.max}`, { maxW: 360, maxH: 72, size: 48, color: C.goldCss });
-  fitLabel(scene, card, 0, 48, String(spec.focus || ""), { maxW: 280, maxH: 36, size: 22, color: C.muted });
+function paintCounts(scene, card, g, w, h, spec) {
+  fitLabel(scene, card, 0, -h * 0.06, `${spec.min}–${spec.max}`, {
+    maxW: w - 24,
+    maxH: Math.min(64, h * 0.28),
+    size: 48,
+    color: C.goldCss,
+  });
+  fitLabel(scene, card, 0, h * 0.2, String(spec.focus || ""), {
+    maxW: w - 24,
+    maxH: Math.min(32, h * 0.18),
+    size: 22,
+    color: C.muted,
+  });
 }
 
 function paintZeros(scene, card, g, w, h) {
@@ -1018,7 +1040,7 @@ function paintSpec(scene, card, g, w, h, spec, step) {
   else if (kind === "memory") paintMemory(scene, card, g, w, h, spec);
   else if (kind === "address") paintAddress(scene, card, g, w, h, spec);
   else if (kind === "big") paintBig(scene, card, g, w, h, spec);
-  else if (kind === "counts") paintCounts(scene, card, spec);
+  else if (kind === "counts") paintCounts(scene, card, g, w, h, spec);
   else if (kind === "hats") paintHats(scene, card, g, w, h, spec, step);
   else if (kind === "rules" || kind === "stars") paintRules(scene, card, g, w, h, spec, step);
   else if (kind === "join") paintJoin(scene, card, g, w, h, spec);
