@@ -1405,6 +1405,40 @@ function home3Shot(lang, width, height) {
   return `/opt/cursor/artifacts/home3/home-${lang}-${width}x${height}.png`;
 }
 
+async function assertJaBunsetsu(page) {
+  const rows = await page.evaluate(() => {
+    const scene = (window.__nanoGPTGame?.scene?.getScenes?.(true) || []).find((item) => item.sys.settings.key === "Home");
+    const found = [];
+    const walk = (obj) => {
+      if (!obj) return;
+      if (obj.type === "Text") {
+        const role = obj.getData?.("hubRole") || "";
+        if (role === "title" || role === "sub" || role === "card-title" || role === "card-desc") {
+          found.push({
+            role,
+            id: obj.getData?.("cardId") || "",
+            source: String(obj.getData?.("source") || ""),
+            text: String(obj.text || ""),
+          });
+        }
+      }
+      (obj.list || []).forEach(walk);
+    };
+    (scene?.children?.list || []).forEach(walk);
+    return found;
+  });
+  const rag = rows.find((row) => row.id === "rag" && row.role === "card-title");
+  if (!rag?.source.includes("うけつけで")) throw new Error(`rag title missing ${JSON.stringify(rows)}`);
+  const lines = rag.text.split("\n").map((line) => line.replace(/\s+/g, ""));
+  if (lines.join("") !== "うけつけで聞く") throw new Error(`rag title text ${JSON.stringify(rag)}`);
+  const phraseEnd = [..."うけつけで"].length;
+  let pos = 0;
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    pos += [...lines[i]].length;
+    if (pos < phraseEnd) throw new Error(`bunsetsu split うけつけで ${JSON.stringify(rag)}`);
+  }
+}
+
 async function waitHome(page, mobile) {
   await page.waitForFunction(
     () => window.__nanoGPTState?.().scene === "Home" && typeof window.__nanoGPTAssertLayout === "function",
@@ -1463,6 +1497,7 @@ async function assertHomeViewport(page, label, lang, mobile) {
   if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
   if (lang === "ja") {
     if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
+    await assertJaBunsetsu(page);
   } else if (copy.soon !== "准备中" || copy.home !== "首页") {
     throw new Error(`zh home copy ${JSON.stringify(copy)}`);
   }
