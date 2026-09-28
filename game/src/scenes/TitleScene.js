@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { narrateBeat } from "../audio/narrate.js";
 import { TITLE_BEAT } from "../data/beats.js";
-import { chapterList, localizeBeat, t } from "../i18n/locale.js";
+import { chapterList, localizeBeat, setCourse, t } from "../i18n/locale.js";
 import { consumePendingSheet, pickChapter } from "../ui/catalog.js";
 import { syncHubChrome } from "../ui/chrome.js";
 import { syncPseudo } from "../ui/pseudo.js";
@@ -21,6 +21,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    setCourse("nanogpt");
     if (!this.game.registry.get("assetsReady")) {
       this.scene.start("Boot");
       return;

@@ -1,6 +1,7 @@
 import { narrateLine } from "../audio/narrate.js";
 import { unlockAudio } from "../audio/sound.js";
 import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "../data/beats.js";
+import { ragPagesFor } from "../i18n/rag/skeleton.js";
 import { chapterList, t } from "../i18n/locale.js";
 import { openGuide } from "./guide.js";
 
@@ -10,6 +11,11 @@ const BEAT_COUNTS = {
   Level3: LEVEL3_BEATS.length,
   Level4: LEVEL4_BEATS.length,
   Level5: LEVEL5_BEATS.length,
+  Rag1: ragPagesFor(1).length,
+  Rag2: ragPagesFor(2).length,
+  Rag3: ragPagesFor(3).length,
+  Rag4: ragPagesFor(4).length,
+  Rag5: ragPagesFor(5).length,
 };
 
 let mounted = false;
@@ -20,6 +26,11 @@ export function sceneProgressKey(sceneKey) {
   if (sceneKey === "Level3") return "level3.progress";
   if (sceneKey === "Level4") return "level4.progress";
   if (sceneKey === "Level5") return "level5.progress";
+  if (sceneKey === "Rag1") return "rag1.progress";
+  if (sceneKey === "Rag2") return "rag2.progress";
+  if (sceneKey === "Rag3") return "rag3.progress";
+  if (sceneKey === "Rag4") return "rag4.progress";
+  if (sceneKey === "Rag5") return "rag5.progress";
   return null;
 }
 
@@ -314,6 +325,30 @@ export function retreatToPreviousChapter(scene) {
   }
   if (key === "End") {
     goScene(scene, "Level5", { beat: BEAT_COUNTS.Level5 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Rag2") {
+    goScene(scene, "Rag1", { beat: BEAT_COUNTS.Rag1 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Rag3") {
+    goScene(scene, "Rag2", { beat: BEAT_COUNTS.Rag2 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Rag4") {
+    goScene(scene, "Rag3", { beat: BEAT_COUNTS.Rag3 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Rag5") {
+    goScene(scene, "Rag4", { beat: BEAT_COUNTS.Rag4 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "RagEnd") {
+    goScene(scene, "Rag5", { beat: BEAT_COUNTS.Rag5 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Rag1") {
+    scene.scene.start("RagTitle");
     return;
   }
   scene.scene.start("Title");

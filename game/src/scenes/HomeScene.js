@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { narrateLine } from "../audio/narrate.js";
 import { playSfx, unlockAudio } from "../audio/sound.js";
 import { TUTORIALS } from "../data/tutorials.js";
-import { t } from "../i18n/locale.js";
+import { setCourse, t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { addMuteToggle, clearPcHudStack, drawSticker, paintBackdrop, planLessonHeader } from "../ui/components.js";
 import { installLayoutProbe } from "../ui/e2e.js";
@@ -18,6 +18,7 @@ export default class HomeScene extends Phaser.Scene {
   }
 
   create() {
+    setCourse("nanogpt");
     if (!this.game.registry.get("assetsReady")) {
       this.scene.start("Boot");
       return;

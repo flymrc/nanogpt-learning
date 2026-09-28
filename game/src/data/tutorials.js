@@ -16,9 +16,9 @@ export const TUTORIALS = [
     id: "rag",
     titleKey: "hub.rag.title",
     blurbKey: "hub.rag.blurb",
-    actionKey: "hub.soon",
-    status: "soon",
-    scene: null,
+    actionKey: "hub.enter",
+    status: "ready",
+    scene: "RagTitle",
     art: "desk",
   },
 ];

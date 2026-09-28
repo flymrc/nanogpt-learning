@@ -1,5 +1,20 @@
 /** Lesson scenes that can be opened from a hash or a query string. */
-const LESSON_SCENES = new Set(["Title", "End", "Level1", "Level2", "Level3", "Level4", "Level5"]);
+const LESSON_SCENES = new Set([
+  "Title",
+  "End",
+  "Level1",
+  "Level2",
+  "Level3",
+  "Level4",
+  "Level5",
+  "RagTitle",
+  "RagEnd",
+  "Rag1",
+  "Rag2",
+  "Rag3",
+  "Rag4",
+  "Rag5",
+]);
 const STORE_KEY = "nanogpt-lesson";
 
 function finite(value) {

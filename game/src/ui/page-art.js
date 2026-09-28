@@ -11,6 +11,7 @@ import {
   STICKER_SHADOW_Y,
   fitChipGrid,
 } from "./layout.js";
+import { drawRagArt, ragArtReserve, ragExpectedArt } from "./rag-art.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
 function ceilingOf(scene, stage) {
@@ -69,6 +70,7 @@ function statCount(visual) {
 
 /** Minimum example-band height so the picture can shrink instead of disappearing. */
 export function artBandReserve(page, phase = 0, width = 320) {
+  if (page?.course === "rag") return ragArtReserve(page, phase, width);
   const visual = page?.visual;
   if (!visual) return 64;
   const shared = page.shared || {};
@@ -118,6 +120,7 @@ export function artBandReserve(page, phase = 0, width = 320) {
 
 /** What each skeleton visual must actually paint. Counts come from the page, not from what happened to draw. */
 export function expectedArt(page, phase = 0) {
+  if (page?.course === "rag") return ragExpectedArt(page, phase);
   const visual = page?.visual;
   if (!visual) return null;
   const shared = page.shared || {};
@@ -475,6 +478,12 @@ function revealTile(node, glyph) {
 export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
   if (!page) {
     if (scene.frame) scene.frame.artExpect = null;
+    return;
+  }
+  if (page.course === "rag") {
+    if (scene.frame) scene.frame.artExpect = ragExpectedArt(page, phase);
+    if (!stage || stage.h < 8) return;
+    drawRagArt(scene, stage, page, { phase });
     return;
   }
   if (scene.frame) scene.frame.artExpect = expectedArt(page, phase);

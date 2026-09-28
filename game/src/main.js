@@ -8,6 +8,9 @@ import Level3Scene from "./scenes/Level3Scene.js";
 import Level4Scene from "./scenes/Level4Scene.js";
 import Level5Scene from "./scenes/Level5Scene.js";
 import EndScene from "./scenes/EndScene.js";
+import RagTitleScene from "./scenes/RagTitleScene.js";
+import RagEndScene from "./scenes/RagEndScene.js";
+import { Rag1Scene, Rag2Scene, Rag3Scene, Rag4Scene, Rag5Scene } from "./scenes/RagLevelScene.js";
 import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
 import { JA } from "./i18n/ja.js";
 import { setLang, toggleLang } from "./i18n/locale.js";
@@ -25,6 +28,10 @@ import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "
 import { readSafeInsets } from "./ui/layout.js";
 import { applyLayoutMode } from "./ui/mode.js";
 import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "./data/beats.js";
+import { ragPagesFor } from "./i18n/rag/skeleton.js";
+import { RAG_JA } from "./i18n/rag/ja.js";
+import { RAG_ZH } from "./i18n/rag/zh.js";
+import { sceneProgressKey } from "./ui/catalog.js";
 
 const startCss = cssViewportSize();
 const startDpr = displayRatio();
@@ -58,7 +65,24 @@ const config = {
     roundPixels: false,
     powerPreference: "high-performance",
   },
-  scene: [BootScene, HomeScene, TitleScene, Level1Scene, Level2Scene, Level3Scene, Level4Scene, Level5Scene, EndScene],
+  scene: [
+    BootScene,
+    HomeScene,
+    TitleScene,
+    Level1Scene,
+    Level2Scene,
+    Level3Scene,
+    Level4Scene,
+    Level5Scene,
+    EndScene,
+    RagTitleScene,
+    Rag1Scene,
+    Rag2Scene,
+    Rag3Scene,
+    Rag4Scene,
+    Rag5Scene,
+    RagEndScene,
+  ],
 };
 
 function applyOuterViewport() {
@@ -114,9 +138,9 @@ function fontSample(...packs) {
 
 async function boot() {
   if (document.fonts?.ready) {
-    const zhSample = fontSample(ZH);
-    const jaSample = fontSample(JA);
-    const both = fontSample(ZH, JA);
+    const zhSample = fontSample(ZH, RAG_ZH);
+    const jaSample = fontSample(JA, RAG_JA);
+    const both = fontSample(ZH, JA, RAG_ZH, RAG_JA);
     const loads = document.fonts.load
       ? [
           document.fonts.load('700 32px "Noto Sans JP"', jaSample),
@@ -190,7 +214,7 @@ async function boot() {
     if (!scene || scene.sys.settings.key === "Boot") return;
     game.registry.set("forceSpeak", true);
     const key = scene.sys.settings.key;
-    if (/^Level[1-5]$/.test(key)) {
+    if (/^(Level|Rag)[1-5]$/.test(key)) {
       const payload = { beat: scene.beat || 0, phase: scene.phase || 0 };
       game.registry.set(`${key.toLowerCase()}.progress`, payload);
       scene.scene.restart(payload);
@@ -249,13 +273,19 @@ async function boot() {
     phases: PHASE_COUNT,
   };
 
+  window.__nanoGPTRagSpine = {
+    l1: ragPagesFor(1).length,
+    l2: ragPagesFor(2).length,
+    l3: ragPagesFor(3).length,
+    l4: ragPagesFor(4).length,
+    l5: ragPagesFor(5).length,
+    phases: PHASE_COUNT,
+  };
+
   window.__nanoGPTJump = (key, beat = 0, phase = 2) => {
     const payload = { beat, phase };
-    if (key === "Level1") game.registry.set("level1.progress", payload);
-    if (key === "Level2") game.registry.set("level2.progress", payload);
-    if (key === "Level3") game.registry.set("level3.progress", payload);
-    if (key === "Level4") game.registry.set("level4.progress", payload);
-    if (key === "Level5") game.registry.set("level5.progress", payload);
+    const store = sceneProgressKey(key);
+    if (store) game.registry.set(store, payload);
     const active = game.scene.getScenes(true)[0];
     active?.scene.start(key, payload);
     return key;

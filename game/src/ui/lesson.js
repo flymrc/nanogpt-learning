@@ -189,6 +189,18 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
       purpose.setFontSize(size);
       purpose.setText(wrapToWidth(scene, text, size, maxW, displayText));
     }
+    // A long めあて (chapter 5 threshold, Japanese) can stay taller than the
+    // banner after the font floor. Drop wrapped lines until the banner box
+    // stays clear of the tabs. The full line remains on the phase card.
+    let clipGuard = 0;
+    while (purpose.height > rect.h * 0.5 && clipGuard < 6) {
+      const lines = String(purpose.text || "").split("\n");
+      if (lines.length <= 1) break;
+      lines.pop();
+      const body = lines.join("\n").replace(/…$/, "").trimEnd();
+      purpose.setText(body ? `${body}…` : "…");
+      clipGuard += 1;
+    }
     purpose.setAlpha(0);
     window.__nanoGPTPurposeAlpha = () => purpose.alpha;
     window.__nanoGPTBannerSettled = false;

@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { CHAPTER_COUNT, LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, PHASE_COUNT, SPINE_TOTAL } from "../data/beats.js";
-import { t } from "../i18n/locale.js";
+import { setCourse, t } from "../i18n/locale.js";
 import { retreatToPreviousChapter, takeSceneProgress } from "../ui/catalog.js";
 import { ctaFor, presentBeat } from "../ui/lesson-nav.js";
 import { clearLayer, makeLessonFrame } from "../ui/lesson.js";
@@ -16,6 +16,7 @@ export default class Level3Scene extends Phaser.Scene {
   }
 
   create() {
+    setCourse("nanogpt");
     const frame = makeLessonFrame(this, {
       level: 3,
       total: CHAPTER_COUNT,

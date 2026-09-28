@@ -14,6 +14,9 @@ import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
 import { ZH } from "../src/i18n/zh.js";
+import { RAG_JA } from "../src/i18n/rag/ja.js";
+import { RAG_ZH } from "../src/i18n/rag/zh.js";
+import { ragPagesFor } from "../src/i18n/rag/skeleton.js";
 import { pagesFor } from "../src/i18n/skeleton.js";
 
 const LEVEL_PAGES = {
@@ -23,6 +26,22 @@ const LEVEL_PAGES = {
   Level4: pagesFor(4),
   Level5: pagesFor(5),
 };
+
+const RAG_LEVEL_PAGES = {
+  Rag1: ragPagesFor(1),
+  Rag2: ragPagesFor(2),
+  Rag3: ragPagesFor(3),
+  Rag4: ragPagesFor(4),
+  Rag5: ragPagesFor(5),
+};
+
+const RAG_SHOTS = [
+  ["r1-p9", "ch1"],
+  ["r2-p3", "ch2"],
+  ["r3-p3", "ch3"],
+  ["r4-p6", "ch4"],
+  ["r5-p4", "ch5"],
+];
 
 function expectedVo(lang, key, beat) {
   const pack = lang === "ja" ? JA : ZH;
@@ -97,6 +116,40 @@ async function assertVo(page, key, beat) {
   }
 }
 
+function expectedRagVo(lang, key, beat) {
+  const pack = lang === "ja" ? RAG_JA : RAG_ZH;
+  const nano = lang === "ja" ? JA : ZH;
+  const id = key === "RagTitle" ? "rtitle" : RAG_LEVEL_PAGES[key][beat].id;
+  return {
+    id,
+    prefix: nano.voiceBeat,
+    text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
+  };
+}
+
+async function assertRagVo(page, key, beat) {
+  const lang = await page.evaluate(() => (document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh");
+  const want = expectedRagVo(lang, key, beat);
+  try {
+    await page.waitForFunction((expected) => {
+      const line = String(document.getElementById("voice-line")?.textContent || "").replace(/\s+/g, " ").trim();
+      const narr = window.__nanoGPTNarration?.() || {};
+      const narrText = String(narr.text || "").replace(/\s+/g, " ").trim();
+      const pageId = window.__nanoGPTState?.().pageId || "";
+      const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
+      const source = narr.source === "clip" || narr.source === "speech";
+      return pageId === expected.id && narr.id === expected.id && source && body === expected.text && narrText === expected.text;
+    }, want, { timeout: 4000 });
+  } catch {
+    const got = await page.evaluate(() => ({
+      line: document.getElementById("voice-line")?.textContent || "",
+      narr: window.__nanoGPTNarration?.() || {},
+      pageId: window.__nanoGPTState?.().pageId || "",
+    }));
+    throw new Error(`rag vo mismatch ${key} b${beat} want=${JSON.stringify(want)} got=${JSON.stringify(got)}`);
+  }
+}
+
 async function waitTutor(page) {
   const wide = await page.evaluate(() => window.innerWidth >= 1024 && window.innerWidth > window.innerHeight);
   if (!wide) return;
@@ -150,6 +203,26 @@ function walks(spine, { allPhases }) {
   pushLevel("Level3", spine.l3, "L3");
   pushLevel("Level4", spine.l4, "L4");
   pushLevel("Level5", spine.l5, "L5");
+  return jobs;
+}
+
+function ragWalks(spine, { allPhases }) {
+  const jobs = [];
+  const pushLevel = (key, count, prefix) => {
+    for (let beat = 0; beat < count; beat += 1) {
+      const phases = allPhases ? spine.phases : 1;
+      for (let phase = 0; phase < phases; phase += 1) {
+        const p = allPhases ? phase : 2;
+        const tag = PHASE_NAMES[p] || `p${p}`;
+        jobs.push([key, beat, p, `${prefix}-b${beat}-p${p}-${tag}`]);
+      }
+    }
+  };
+  pushLevel("Rag1", spine.l1, "R1");
+  pushLevel("Rag2", spine.l2, "R2");
+  pushLevel("Rag3", spine.l3, "R3");
+  pushLevel("Rag4", spine.l4, "R4");
+  pushLevel("Rag5", spine.l5, "R5");
   return jobs;
 }
 
@@ -1469,6 +1542,10 @@ async function assertHomeViewport(page, label, lang, mobile) {
   const layout = await page.evaluate(() => window.__nanoGPTAssertLayout());
   const viewNow = page.viewportSize();
   await page.screenshot({ path: homeShot(lang, viewNow.width, viewNow.height) });
+  if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 390 && viewNow.height === 844)) {
+    mkdirSync("/opt/cursor/artifacts/rag", { recursive: true });
+    await page.screenshot({ path: `/opt/cursor/artifacts/rag/home-${lang}-${viewNow.width}x${viewNow.height}.png` });
+  }
   if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 1920 && viewNow.height === 1080)) {
     await page.screenshot({ path: home2Shot(`home-${lang}-${viewNow.width}x${viewNow.height}`) });
   }
@@ -1493,7 +1570,7 @@ async function assertHomeViewport(page, label, lang, mobile) {
   if (cards.length < 2) throw new Error(`home cards ${cards.length}`);
   const rag = cards.find((card) => card.id === "rag");
   const nano = cards.find((card) => card.id === "nanogpt");
-  if (!rag || rag.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
+  if (!rag?.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
   if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
   if (lang === "ja") {
     if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
@@ -1506,14 +1583,22 @@ async function assertHomeViewport(page, label, lang, mobile) {
     window.__nanoGPTHubLast = "";
   });
   await clickHubCard(page, "rag");
-  await page.waitForTimeout(250);
-  const afterRag = await page.evaluate(() => ({
-    scene: window.__nanoGPTState?.().scene,
-    last: window.__nanoGPTHubLast,
-  }));
-  if (afterRag.scene !== "Home" || afterRag.last !== "rag") {
-    throw new Error(`rag card navigated ${JSON.stringify(afterRag)}`);
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "RagTitle" && window.__nanoGPTState?.().pageId === "rtitle",
+    { timeout: 15000 },
+  );
+  const ragGuide = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === false);
+  if (ragGuide) {
+    await page.click("#guide-close");
+    await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === true);
   }
+  const ragLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!ragLayout?.ok) {
+    throw new Error(`rag title ${lang} ${label} ${JSON.stringify({ overlaps: ragLayout?.overlaps, overflows: ragLayout?.overflows, orphans: ragLayout?.orphans })}`);
+  }
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  await waitHome(page, mobile);
   await clickHubCard(page, "nanogpt");
   await page.waitForFunction(
     () => window.__nanoGPTState?.().scene === "Title" && window.__nanoGPTState?.().pageId === "title",
@@ -1690,9 +1775,144 @@ async function assertHomeHub(browser) {
 const live2dFit = await assertLive2dPanel(browser);
 const home = await assertHomeHub(browser);
 
+function ragShotFor(pageId, lang, width, height) {
+  const spec = RAG_SHOTS.find(([id]) => id === pageId);
+  if (!spec) return "";
+  const wide = width === 1440 && height === 900;
+  const phone = width === 390 && height === 844;
+  const chapterShot = (lang === "zh" && wide) || (lang === "ja" && phone);
+  const bothLocales = wide && (pageId === "r3-p3" || pageId === "r5-p4");
+  if (!chapterShot && !bothLocales) return "";
+  return `/opt/cursor/artifacts/rag/${spec[1]}-${lang}-${width}x${height}.png`;
+}
+
+async function jumpRag(page, key, beat, phase, name) {
+  await jumpLanded(page, key, beat, phase);
+  await page.waitForTimeout(280);
+  await assertRagVo(page, key, beat);
+  const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (name.startsWith("rag-mobile")) {
+    const card = await page.evaluate(() => window.__nanoGPTCard || null);
+    if (card?.truncated) {
+      const shown = card.shown || "";
+      if (!shown.includes("点整页") && !shown.includes("ページで全部")) {
+        throw new Error(`rag card truncated without ellipsis ${name}`);
+      }
+    }
+  }
+  if (!result?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
+  const shot = ragShotFor(
+    result?.pageId || (await page.evaluate(() => window.__nanoGPTState?.().pageId || "")),
+    name.includes("-ja-") ? "ja" : "zh",
+    page.viewportSize().width,
+    page.viewportSize().height,
+  );
+  if (shot && phase === 2) await page.screenshot({ path: shot });
+  return { name, ...result };
+}
+
+async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
+  const page = await browser.newPage(pageOpts);
+  await page.addInitScript((next) => {
+    localStorage.setItem("nanogpt-lang", next);
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-seen-guide-rag", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+  }, lang);
+  await ready(page);
+  await page.evaluate(() => window.__nanoGPTJump("RagTitle", 0, 0));
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "RagTitle" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(300);
+  await assertRagVo(page, "RagTitle", 0);
+  const title = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!title?.ok) {
+    await page.screenshot({ path: `${OUT}/rag-${label}-${lang}-title.png` });
+    throw new Error(`rag title ${label} ${lang} ${JSON.stringify({ overlaps: title?.overlaps, overflows: title?.overflows })}`);
+  }
+  const spine = await page.evaluate(() => window.__nanoGPTRagSpine);
+  if (spine?.l1 !== 12 || spine?.l5 !== 12 || spine?.phases !== 5) throw new Error(`rag spine ${JSON.stringify(spine)}`);
+  const jobs = ragWalks(spine, { allPhases });
+  const reports = [];
+  for (const [key, beat, phase, name] of jobs) {
+    const result = await jumpRag(page, key, beat, phase, `rag-${label}-${lang}-${name}`);
+    reports.push(result);
+    if (!result.ok) {
+      console.error(`FAIL rag ${label} ${lang} ${name} ${JSON.stringify(result.overlaps || result.overflows || result.orphans)}`);
+    } else {
+      console.log(`ok rag ${label} ${lang} ${name}`);
+    }
+  }
+  const scoring = RAG_LEVEL_PAGES.Rag3.findIndex((item) => item.id === "r3-p3");
+  const threshold = RAG_LEVEL_PAGES.Rag5.findIndex((item) => item.id === "r5-p4");
+  await openPseudoShot(page, "Rag3", scoring, 2, null);
+  await openPseudoShot(page, "Rag5", threshold, 2, null);
+  await page.click("#book-toggle");
+  await page.waitForTimeout(200);
+  const book = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!book?.ok) throw new Error(`rag book ${label} ${lang}`);
+  await page.click("#lesson-book-close");
+  await page.click("#notes-toggle");
+  await page.waitForTimeout(200);
+  const notes = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!notes?.ok) throw new Error(`rag notes ${label} ${lang} ${JSON.stringify(notes?.overlaps)}`);
+  await page.click("#notes-close");
+  if (lang === "zh") {
+    await page.click("#catalog-toggle");
+    await page.waitForSelector("#catalog-overlay:not([hidden])");
+    const count = await page.locator("#catalog-list [data-chapter]").count();
+    if (count !== 5) throw new Error(`rag chapters ${count}`);
+    await page.click("[data-chapter='Rag2']");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Rag2" && window.__nanoGPTState?.().beat === 0);
+    await page.click("#back-toggle");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Rag1" && window.__nanoGPTState?.().beat === 11);
+  }
+  await page.close();
+  return { reports, walked: jobs.length, lang, spine };
+}
+
+async function runRagViewport(browser, label, pageOpts, { allPhases }) {
+  mkdirSync("/opt/cursor/artifacts/rag", { recursive: true });
+  const zh = await runRagLocale(browser, label, pageOpts, "zh", { allPhases });
+  const ja = await runRagLocale(browser, label, pageOpts, "ja", { allPhases });
+  const reports = [...zh.reports, ...ja.reports];
+  return {
+    ok: reports.every((item) => item.ok),
+    walked: zh.walked + ja.walked,
+    reports,
+  };
+}
+
+const ragMobile = await runRagViewport(
+  browser,
+  "mobile",
+  {
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: MOBILE_UA,
+  },
+  { allPhases: true },
+);
+const ragPc = await runRagViewport(
+  browser,
+  "pc",
+  { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+const ragPc1024 = await runRagViewport(
+  browser,
+  "pc1024",
+  { viewport: { width: 1024, height: 640 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+
 await browser.close();
 
-const summary = { mobile, pc, pc1024, speech, home };
+const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024 };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
@@ -1728,7 +1948,10 @@ const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
 const live2dOk = live2dFit?.ok === true;
 const homeOk = home?.ok === true;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk) {
+const ragWalked =
+  ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
+const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -1748,8 +1971,13 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     live2dFit,
     homeOk,
     home,
+    ragOk,
+    ragWalked,
+    ragMobile: ragMobile.walked,
+    ragPc: ragPc.walked,
+    ragPc1024: ragPc1024.walked,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} jaSpeech=1`);
+console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked} jaSpeech=1`);
