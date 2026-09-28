@@ -271,10 +271,21 @@ function protectWrap(scene, line, size, maxW) {
   return wrapped;
 }
 
-/** Break after punctuation. 「第 4 页」 and Page N stay on one line. */
+/** Break on spaces when the line has them, otherwise after punctuation. 「第 4 页」 and Page N stay on one line. */
 function wrapAtPhrases(scene, raw, size, maxW) {
   const text = String(raw || "");
   if (!text) return "";
+  if (text.includes("\n")) {
+    return text.split("\n").map((line) => wrapAtPhrases(scene, line, size, maxW)).join("\n");
+  }
+  const tokens = [];
+  const masked = text.replace(/第\s*\d+\s*页|Page\s+\d+|\d+\s*ページ/g, (token) => {
+    const key = `⟦${tokens.length}⟧`;
+    tokens.push(token);
+    return key;
+  });
+  const unmask = (value) => tokens.reduce((out, token, index) => out.split(`⟦${index}⟧`).join(token), value);
+  if (/\s/.test(masked)) return unmask(wrapAtBreaks(scene, masked, size, maxW, uiText, { latinWhole: true }));
   const chunks = text.split(/(?<=[：，。、！？；:])/u).filter((part) => part.length);
   if (chunks.length <= 1) return protectWrap(scene, text, size, maxW);
   const lines = [];
@@ -458,10 +469,15 @@ const ROLE_INK = {
 };
 
 function textWidth(scene, value, size) {
-  const probe = scene.add.text(-9000, -9000, value, uiText(size)).setVisible(false);
+  return literalSize(scene, value, size).width;
+}
+
+function literalSize(scene, value, size) {
+  const probe = scene.add.text(-9000, -9000, value, uiText(size, { align: "center" })).setVisible(false);
   const width = probe.width;
+  const height = probe.height;
   probe.destroy();
-  return width;
+  return { width, height };
 }
 
 function latinWords(raw) {
@@ -1212,14 +1228,65 @@ function paintTake(scene, card, g, w, h, spec, step) {
   const many = (spec.many || []).slice(0, 3);
   const showSheet = step >= 3;
   const showLift = step >= 2;
+  const narrow = w < 640;
+  const labels = [
+    { text: pageCardText(one), id: "one", picked: false },
+    ...many.map((item) => ({
+      text: pageCardText(item),
+      id: `many-${item.page}`,
+      picked: showLift && item.page === spec.pick,
+    })),
+  ];
+  const fontFloor = stageMinFont();
+  const sample = labels.find((label) => label.text.includes("\n"))?.text || labels[0]?.text || "Page";
+  const measured = literalSize(scene, sample, fontFloor);
+  const widest = Math.max(
+    24,
+    ...labels.map((label) => Math.max(...String(label.text).split("\n").map((line) => textWidth(scene, line, fontFloor)))),
+  );
+  const slipH0 = Math.max(28, Math.ceil(measured.height + 10));
+  const minW = Math.ceil(widest + 14);
+  const carry = spec.carry ?? one.page;
+  const carryTitle = handbookTitle(carry);
+  const carryText = carryTitle ? `Page ${carry}  ${carryTitle}  ?` : `Page ${carry}  ?`;
+  const carrySize = literalSize(scene, carryText, fontFloor);
+  const sheetH = showSheet ? Math.max(32, Math.ceil(carrySize.height + 14)) : 0;
+  const sheetGap = showSheet ? 8 : 0;
+  const liftGap = showLift ? 14 : 0;
+  const gridGap = 8;
+  const innerW = Math.max(48, w - 20);
+  const lifted = labels.filter((label) => label.picked);
+  const resting = labels.filter((label) => !label.picked);
+  let cols = Math.max(1, resting.length);
+  while (cols > 1 && cols * minW + (cols - 1) * gridGap > innerW) cols -= 1;
+  const rows = resting.length ? Math.ceil(resting.length / cols) : 0;
+  const cardRows = rows + (lifted.length ? 1 : 0);
+  const vGap = Math.max(0, rows - 1) * gridGap + (lifted.length ? liftGap : 0);
+  const cardBlock = cardRows * slipH0 + vGap;
   const actorFloor = h * (pc ? 0.34 : 0.26);
   let s = actorFloor / 3.87;
   const leftX = -w * (w < 560 ? 0.2 : 0.24);
   const rightX = w * (w < 560 ? 0.2 : 0.24);
   const castSpan = Math.abs(rightX - leftX);
   if (castSpan < s * 2.3 + 8) s = Math.max(2, (castSpan - 8) / 2.3);
+  const regionOf = (scale) => {
+    const nextFace = feet - 1.59 * scale;
+    const nextTop = nextFace - scale * 2.28;
+    const nextRegionTop = top + 4;
+    const nextRegionBottom = Math.max(nextRegionTop + 36, nextTop - 8);
+    return {
+      faceY: nextFace,
+      actorTop: nextTop,
+      regionTop: nextRegionTop,
+      regionBottom: nextRegionBottom,
+      regionH: nextRegionBottom - nextRegionTop,
+    };
+  };
+  if (narrow) {
+    const need = cardBlock + sheetH + sheetGap + 2;
+    while (s > 2 && regionOf(s).regionH + 0.5 < need) s = Math.max(2, s - 0.35);
+  }
   const faceY = feet - 1.59 * s;
-  const actorTop = faceY - s * 2.28;
   paintLobbyFrame(g, w, top, bottom, desk);
   const blue = addActor(scene, card, leftX, faceY, s, "blue", "blue");
   addActor(scene, card, rightX, faceY, s, "gold", "gold");
@@ -1240,44 +1307,36 @@ function paintTake(scene, card, g, w, h, spec, step) {
   });
   addZone(scene, card, 0, desk, w - 20, 8, "desk");
 
-  const regionTop = top + 4;
-  const regionBottom = Math.max(regionTop + 36, actorTop - 8);
-  const regionH = regionBottom - regionTop;
-  const narrow = w < 640;
-  const sheetH = showSheet ? Math.min(narrow ? 44 : 52, Math.max(32, regionH * (narrow ? 0.22 : 0.26))) : 0;
-  const sheetGap = showSheet ? 6 : 0;
-  const rowRoom = Math.max(32, regionH - sheetH - sheetGap);
-  const liftGap = showLift ? 14 : 0;
+  const region = regionOf(s);
+  const regionTop = region.regionTop;
+  const regionBottom = region.regionBottom;
+  const regionH = region.regionH;
+  const roomForCards = Math.max(24, regionH - sheetH - sheetGap);
+  let slipH = slipH0;
+  if (narrow && cardRows > 0 && cardBlock > roomForCards) {
+    slipH = Math.max(fontFloor + 8, (roomForCards - vGap) / cardRows);
+  }
+  const usedBlock = narrow ? cardRows * slipH + vGap : 0;
+  const rowRoom = narrow ? Math.min(roomForCards, usedBlock) : Math.max(32, roomForCards);
   if (narrow) {
-    const count = Math.max(1, many.length);
-    const stackGap = 6;
-    const slipH = Math.max(
-      28,
-      Math.min(48, (rowRoom - (showLift ? liftGap : 0) - stackGap * (count - 1)) / (count + (showLift ? 1 : 0))),
-    );
-    const manyW = Math.min(w * 0.44, Math.max(108, (w - 36) * 0.48));
-    const oneW = Math.min(w * 0.4, Math.max(96, w - manyW - 40));
-    const manyX = Math.min(w / 2 - 8 - manyW / 2, rightX + manyW * 0.15);
-    const oneX = Math.max(-w / 2 + 8 + oneW / 2, Math.min(leftX, manyX - manyW / 2 - 12 - oneW / 2));
-    const stackTop = regionTop + (showLift ? slipH + liftGap : 0);
-    const stackH = count * slipH + stackGap * (count - 1);
-    placeTakeCard(scene, card, oneX, stackTop + stackH / 2, oneW, Math.min(stackH, rowRoom), 0xfffdf8, pageCardText(one), "one");
-    many.forEach((item, index) => {
-      const picked = showLift && item.page === spec.pick;
-      const y = stackTop + slipH / 2 + index * (slipH + stackGap);
-      const slip = placeTakeCard(
-        scene,
-        card,
-        manyX,
-        picked ? regionTop + slipH / 2 : y,
-        manyW,
-        slipH,
-        picked ? 0xffe08a : 0xfffdf8,
-        pageCardText(item),
-        `many-${item.page}`,
-        { fromY: y + 8, lift: picked },
-      );
-      if (picked && scene.__ragAnimate) popIn(scene, slip);
+    if (lifted.length) {
+      const cw = Math.min(innerW, Math.max(minW, Math.min(168, innerW * 0.46)));
+      const y = regionTop + slipH / 2;
+      const slip = placeTakeCard(scene, card, 0, y, cw, slipH, 0xffe08a, lifted[0].text, lifted[0].id, {
+        fromY: y + slipH,
+        lift: true,
+      });
+      if (scene.__ragAnimate) popIn(scene, slip);
+    }
+    const gridTop = regionTop + (lifted.length ? slipH + liftGap : 0);
+    const cardW = (innerW - gridGap * (cols - 1)) / cols;
+    const gridW = cols * cardW + (cols - 1) * gridGap;
+    resting.forEach((label, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const x = -gridW / 2 + cardW / 2 + col * (cardW + gridGap);
+      const y = gridTop + slipH / 2 + row * (slipH + gridGap);
+      placeTakeCard(scene, card, x, y, cardW, slipH, 0xfffdf8, label.text, label.id);
     });
   } else {
     const slipBudget = showLift ? Math.max(24, rowRoom - liftGap) : rowRoom;
@@ -1317,10 +1376,7 @@ function paintTake(scene, card, g, w, h, spec, step) {
   }
 
   if (showSheet) {
-    const carry = spec.carry ?? one.page;
-    const carryTitle = handbookTitle(carry);
-    const carryText = carryTitle ? `Page ${carry}  ${carryTitle}  ?` : `Page ${carry}  ?`;
-    const sheetW = Math.min(w - 24, Math.max(narrow ? 180 : 240, w * 0.46));
+    const sheetW = Math.min(w - 24, Math.max(narrow ? Math.min(w - 24, carrySize.width + 28) : 240, w * (narrow ? 0.7 : 0.46)));
     const sheetY = regionTop + rowRoom + sheetGap + sheetH / 2;
     const sheet = placeTakeCard(scene, card, 0, Math.min(sheetY, regionBottom - sheetH / 2), sheetW, sheetH, 0xfff1d2, carryText, "carry", { fromY: sheetY + 12 });
     if (scene.__ragAnimate) popIn(scene, sheet);
@@ -1619,7 +1675,7 @@ function paintCite(scene, card, g, w, h, spec, step) {
   let font = maxType;
   let wrapped = wrapAtPhrases(scene, copy, font, textW);
   while (font > stageMinFont()) {
-    const block = textBlock(scene, wrapped, font, textW);
+    const block = literalSize(scene, wrapped, font);
     if (block.height <= textH + 0.5 && block.width <= textW + 1) break;
     font -= 1;
     wrapped = wrapAtPhrases(scene, copy, font, textW);
