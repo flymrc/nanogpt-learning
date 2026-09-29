@@ -130,7 +130,7 @@ const REF_CARD_W = (REF_ROW - 16) / 2;
 const REF_CARD_H = 210;
 
 function layoutHub(v, top, bottom, count, blocks) {
-  const cols = v.innerW >= 720 ? Math.min(2, Math.max(1, count)) : 1;
+  const cols = count >= 3 && v.innerW >= 960 ? 3 : v.innerW >= 720 ? Math.min(2, Math.max(1, count)) : 1;
   const rows = Math.ceil(count / Math.max(1, cols));
   const gap = 16;
   const cardGap = 16;
@@ -157,7 +157,7 @@ function layoutHub(v, top, bottom, count, blocks) {
     const titleH = Math.round(blocks.titleH * s);
     const introH = Math.round(blocks.introH * s);
     const cardH = REF_CARD_H * s;
-    const cardW = REF_CARD_W * s;
+    const cardW = (rowBudget - zoomGap * (cols - 1)) / cols;
     const cardsH = rows * cardH + (rows - 1) * zoomGap;
     const items = [
       { id: "title", h: titleH },
@@ -170,7 +170,7 @@ function layoutHub(v, top, bottom, count, blocks) {
   const base = measure(1);
   // Wide PC with two cards. A nearly square lesson (1920×1080) is still this
   // row, not the phone stack. 390, 1024×522, and 1024×640 stay on measure(1).
-  const roomy = cols === 2 && v.w >= 700 && v.h >= 800 && base.h + 80 < available;
+  const roomy = rows === 1 && cols >= 2 && v.w >= 700 && v.h >= 800 && base.h + 40 < available;
   const place = (chosen) => {
     const stacked = stackSlots(chosen.items, {
       top,
@@ -299,6 +299,7 @@ function buildCard(scene, spec, x, y, w, h, scale = 1) {
   const contentTop = innerTop + slack / 2;
   art.y = contentTop + (side ? Math.max(0, (Math.max(art.h, blockH) - art.h) / 2) : 0);
   if (spec.art === "desk") drawHotelDesk(card, art, u);
+  else if (spec.art === "map") drawMapArt(card, art, u);
   else drawTapeArt(scene, card, art, spec.id, u);
   const textTop = side ? contentTop + Math.max(0, (Math.max(art.h, blockH) - blockH) / 2) : art.y + art.h + textGap;
   const title = scene.add.text(textX, textTop, titleFit.body, hubDisplay(titleFit.size)).setOrigin(0, 0);
@@ -409,6 +410,37 @@ function drawHotelDesk(card, art, unit = 1) {
   g.moveTo(bx + bw * 0.42, by + px(6));
   g.lineTo(bx + bw * 0.42, by + bh - px(6));
   g.strokePath();
+  card.add(g);
+}
+
+function drawMapArt(card, art, unit = 1) {
+  const u = unit > 1.001 ? unit : 1;
+  const px = (n) => (u === 1 ? n : n * u);
+  const g = card.scene.add.graphics();
+  const { x, y, w, h } = art;
+  g.fillStyle(0xb7e4ff, 1);
+  g.fillRoundedRect(x, y, w, h * 0.72, px(10));
+  g.fillStyle(0x86de7a, 1);
+  g.fillEllipse(x + w * 0.5, y + h * 0.78, w * 0.92, h * 0.36);
+  g.fillStyle(0xffe566, 1);
+  g.fillCircle(x + w * 0.78, y + h * 0.18, Math.max(px(6), Math.min(w, h) * 0.08));
+  const dots = [
+    [0.28, 0.42, 0xe24b57],
+    [0.4, 0.36, 0xe24b57],
+    [0.62, 0.58, 0x1d4ed8],
+    [0.48, 0.66, 0x1d4ed8],
+  ];
+  g.lineStyle(px(3), 0x3b2a2e, 1);
+  g.beginPath();
+  g.moveTo(x + w * dots[0][0], y + h * dots[0][1]);
+  g.lineTo(x + w * dots[1][0], y + h * dots[1][1]);
+  g.moveTo(x + w * dots[2][0], y + h * dots[2][1]);
+  g.lineTo(x + w * dots[3][0], y + h * dots[3][1]);
+  g.strokePath();
+  dots.forEach(([dx, dy, color]) => {
+    g.fillStyle(color, 1);
+    g.fillCircle(x + w * dx, y + h * dy, Math.max(px(4), Math.min(w, h) * 0.06));
+  });
   card.add(g);
 }
 

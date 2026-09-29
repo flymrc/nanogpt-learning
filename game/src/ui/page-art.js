@@ -11,6 +11,7 @@ import {
   STICKER_SHADOW_Y,
   fitChipGrid,
 } from "./layout.js";
+import { drawEmbedArt, embedArtReserve, embedExpectedArt } from "./embed-art.js";
 import { drawRagArt, ragArtReserve, ragExpectedArt } from "./rag-art.js";
 import { C, uiText, wrapToWidth } from "./theme.js";
 
@@ -70,6 +71,7 @@ function statCount(visual) {
 
 /** Minimum example-band height so the picture can shrink instead of disappearing. */
 export function artBandReserve(page, phase = 0, width = 320) {
+  if (page?.course === "embed") return embedArtReserve(page, phase, width);
   if (page?.course === "rag") return ragArtReserve(page, phase, width);
   const visual = page?.visual;
   if (!visual) return 64;
@@ -120,6 +122,7 @@ export function artBandReserve(page, phase = 0, width = 320) {
 
 /** What each skeleton visual must actually paint. Counts come from the page, not from what happened to draw. */
 export function expectedArt(page, phase = 0) {
+  if (page?.course === "embed") return embedExpectedArt(page, phase);
   if (page?.course === "rag") return ragExpectedArt(page, phase);
   const visual = page?.visual;
   if (!visual) return null;
@@ -478,6 +481,12 @@ function revealTile(node, glyph) {
 export function drawPageArt(scene, stage, page, { phase = 0 } = {}) {
   if (!page) {
     if (scene.frame) scene.frame.artExpect = null;
+    return;
+  }
+  if (page.course === "embed") {
+    if (scene.frame) scene.frame.artExpect = embedExpectedArt(page, phase);
+    if (!stage || stage.h < 8) return;
+    drawEmbedArt(scene, stage, page, { phase });
     return;
   }
   if (page.course === "rag") {

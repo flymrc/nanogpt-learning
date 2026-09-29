@@ -21,4 +21,13 @@ export const TUTORIALS = [
     scene: "RagTitle",
     art: "desk",
   },
+  {
+    id: "embed",
+    titleKey: "hub.embed.title",
+    blurbKey: "hub.embed.blurb",
+    actionKey: "hub.enter",
+    status: "ready",
+    scene: "EmbedTitle",
+    art: "map",
+  },
 ];

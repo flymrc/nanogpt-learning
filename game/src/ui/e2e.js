@@ -1037,7 +1037,7 @@ function unionOf(boxes) {
 function collectRagStageHits(scene, origin) {
   const key = String(scene.sys?.settings?.key || "");
   window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, ratio: 1, height: 0 };
-  if (!key.startsWith("Rag") || key === "RagTitle" || key === "RagEnd") return [];
+  if (!/^(Rag|Embed)[1-5]$/.test(key)) return [];
   const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
   if (!scheme) return [];
   const boxes = [];
@@ -1210,7 +1210,7 @@ function collectRagStageHits(scene, origin) {
 /** RAG pages wrap. A text object must not end in an ellipsis or spill out of its card. */
 function collectRagTextHits(scene, origin) {
   const key = scene.sys?.settings?.key || "";
-  if (!String(key).startsWith("Rag")) return [];
+  if (!/^(Rag|Embed)/.test(String(key))) return [];
   const hits = [];
   const lang = String(document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh";
   const walk = (obj) => {

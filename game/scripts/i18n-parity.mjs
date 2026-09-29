@@ -8,11 +8,14 @@ import { fileURLToPath } from "node:url";
 import { JA } from "../src/i18n/ja.js";
 import { PAGES } from "../src/i18n/skeleton.js";
 import { ZH } from "../src/i18n/zh.js";
+import { EMBED_JA } from "../src/i18n/embed/ja.js";
+import { EMBED_END, EMBED_PAGES, EMBED_TITLE } from "../src/i18n/embed/skeleton.js";
+import { EMBED_ZH } from "../src/i18n/embed/zh.js";
 import { RAG_JA } from "../src/i18n/rag/ja.js";
 import { RAG_END, RAG_PAGES, RAG_TITLE } from "../src/i18n/rag/skeleton.js";
 import { RAG_ZH } from "../src/i18n/rag/zh.js";
 import { END_BEAT, TITLE_BEAT } from "../src/data/lessons.js";
-import { checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
+import { checkEmbedVoFiles, checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
 
 const BANNED = [
   "纸带",
@@ -224,14 +227,106 @@ function checkRagPack() {
   return ragZh.size;
 }
 
+function embedPointSet(data) {
+  const pts = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 50, 100, 384, 45, 70, 71, 74, 80, 83]);
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (typeof node.points === "number") pts.add(node.points);
+    if (typeof node.score_x100 === "number") pts.add(node.score_x100);
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(data);
+  for (const matrix of Object.values(data.similarity_matrix || {})) {
+    for (const row of Object.values(matrix)) {
+      if (!row || typeof row !== "object") continue;
+      for (const value of Object.values(row)) {
+        if (typeof value === "number") pts.add(Math.round(value * 100));
+      }
+    }
+  }
+  return pts;
+}
+
+function checkEmbedPack() {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+  const data = JSON.parse(readFileSync(join(root, "embed/demo/results.json"), "utf8"));
+  const ragZh = JSON.parse(readFileSync(join(root, "rag/demo/results_zh.json"), "utf8"));
+  const allowed = embedPointSet(data);
+  embedPointSet(ragZh).forEach((n) => allowed.add(n));
+  const embedZh = new Set(Object.keys(EMBED_ZH));
+  const embedJa = new Set(Object.keys(EMBED_JA));
+  for (const key of embedZh) {
+    if (!embedJa.has(key)) fail(`missing embed ja key ${key}`);
+  }
+  for (const key of embedJa) {
+    if (!embedZh.has(key)) fail(`missing embed zh key ${key}`);
+  }
+  for (const [key, value] of Object.entries(EMBED_ZH)) {
+    if (typeof value !== "string" || !value.trim()) fail(`empty embed zh ${key}`);
+    if (value.includes("`") || value.includes("【") || value.includes("】") || value.includes("→")) fail(`embed zh marker ${key}`);
+    if (/\n+---\s*$/.test(value)) fail(`embed zh trailing rule ${key}`);
+  }
+  for (const [key, value] of Object.entries(EMBED_JA)) {
+    if (typeof value !== "string" || !value.trim()) fail(`empty embed ja ${key}`);
+    if (value.includes("`") || value.includes("【") || value.includes("】") || value.includes("→")) fail(`embed ja marker ${key}`);
+    if (/\n+---\s*$/.test(value)) fail(`embed ja trailing rule ${key}`);
+    for (const n of [45, 71, 74, 83]) {
+      if (new RegExp(`(?<!\\d)${n}\\s*てん`).test(value)) fail(`embed ja rag score ${key} ${n}`);
+    }
+  }
+  const counts = [1, 2, 3, 4, 5].map((chapter) => EMBED_PAGES.filter((page) => page.chapter === chapter).length);
+  if (counts.join(",") !== "8,8,8,8,8") fail(`embed page counts ${counts.join(",")}`);
+  const pages = [...EMBED_PAGES, EMBED_TITLE, EMBED_END];
+  for (const page of pages) {
+    if (page.course !== "embed") fail(`${page.id} course`);
+    for (const key of Object.values(page.keys || {})) {
+      if (!embedZh.has(key) || !embedJa.has(key)) fail(`${page.id} references missing embed key ${key}`);
+    }
+    if (page.chapter && page.keys && !page.keys.talk && !/-(sum|rev)$/.test(page.id) && page.kind !== "intro") {
+      fail(`${page.id} missing talk key`);
+    }
+    if (String(page.id || "").startsWith("e")) {
+      for (const suffix of ["does", "metaphor", "myth", "l1", "l2", "l3", "l4"]) {
+        const key = `pseudo.${page.id}.${suffix}`;
+        if (!embedZh.has(key) || !embedJa.has(key)) fail(`missing embed pseudo ${key}`);
+      }
+    }
+  }
+  const visit = (page, loc, node, path) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(page, loc, item, `${path}[${index}]`));
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "kind" || key === "mapKey" || key === "word" || key === "label" || key === "a" || key === "b" || key === "aLabel" || key === "bLabel" || key === "name" || key === "title") continue;
+      if (typeof value === "number" && !allowed.has(value)) fail(`${page.id} ${loc} ${path}.${key}=${value} is not in results.json`);
+      else if (value && typeof value === "object") visit(page, loc, value, `${path}.${key}`);
+    }
+  };
+  for (const page of EMBED_PAGES) {
+    visit(page, "zh", page.shared?.locales?.zh, "pic");
+    visit(page, "ja", page.shared?.locales?.ja, "pic");
+    if (!page.keys?.talk || !EMBED_ZH[page.keys.talk]) fail(`${page.id} talk`);
+  }
+  const zhPark = data.rag_link.parking_recomputed_here.zh.top3.map((row) => row.score_x100).join(",");
+  const ragPark = ragZh.meaning.questions.find((item) => item.id === "q4_parking").top3.map((row) => row.score_x100).join(",");
+  if (zhPark !== ragPark) fail(`embed zh parking ${zhPark} != rag ${ragPark}`);
+  const enWord = data.rag_link.parking_recomputed_here?.en;
+  void enWord;
+  return embedZh.size;
+}
+
 const ragKeys = checkRagPack();
+const embedKeys = checkEmbedPack();
 
 for (const error of checkVoFiles()) fail(error);
 for (const error of checkRagVoFiles()) fail(error);
+for (const error of checkEmbedVoFiles()) fail(error);
 
 if (errors.length) {
   console.error("I18N_FAIL");
   for (const error of errors) console.error(error);
   process.exit(1);
 }
-console.log(`I18N_OK keys=${zhKeys.size} pages=${PAGES.length} ragKeys=${ragKeys} ragPages=${RAG_PAGES.length}`);
+console.log(`I18N_OK keys=${zhKeys.size} pages=${PAGES.length} ragKeys=${ragKeys} ragPages=${RAG_PAGES.length} embedKeys=${embedKeys} embedPages=${EMBED_PAGES.length}`);

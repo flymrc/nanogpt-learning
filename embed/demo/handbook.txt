@@ -1,0 +1,38 @@
+# FICTIONAL hotel handbook for a kids' tutorial. "Hotel Hoshi" is made up.
+# None of these rules describe a real hotel. One page = one card.
+
+## Page 1: Welcome
+Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.
+
+## Page 2: Check-in
+Check-in time starts at 3:00 PM. Please tell us your name at the front desk.
+
+## Page 3: Checkout
+Checkout time is 11:00 AM. Please give your room key back to the front desk.
+
+## Page 4: Breakfast
+Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.
+
+## Page 5: Dinner
+Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.
+
+## Page 6: Swimming pool
+The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.
+
+## Page 7: Big bath
+The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.
+
+## Page 8: Wi-Fi
+Free Wi-Fi works in every room. The password is printed on your room key card.
+
+## Page 9: Parking
+The parking lot is next to the hotel. Parking costs 1,000 yen per night.
+
+## Page 10: Towels
+Extra towels and pillows are free. Call the front desk from the phone in your room.
+
+## Page 11: Bags
+We can keep your bags at the front desk before check-in and after checkout.
+
+## Page 12: Lost and found
+If you lose something, ask the front desk. We keep lost things for one month.

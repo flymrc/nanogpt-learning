@@ -3,6 +3,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JA } from "../src/i18n/ja.js";
 import { ZH } from "../src/i18n/zh.js";
+import { EMBED_JA } from "../src/i18n/embed/ja.js";
+import { EMBED_ZH } from "../src/i18n/embed/zh.js";
 import { RAG_JA } from "../src/i18n/rag/ja.js";
 import { RAG_ZH } from "../src/i18n/rag/zh.js";
 import { voHash } from "./vo-hash.mjs";
@@ -93,6 +95,46 @@ export function checkRagVoFiles() {
         continue;
       }
       if (!expected.has(name)) errors.push(`stale rag vo file ${lang}/${name}`);
+    }
+  }
+  return errors;
+}
+
+export function checkEmbedVoFiles() {
+  const errors = [];
+  const manifestPath = join(root, "src/audio/embed-vo-manifest.json");
+  if (!existsSync(manifestPath)) return ["missing src/audio/embed-vo-manifest.json"];
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const packs = { zh: EMBED_ZH, ja: EMBED_JA };
+  for (const lang of ["zh", "ja"]) {
+    const voKeys = Object.keys(packs[lang]).filter((key) => key.endsWith(".vo")).sort();
+    const table = manifest[lang] || {};
+    const manifestKeys = Object.keys(table).sort();
+    if (manifestKeys.join("\n") !== voKeys.join("\n")) errors.push(`embed vo manifest keys differ for ${lang}`);
+    const dir = join(root, "public/audio/vo-embed", lang);
+    if (!existsSync(dir)) {
+      errors.push(`missing embed audio dir ${lang}`);
+      continue;
+    }
+    const expected = new Set();
+    for (const key of voKeys) {
+      const hash = voHash(packs[lang][key]);
+      if (table[key] !== hash) errors.push(`stale embed vo ${lang} ${key}`);
+      const name = `${key}.${hash}.mp3`;
+      expected.add(name);
+      const file = join(dir, name);
+      if (!existsSync(file)) {
+        errors.push(`missing embed vo file ${lang}/${name}`);
+        continue;
+      }
+      if (statSync(file).size < 500) errors.push(`tiny embed vo file ${lang}/${name}`);
+    }
+    for (const name of readdirSync(dir)) {
+      if (!name.endsWith(".mp3")) {
+        errors.push(`unexpected file in vo-embed/${lang}: ${name}`);
+        continue;
+      }
+      if (!expected.has(name)) errors.push(`stale embed vo file ${lang}/${name}`);
     }
   }
   return errors;

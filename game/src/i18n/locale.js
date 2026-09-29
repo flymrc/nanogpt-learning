@@ -1,22 +1,30 @@
 import { LESSON_PHASES } from "../data/lessons.js";
 import { JA } from "./ja.js";
 import { ZH } from "./zh.js";
+import { EMBED_JA } from "./embed/ja.js";
+import { EMBED_ZH } from "./embed/zh.js";
 import { RAG_JA } from "./rag/ja.js";
 import { RAG_ZH } from "./rag/zh.js";
 
 export const LANG_KEY = "nanogpt-lang";
 export const GUIDE_KEY = "nanogpt-seen-guide";
 export const RAG_GUIDE_KEY = "nanogpt-seen-guide-rag";
+export const EMBED_GUIDE_KEY = "nanogpt-seen-guide-embed";
 
 const PACKS = { zh: ZH, ja: JA };
 const RAG_PACKS = { zh: RAG_ZH, ja: RAG_JA };
+const EMBED_PACKS = { zh: EMBED_ZH, ja: EMBED_JA };
 
 let lang = "zh";
 let course = "nanogpt";
 
 export function setCourse(next) {
-  course = next === "rag" ? "rag" : "nanogpt";
+  course = next === "rag" || next === "embed" ? next : "nanogpt";
   if (typeof document !== "undefined") document.documentElement.dataset.course = course;
+}
+
+export function isPictureCourse() {
+  return course === "rag" || course === "embed";
 }
 
 export function getCourse() {
@@ -36,7 +44,9 @@ export function readStoredLang() {
 }
 
 function guideStorageKey() {
-  return getCourse() === "rag" ? RAG_GUIDE_KEY : GUIDE_KEY;
+  if (getCourse() === "rag") return RAG_GUIDE_KEY;
+  if (getCourse() === "embed") return EMBED_GUIDE_KEY;
+  return GUIDE_KEY;
 }
 
 export function readSeenGuide() {
@@ -67,6 +77,11 @@ export function present(value) {
 
 export function t(key) {
   if (!key) return "";
+  if (getCourse() === "embed") {
+    const embed = EMBED_PACKS[lang] || EMBED_ZH;
+    const embedValue = embed[key];
+    if (typeof embedValue === "string" && embedValue.length) return present(embedValue);
+  }
   if (getCourse() === "rag") {
     const rag = RAG_PACKS[lang] || RAG_ZH;
     const ragValue = rag[key];
@@ -95,7 +110,9 @@ export function resolveBeat(page) {
   const aim = t(keys.aim);
   const bubble = t(keys.bubble);
   const local = keys.local ? t(keys.local) : "";
-  const look = [t(keys.look), local].filter(Boolean).join("\n");
+  const talk = keys.talk ? t(keys.talk) : "";
+  const talkLabel = talk ? t("talkLabel") : "";
+  const look = [t(keys.look), local, talk ? `${talkLabel}\n${talk}` : ""].filter(Boolean).join("\n");
   const summary = t(keys.summary);
   const aside = keys.aside ? t(keys.aside) : "";
   const checkQ = t(keys.checkQ);
@@ -121,6 +138,8 @@ export function resolveBeat(page) {
     checkA,
     stars,
     detail,
+    talk,
+    talkLabel,
   };
 }
 
@@ -187,10 +206,10 @@ export function guideCards() {
 }
 
 export function chapterList() {
-  const rag = getCourse() === "rag";
+  const prefix = getCourse() === "rag" ? "Rag" : getCourse() === "embed" ? "Embed" : "Level";
   return [1, 2, 3, 4, 5].map((index) => ({
-    id: rag ? `Rag${index}` : `Level${index}`,
-    scene: rag ? `Rag${index}` : `Level${index}`,
+    id: `${prefix}${index}`,
+    scene: `${prefix}${index}`,
     playable: true,
     short: t(`chapter.${index}.short`),
     title: t(`chapter.${index}.title`),
@@ -205,7 +224,9 @@ export function chapterList() {
 export function noteList() {
   const ids = getCourse() === "rag"
     ? ["memory", "ai", "rag", "finder", "writer", "card", "line"]
-    : ["vocab", "encode", "decode", "split", "loss", "embed", "attention", "train", "sample"];
+    : getCourse() === "embed"
+      ? ["vector", "embed", "near", "angle", "ruler", "flat", "maker", "class"]
+      : ["vocab", "encode", "decode", "split", "loss", "embed", "attention", "train", "sample"];
   return ids.map((id) => ({
     id,
     term: t(`note.${id}.term`),

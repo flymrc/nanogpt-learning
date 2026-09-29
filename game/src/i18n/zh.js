@@ -38,6 +38,8 @@ export const ZH = {
   "hub.nanogpt.blurb": "看前面，猜下一个字。",
   "hub.rag.title": "问前台",
   "hub.rag.blurb": "先问人，再翻书找答案。",
+  "hub.embed.title": "按意思找的秘密",
+  "hub.embed.blurb": "词怎么变成一排数字",
   "subtitle": "看前面，猜下一个",
   "bubble": "下一个是什么呢？",
   "tapeCaption": "一个字，一格",

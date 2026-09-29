@@ -20,6 +20,7 @@ const TAG = {
   summary: ["まとめ"],
   check: ["たしかめよう"],
   vo: ["配音", "ナレーション"],
+  art: ["动画", "アニメーション"],
   next: ["下一章预告", "つぎの章の よ告", "次の章"],
 };
 
@@ -99,6 +100,7 @@ function firstSentence(text) {
 function kidOnly(text) {
   return String(text || "")
     .split(/\n---\n/)[0]
+    .replace(/\n+---\s*$/g, "")
     .split(/\n###\s*附/)[0]
     .split(/\n（出典/)[0]
     .trim();
@@ -121,12 +123,6 @@ function shareBoards(data, qid) {
         }))
         .sort((a, b) => b.share - a.share),
     }));
-}
-
-function shortArt(text, lang) {
-  const line = firstSentence(text);
-  if (lang === "ja") return line.split(/\s+/).slice(0, 10).join(" ");
-  return [...line].slice(0, 18).join("");
 }
 
 function parseChapter(markdown) {
@@ -370,7 +366,7 @@ function pageCopy(section, lang) {
     checkQ: quiz.q,
     checkA: quiz.a,
     vo,
-    art: shortArt(blocks.look || aim, lang),
+    art: blocks.art || blocks.action || firstSentence(blocks.look || aim),
     stars: [],
     quiz: true,
   };
@@ -398,7 +394,7 @@ function pseudoLines(copy, lang, chapter) {
   while (bits.length < 4) bits.push(bits[0]);
   return {
     does: firstSentence(copy.action),
-    metaphor: copy.art,
+    metaphor: firstSentence(copy.art),
     myth: MYTH[lang][chapter],
     l1: bits[0],
     l2: bits[1],

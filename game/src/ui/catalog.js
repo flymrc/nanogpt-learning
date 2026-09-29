@@ -1,6 +1,7 @@
 import { narrateLine } from "../audio/narrate.js";
 import { unlockAudio } from "../audio/sound.js";
 import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "../data/beats.js";
+import { embedPagesFor } from "../i18n/embed/skeleton.js";
 import { ragPagesFor } from "../i18n/rag/skeleton.js";
 import { chapterList, t } from "../i18n/locale.js";
 import { openGuide } from "./guide.js";
@@ -17,6 +18,11 @@ const BEAT_COUNTS = {
   Rag3: ragPagesFor(3).length,
   Rag4: ragPagesFor(4).length,
   Rag5: ragPagesFor(5).length,
+  Embed1: embedPagesFor(1).length,
+  Embed2: embedPagesFor(2).length,
+  Embed3: embedPagesFor(3).length,
+  Embed4: embedPagesFor(4).length,
+  Embed5: embedPagesFor(5).length,
 };
 
 let mounted = false;
@@ -32,6 +38,11 @@ export function sceneProgressKey(sceneKey) {
   if (sceneKey === "Rag3") return "rag3.progress";
   if (sceneKey === "Rag4") return "rag4.progress";
   if (sceneKey === "Rag5") return "rag5.progress";
+  if (sceneKey === "Embed1") return "embed1.progress";
+  if (sceneKey === "Embed2") return "embed2.progress";
+  if (sceneKey === "Embed3") return "embed3.progress";
+  if (sceneKey === "Embed4") return "embed4.progress";
+  if (sceneKey === "Embed5") return "embed5.progress";
   return null;
 }
 
@@ -351,6 +362,30 @@ export function retreatToPreviousChapter(scene) {
   }
   if (key === "Rag1") {
     scene.scene.start("RagTitle");
+    return;
+  }
+  if (key === "Embed2") {
+    goScene(scene, "Embed1", { beat: BEAT_COUNTS.Embed1 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Embed3") {
+    goScene(scene, "Embed2", { beat: BEAT_COUNTS.Embed2 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Embed4") {
+    goScene(scene, "Embed3", { beat: BEAT_COUNTS.Embed3 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Embed5") {
+    goScene(scene, "Embed4", { beat: BEAT_COUNTS.Embed4 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "EmbedEnd") {
+    goScene(scene, "Embed5", { beat: BEAT_COUNTS.Embed5 - 1, phase: PHASE_COUNT - 1 });
+    return;
+  }
+  if (key === "Embed1") {
+    scene.scene.start("EmbedTitle");
     return;
   }
   scene.scene.start("Title");
