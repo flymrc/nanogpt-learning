@@ -6,7 +6,7 @@ import { syncHubChrome } from "./chrome.js";
 import { addChrome, addFooterCta, bindAdvance, drawSticker, paintBackdrop, planLessonHeader } from "./components.js";
 import { addRobot, addSpeechBubble, setSpeech } from "./mascot.js";
 import { syncMobileChrome } from "./mode.js";
-import { C, displayText, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
+import { C, displayText, setGluedText, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
 export function openCopyPop(text) {
   let pop = document.getElementById("copy-pop");
@@ -22,7 +22,7 @@ export function openCopyPop(text) {
   }
   const body = document.getElementById("copy-pop-body");
   const close = document.getElementById("copy-pop-close");
-  if (body) body.textContent = String(text || "");
+  if (body) setGluedText(body, String(text || ""));
   if (close) close.textContent = t("close");
   pop.hidden = false;
   window.__nanoGPTCopyPopOpen = true;

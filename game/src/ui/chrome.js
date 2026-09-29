@@ -1,5 +1,6 @@
 import { t } from "../i18n/locale.js";
 import { isPcLayout } from "./mode.js";
+import { glueRegExp } from "./theme.js";
 
 const HUD_IDS = ["home-toggle", "back-toggle", "catalog-toggle", "lang-toggle", "pseudo-toggle", "book-toggle", "notes-toggle", "mute-toggle"];
 const LESSON_CHROME = ["back-toggle", "catalog-toggle", "pseudo-toggle", "book-toggle", "notes-toggle"];
@@ -89,30 +90,50 @@ export function bindVoiceNote() {
     const note = line?.parentElement;
     if (!line) return;
     const words = [...line.querySelectorAll(".voice-word")];
-    for (const word of words) word.classList.remove("is-breakable");
+    for (const word of words) {
+      if (word.dataset.glue !== "1") word.classList.remove("is-breakable");
+    }
     const limit = line.clientWidth || note?.clientWidth || 0;
     if (limit < 8) return;
     const lineOverflow = line.scrollWidth > limit + 1;
     const noteOverflow = Boolean(note) && note.scrollWidth > note.clientWidth + 1;
     if (!lineOverflow && !noteOverflow) return;
     for (const word of words) {
+      if (word.dataset.glue === "1") continue;
       const range = document.createRange();
       range.selectNodeContents(word);
       if (range.getBoundingClientRect().width > limit - 1) word.classList.add("is-breakable");
     }
   };
+  const appendPiece = (line, text, glue) => {
+    if (!text) return;
+    const word = document.createElement("span");
+    word.className = "voice-word";
+    if (glue) word.dataset.glue = "1";
+    word.textContent = text;
+    line.appendChild(word);
+  };
   const fillLine = (line, shown) => {
     line.replaceChildren();
-    for (const part of String(shown).split(/(\s+)/)) {
-      if (!part) continue;
-      if (/^\s+$/.test(part)) {
-        line.appendChild(document.createTextNode(part));
+    const src = String(shown);
+    const pieces = [];
+    let last = 0;
+    for (const match of src.matchAll(glueRegExp())) {
+      if (match.index > last) pieces.push({ text: src.slice(last, match.index), glue: false });
+      pieces.push({ text: match[0], glue: true });
+      last = match.index + match[0].length;
+    }
+    if (last < src.length) pieces.push({ text: src.slice(last), glue: false });
+    for (const piece of pieces) {
+      if (piece.glue) {
+        appendPiece(line, piece.text, true);
         continue;
       }
-      const word = document.createElement("span");
-      word.className = "voice-word";
-      word.textContent = part;
-      line.appendChild(word);
+      for (const part of piece.text.split(/(\s+)/)) {
+        if (!part) continue;
+        if (/^\s+$/.test(part)) line.appendChild(document.createTextNode(part));
+        else appendPiece(line, part, false);
+      }
     }
     reflowCaption(line);
   };

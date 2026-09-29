@@ -2024,6 +2024,45 @@ async function saveRag5Shots(browser) {
 
 await saveRag5Shots(browser);
 
+async function saveRag6Shots(browser) {
+  const dir = "/opt/cursor/artifacts/rag6";
+  mkdirSync(dir, { recursive: true });
+  const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const jaPc = await open(1440, 900, "ja");
+  const take = beatOf("Rag5", "r5-p2");
+  await shootRag5(jaPc, "Rag5", take, 2, 1, `${dir}/r6-ch5-take-ja-1440-tap1.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 3, `${dir}/r6-ch5-take-ja-1440-tap3.png`);
+  const fillJa = beatOf("Rag4", "r4-p6");
+  await shootRag5(jaPc, "Rag4", fillJa, 2, 1, `${dir}/r6-captions-ja-1440.png`);
+  await jaPc.close();
+  const zhPhone = await open(390, 844, "zh", true);
+  await shootRag5(zhPhone, "Rag5", take, 2, 1, `${dir}/r6-ch5-take-zh-390-tap1.png`);
+  await zhPhone.close();
+  const zhPc = await open(1440, 900, "zh");
+  const fill = beatOf("Rag4", "r4-p6");
+  await shootRag5(zhPc, "Rag4", fill, 2, 1, `${dir}/r6-ch4-fill-zh-1440-filled.png`);
+  await zhPc.close();
+}
+
+await saveRag6Shots(browser);
+
 await browser.close();
 
 const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024 };

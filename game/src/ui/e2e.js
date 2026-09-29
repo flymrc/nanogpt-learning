@@ -1,6 +1,6 @@
 import { isWidePcTutor } from "../tutor/bus.js";
 import { CAPTION_CLEAR, MIN_CHIP_H, MIN_CHIP_W, MIN_ID_FONT, STICKER_SHADOW_X, STICKER_SHADOW_Y } from "./layout.js";
-import { orphanLines } from "./theme.js";
+import { glueRegExp, gluedRunSplits, orphanLines } from "./theme.js";
 
 const PAD = 2;
 const PIECE_KINDS = new Set(["tile", "chip", "placeholder", "card", "hub-card"]);
@@ -988,21 +988,9 @@ function splitEnglishWords(source, rendered) {
   return hits;
 }
 
-/** 「第 4 页」 and Page N must stay on one rendered line. */
+/** Times, thousands, ranges, and page marks must stay on one rendered line. */
 function splitPageMarks(source, rendered) {
-  const marks = String(source || "").match(/第\s*\d+\s*页|Page\s+\d+/g) || [];
-  if (!marks.length) return [];
-  const lines = String(rendered || "").split("\n");
-  const hits = [];
-  const seen = new Set();
-  for (const mark of marks) {
-    const compact = mark.replace(/\s+/g, "");
-    if (seen.has(compact)) continue;
-    seen.add(compact);
-    if (lines.some((line) => line.replace(/\s+/g, "").includes(compact))) continue;
-    if (lines.join("").replace(/\s+/g, "").includes(compact)) hits.push(compact);
-  }
-  return hits;
+  return gluedRunSplits(source, rendered);
 }
 
 function cardHasVisibleContent(node) {
@@ -1099,6 +1087,50 @@ function collectRagStageHits(scene, origin) {
     empty += 1;
     if (hits.length < 8) hits.push(["stage-empty", box.id || box.sample]);
   }
+  const oneHand = boxes.find((box) => box.role === "card" && box.id === "one");
+  const manyHand = boxes.filter((box) => box.role === "card" && String(box.id || "").startsWith("many-"));
+  if (oneHand && manyHand.length) {
+    const manyLeft = Math.min(...manyHand.map((box) => box.x));
+    if (oneHand.x + oneHand.w > manyLeft - 12) {
+      overlaps += 1;
+      if (hits.length < 8) hits.push(["stage-hands", "gap"]);
+    }
+    const labelAbove = (id, group) => {
+      const label = boxes.find((box) => box.role === "chip" && box.id === id);
+      if (!label) {
+        overlaps += 1;
+        if (hits.length < 8) hits.push(["stage-hands", id]);
+        return;
+      }
+      const top = Math.min(...group.map((box) => box.y));
+      const gLeft = Math.min(...group.map((box) => box.x));
+      const gRight = Math.max(...group.map((box) => box.x + box.w));
+      if (label.y + label.h > top - 2) {
+        overlaps += 1;
+        if (hits.length < 8) hits.push(["stage-hands", `${id}-above`]);
+      }
+      const mid = label.x + label.w / 2;
+      if (mid < gLeft - 8 || mid > gRight + 8) {
+        overlaps += 1;
+        if (hits.length < 8) hits.push(["stage-hands", `${id}-align`]);
+      }
+    };
+    labelAbove("hand-one", [oneHand]);
+    labelAbove("hand-many", manyHand);
+    const ownerIn = (actorId, group) => {
+      const actor = boxes.find((box) => box.role === "actor" && box.id === actorId);
+      if (!actor) return;
+      const mid = actor.x + actor.w / 2;
+      const gLeft = Math.min(...group.map((box) => box.x));
+      const gRight = Math.max(...group.map((box) => box.x + box.w));
+      if (mid < gLeft - 16 || mid > gRight + 16) {
+        overlaps += 1;
+        if (hits.length < 8) hits.push(["stage-hands", actorId]);
+      }
+    };
+    ownerIn("blue", [oneHand]);
+    ownerIn("gold", manyHand);
+  }
   const lifted = boxes.filter((box) => box.node?.getData?.("stageLift"));
   if (lifted.length) {
     const peers = boxes.filter((box) => box.role === "card" && String(box.id || "").startsWith("many-") && !box.node?.getData?.("stageLift"));
@@ -1194,6 +1226,11 @@ function collectRagTextHits(scene, origin) {
         const tooWide = (phrase) => phraseWiderThan(obj, phrase, wrapWidth);
         for (const hit of phraseSplitHits(source, body, tooWide)) hits.push(["rag-phrase", hit[0], hit[1] || "", hit[2] || ""]);
       }
+      if (source && !insideScheme(obj)) {
+        for (const token of gluedRunSplits(source, body)) {
+          if (hits.length < 8) hits.push(["rag-glue", token]);
+        }
+      }
       const parent = obj.parentContainer;
       const hostW = parent?.getData?.("width");
       const hostH = parent?.getData?.("height");
@@ -1218,6 +1255,56 @@ function collectRagTextHits(scene, origin) {
   };
   (scene.children?.list || []).forEach(walk);
   if (window.__nanoGPTCard?.truncated) hits.push(["rag-ellipsis", "card"]);
+  for (const token of domGlueSplits()) {
+    if (hits.length < 8) hits.push(["rag-glue", token]);
+  }
+  return hits;
+}
+
+function insideScheme(obj) {
+  let node = obj;
+  while (node) {
+    if (node.getData?.("artPart") === "scheme") return true;
+    node = node.parentContainer;
+  }
+  return false;
+}
+
+function domGlueSplits() {
+  const roots = ["voice-line", "copy-pop-body", "tutor-book", "pseudo-does", "pseudo-metaphor", "pseudo-myth", "notes-detail"]
+    .map((id) => document.getElementById(id))
+    .filter((el) => rootVisible(el));
+  const hits = [];
+  const seen = new Set();
+  for (const root of roots) {
+    const locator = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      const value = node.textContent || "";
+      for (let i = 0; i < value.length; i += 1) locator.push({ node, offset: i });
+      node = walker.nextNode();
+    }
+    const full = root.textContent || "";
+    if (full.length !== locator.length) continue;
+    for (const match of full.matchAll(glueRegExp())) {
+      const compact = match[0].replace(/\s+/g, "");
+      if (!compact || seen.has(compact) || match[0].length < 1) continue;
+      const start = locator[match.index];
+      const end = locator[match.index + match[0].length - 1];
+      if (!start || !end) continue;
+      const range = document.createRange();
+      range.setStart(start.node, start.offset);
+      range.setEnd(end.node, end.offset + 1);
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0.5 && rect.height > 0.5);
+      if (rects.length < 2) continue;
+      const tops = rects.map((rect) => Math.round(rect.top));
+      if (Math.max(...tops) - Math.min(...tops) > 4) {
+        seen.add(compact);
+        hits.push(compact);
+      }
+    }
+  }
   return hits;
 }
 
@@ -1240,7 +1327,25 @@ function collectCaptionHits(scene, origin) {
   const box = domBox(note, "caption");
   const cta = scene.frame?.nextBtn ? phaserBox(scene.frame.nextBtn, "cta", origin) : null;
   if (box && cta && intersects(box, cta)) hits.push(["caption", "cta"]);
+  const schemeLabel = schemeLabelBox(scene, origin);
+  if (box && schemeLabel && intersects(box, schemeLabel)) hits.push(["voice-note", "scheme-label"]);
   return hits;
+}
+
+function schemeLabelBox(scene, origin) {
+  let found = null;
+  const walk = (obj) => {
+    if (!obj || found) return;
+    if (obj.getData?.("artPart") === "scheme-label" && obj.visible !== false && obj.alpha > 0.2) {
+      const bounds = obj.getBounds?.();
+      if (bounds && bounds.width > 1 && bounds.height > 1) {
+        found = { x: origin.x + bounds.x, y: origin.y + bounds.y, w: bounds.width, h: bounds.height };
+      }
+    }
+    (obj.list || []).forEach(walk);
+  };
+  (scene.children?.list || []).forEach(walk);
+  return found;
 }
 
 function collectTopBarHits() {

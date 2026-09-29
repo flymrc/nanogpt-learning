@@ -867,6 +867,12 @@ html.has-game-cursor * {
   overflow-wrap: anywhere;
 }
 
+.rag-glue,
+.voice-word[data-glue="1"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 html.is-mobile[data-scene="home"] #mobile-chrome {
   flex-wrap: nowrap;
   justify-content: flex-end;

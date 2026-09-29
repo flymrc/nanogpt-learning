@@ -7,7 +7,7 @@ import { lessonRhythm } from "./layout.js";
 import { installLayoutProbe } from "./e2e.js";
 import { artBandReserve } from "./page-art.js";
 import { ctaCeiling, keepStageAboveCta, layerBottom, openCopyPop, placeLessonCta } from "./lesson.js";
-import { C, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
+import { C, glueUnits, isGluedUnit, setGluedText, uiText, wrapAtBreaks, wrapToWidth } from "./theme.js";
 
 let bookMounted = false;
 
@@ -92,12 +92,12 @@ export function renderTutorBook(beat) {
     const h = document.createElement("h3");
     h.textContent = title;
     const p = document.createElement("p");
-    p.textContent = body;
+    setGluedText(p, body);
     sec.append(h, p);
     if (id === "box" && beat.footnote) {
       const foot = document.createElement("p");
       foot.className = "tutor-footnote";
-      foot.textContent = beat.footnote;
+      setGluedText(foot, beat.footnote);
       sec.append(foot);
     }
     root.appendChild(sec);
@@ -109,7 +109,7 @@ export function renderTutorBook(beat) {
     const h = document.createElement("h3");
     h.textContent = t("adultHeading");
     const p = document.createElement("p");
-    p.textContent = beat.detail;
+    setGluedText(p, beat.detail);
     sec.append(h, p);
     root.appendChild(sec);
   }
@@ -342,25 +342,30 @@ function drawCompactPhaseCard(scene, stage, beat, phase, meta, copy, cardTop, wi
   };
   while (size > 13 && widthOf(shown, size) > textMax) size -= 1;
   if (widthOf(shown, size) > textMax) {
-    const parts = full.split(/\s+/).filter(Boolean);
-    if (parts.length > 1) {
-      let acc = "";
-      for (const part of parts) {
-        const trial = acc ? `${acc} ${part}` : part;
-        if (widthOf(trial, size) > textMax) break;
-        acc = trial;
+    let next = "";
+    const pushFit = (piece) => {
+      if (!piece) return true;
+      if (!next || widthOf(next + piece, size) <= textMax) {
+        next += piece;
+        return true;
       }
-      shown = acc;
-    }
-    if (!shown || widthOf(shown, size) > textMax) {
-      const chars = [...full];
-      let next = "";
-      for (const ch of chars) {
-        if (widthOf(next + ch, size) > textMax) break;
-        next += ch;
+      return false;
+    };
+    let stopped = false;
+    for (const unit of glueUnits(full)) {
+      if (isGluedUnit(unit)) {
+        if (!pushFit(unit)) stopped = true;
+      } else {
+        for (const ch of unit) {
+          if (!pushFit(ch)) {
+            stopped = true;
+            break;
+          }
+        }
       }
-      shown = next || chars[0] || "";
+      if (stopped) break;
     }
+    shown = next || glueUnits(full)[0] || "";
   }
   probe.destroy();
   const text = scene.add.text(textX, 0, shown, cardStyle(size)).setOrigin(0, 0.5);

@@ -1,5 +1,5 @@
 import { displayRatio } from "./dpr.js";
-import { getLang } from "../i18n/locale.js";
+import { getCourse, getLang } from "../i18n/locale.js";
 
 /** Landscape design reference only — scenes should use getView(). */
 export const W = 1280;
@@ -94,6 +94,105 @@ export function stickerColor(seed) {
 /** No line may start with closing punctuation (禁则). */
 const KINSOKU_HEAD = "。，、！？）」』】》〉";
 
+/**
+ * Times, thousands, ranges, and page marks stay on one line.
+ * 6:30, 9:30, 1,000, 6:30–9:30, Page 4, 第 4 页, 4ページ.
+ */
+const GLUE_SOURCE = "第\\s*\\d+\\s*页|Page\\s+\\d+|\\d+\\s*ページ|\\d+(?:[:.\\u2013\\u2014\\u2212,/\\-]\\d+)+";
+
+export function glueRegExp() {
+  return new RegExp(GLUE_SOURCE, "g");
+}
+
+export function isGluedUnit(value) {
+  return new RegExp(`^(?:${GLUE_SOURCE})$`).test(String(value ?? ""));
+}
+
+export function glueUnits(text) {
+  const src = String(text ?? "");
+  const units = [];
+  if (!src) return units;
+  let last = 0;
+  for (const match of src.matchAll(glueRegExp())) {
+    if (match.index > last) {
+      for (const ch of src.slice(last, match.index)) units.push(ch);
+    }
+    units.push(match[0]);
+    last = match.index + match[0].length;
+  }
+  if (last < src.length) {
+    for (const ch of src.slice(last)) units.push(ch);
+  }
+  return units;
+}
+
+/** Space-delimited words, with a glued run kept as one word (Page 4, 6:30–9:30). */
+export function glueWords(text) {
+  const words = [];
+  let buf = "";
+  const flush = () => {
+    if (!buf) return;
+    words.push(...buf.split(/\s+/).filter(Boolean));
+    buf = "";
+  };
+  for (const unit of glueUnits(text)) {
+    if (isGluedUnit(unit)) {
+      flush();
+      words.push(unit);
+    } else {
+      buf += unit;
+    }
+  }
+  flush();
+  return words;
+}
+
+function useGlue(flag) {
+  if (flag === false) return false;
+  if (flag === true) return true;
+  return getCourse() === "rag";
+}
+
+/** A glued run in `source` must occupy one rendered line. */
+export function gluedRunSplits(source, rendered) {
+  const src = String(source || "");
+  const lines = String(rendered || "").split("\n");
+  const hits = [];
+  const seen = new Set();
+  for (const match of src.matchAll(glueRegExp())) {
+    const compact = match[0].replace(/\s+/g, "");
+    if (!compact || seen.has(compact)) continue;
+    seen.add(compact);
+    if (lines.some((line) => line.replace(/\s+/g, "").includes(compact))) continue;
+    if (lines.join("").replace(/\s+/g, "").includes(compact)) hits.push(compact);
+  }
+  return hits;
+}
+
+/** Keep glued runs in one nowrap span when the course is RAG. */
+export function setGluedText(el, text) {
+  if (!el) return;
+  const value = String(text ?? "");
+  if (typeof document === "undefined" || getCourse() !== "rag") {
+    el.textContent = value;
+    return;
+  }
+  el.replaceChildren();
+  value.split("\n").forEach((line, index) => {
+    if (index) el.appendChild(document.createElement("br"));
+    let last = 0;
+    for (const match of line.matchAll(glueRegExp())) {
+      if (match.index > last) el.appendChild(document.createTextNode(line.slice(last, match.index)));
+      const span = document.createElement("span");
+      span.className = "rag-glue";
+      span.textContent = match[0];
+      el.appendChild(span);
+      last = match.index + match[0].length;
+    }
+    if (last < line.length || line === "") el.appendChild(document.createTextNode(line.slice(last)));
+  });
+}
+
 function applyKinsoku(lines, widthOf, maxWidth) {
   const out = [];
   for (const line of lines) {
@@ -120,29 +219,29 @@ function applyKinsoku(lines, widthOf, maxWidth) {
 }
 
 /** Phaser wordWrap ignores CJK (no spaces). Split on glyphs to a pixel width. */
-export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText) {
+export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText, options = {}) {
+  const glue = useGlue(options.glue);
   const probe = scene.add.text(-4000, -4000, "", styleFn(size)).setVisible(false);
   const widthOf = (value) => {
     probe.setText(value);
     return probe.width;
   };
   const lines = [];
-  String(raw || "")
-    .split("\n")
-    .forEach((para, index) => {
-      let current = "";
-      for (const ch of para) {
-        probe.setText(current + ch);
-        if (current && widthOf(current + ch) > maxWidth) {
-          lines.push(current);
-          current = ch;
-        } else {
-          current += ch;
-        }
+  const paras = String(raw || "").split("\n");
+  paras.forEach((para, index) => {
+    let current = "";
+    const units = glue ? glueUnits(para) : [...para];
+    for (const unit of units) {
+      if (current && widthOf(current + unit) > maxWidth) {
+        lines.push(current);
+        current = unit;
+      } else {
+        current += unit;
       }
-      lines.push(current);
-      if (index < String(raw || "").split("\n").length - 1) lines.push("");
-    });
+    }
+    lines.push(current);
+    if (index < paras.length - 1) lines.push("");
+  });
   const wrapped = applyKinsoku(lines, widthOf, maxWidth).join("\n");
   probe.destroy();
   return wrapped;
@@ -180,7 +279,7 @@ export function orphanLines(body) {
  * phrase alone is wider than the line (`wide` marks those fragments).
  * Otherwise move a whole phrase, or leave the orphan so the caller shrinks the font.
  */
-function rebalancePhrases(lines, wideFlags, widthOf, maxWidth) {
+function rebalancePhrases(lines, wideFlags, widthOf, maxWidth, glue = false) {
   const out = lines.slice();
   const wide = wideFlags.slice();
   let guard = 0;
@@ -192,7 +291,7 @@ function rebalancePhrases(lines, wideFlags, widthOf, maxWidth) {
     const compact = [...String(last).replace(/\s+/g, "")];
     if (visibleCount(last) > 2 && compact.length !== 1) break;
     const prev = String(out[lastIdx - 1] ?? "").replace(/\s+$/u, "");
-    const parts = prev.split(/\s+/).filter(Boolean);
+    const parts = glue ? glueWords(prev) : prev.split(/\s+/).filter(Boolean);
     if (!parts.length) break;
     if (parts.length >= 2) {
       const moved = parts.pop();
@@ -205,12 +304,12 @@ function rebalancePhrases(lines, wideFlags, widthOf, maxWidth) {
       continue;
     }
     if (!wide[lastIdx - 1]) break;
-    const prevChars = [...prev];
-    while (prevChars.length && /\s/u.test(prevChars[prevChars.length - 1])) prevChars.pop();
-    if (prevChars.length <= 1) break;
-    const moved = prevChars.pop();
-    while (prevChars.length && /\s/u.test(prevChars[prevChars.length - 1])) prevChars.pop();
-    const nextPrev = prevChars.join("");
+    const prevUnits = glue ? glueUnits(prev) : [...prev];
+    while (prevUnits.length && /^\s+$/u.test(prevUnits[prevUnits.length - 1])) prevUnits.pop();
+    if (prevUnits.length <= 1) break;
+    const moved = prevUnits.pop();
+    while (prevUnits.length && /^\s+$/u.test(prevUnits[prevUnits.length - 1])) prevUnits.pop();
+    const nextPrev = prevUnits.join("");
     const nextLast = `${moved}${String(last).replace(/^\s+/u, "")}`;
     if (widthOf && widthOf(nextLast) > maxWidth) break;
     if (!nextPrev) {
@@ -237,22 +336,24 @@ function latinWord(token) {
   return /^[A-Za-z]+(?:[-'][A-Za-z]+)*$/.test(token);
 }
 
-export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { latinWhole = false } = {}) {
+export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { latinWhole = false, glue } = {}) {
+  const useGlueFlag = useGlue(glue);
   const probe = scene.add.text(-8000, -8000, "", styleFn(size)).setVisible(false);
   const widthOf = (value) => {
     probe.setText(value);
     return probe.width;
   };
   const breakToken = (token) => {
-    if (latinWhole && latinWord(token)) return [token];
+    if ((latinWhole && latinWord(token)) || (useGlueFlag && isGluedUnit(token))) return [token];
+    const units = useGlueFlag ? glueUnits(token) : [...token];
     const out = [];
     let current = "";
-    for (const ch of token) {
-      if (current && widthOf(current + ch) > maxWidth) {
+    for (const unit of units) {
+      if (current && widthOf(current + unit) > maxWidth) {
         out.push(current);
-        current = ch;
+        current = unit;
       } else {
-        current += ch;
+        current += unit;
       }
     }
     if (current) out.push(current);
@@ -265,7 +366,7 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { lat
     wide.push(Boolean(overWide));
   };
   for (const para of String(raw ?? "").split("\n")) {
-    const words = para.split(/\s+/).filter(Boolean);
+    const words = useGlueFlag ? glueWords(para) : para.split(/\s+/).filter(Boolean);
     if (!words.length) {
       pushLine("", false);
       continue;
@@ -301,7 +402,7 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { lat
   let next = applyKinsoku(lines, widthOf, maxWidth);
   let flags = next.length === wide.length ? wide.slice() : next.map(() => false);
   for (let pass = 0; pass < 3; pass += 1) {
-    const balanced = rebalancePhrases(next, flags, widthOf, maxWidth);
+    const balanced = rebalancePhrases(next, flags, widthOf, maxWidth, useGlueFlag);
     const kin = applyKinsoku(balanced.lines, widthOf, maxWidth);
     const kinFlags = kin.length === balanced.wide.length ? balanced.wide : kin.map(() => false);
     next = kin;
