@@ -1236,9 +1236,10 @@ function paintTake(scene, card, g, w, h, spec, step) {
   const top = -h / 2 + margin;
   const bottom = h / 2 - margin;
   const inner = Math.max(20, bottom - top);
-  const front = Math.min(pc ? 16 : 12, Math.max(8, inner * 0.04));
-  const chipH = Math.min(pc ? 36 : 28, Math.max(pc ? 30 : 26, inner * 0.08));
-  const chipGap = pc ? 10 : 8;
+  const shortPic = h < (pc ? 460 : 420);
+  const front = Math.min(shortPic ? 10 : (pc ? 16 : 12), Math.max(8, inner * 0.04));
+  const chipH = Math.min(pc ? 36 : 28, Math.max(shortPic ? 26 : (pc ? 30 : 26), inner * 0.08));
+  const chipGap = shortPic ? 6 : (pc ? 10 : 8);
   const desk = bottom - front;
   const chipTop = desk - chipGap - chipH;
   const feet = chipTop - chipGap;
@@ -1257,60 +1258,25 @@ function paintTake(scene, card, g, w, h, spec, step) {
   const measured = literalSize(scene, sample, fontFloor);
   const lineWidth = (text) => Math.max(...String(text || "Page").split("\n").map((line) => textWidth(scene, line, fontFloor)));
   const widest = Math.max(64, lineWidth(oneText), ...manyLabels.map((label) => lineWidth(label.text)));
-  const minCardW = Math.ceil(widest + 16);
-  const minSlipH = Math.max(pc ? 54 : 46, Math.ceil(measured.height + 12));
+  const minCardW = Math.ceil(widest + 12);
+  const minSlipH = Math.max(Math.ceil(measured.height + 8), fontFloor + 12);
   const labelN = handCountLabel(Math.max(1, manyLabels.length));
   const labelMeasure = literalSize(scene, labelN, fontFloor);
   const labelH = Math.max(fontFloor + 14, Math.ceil(labelMeasure.height + 10));
   const labelGap = 6;
-  const gridGap = 8;
+  const gridGap = pc ? 8 : 4;
   const liftGap = showLift ? 12 : 0;
-  const minGap = pc ? 36 : 22;
+  const minGap = pc ? 36 : 12;
   const maxCardW = pc ? 168 : 118;
   const innerW = Math.max(80, w - 20);
   const count = Math.max(1, manyLabels.length);
-  let cols = Math.min(count, 3);
-  let cardW = Math.min(maxCardW, Math.max(minCardW, pc ? 148 : 96));
-  const planOf = () => {
-    const rightGroupW = cols * cardW + Math.max(0, cols - 1) * gridGap;
-    const leftGroupW = Math.min(maxCardW, Math.max(minCardW, cardW));
-    return { rightGroupW, leftGroupW, used: leftGroupW + rightGroupW };
-  };
-  let plan = planOf();
-  let guard = 0;
-  while (guard < 24 && plan.used + minGap > innerW && cols > 1) {
-    guard += 1;
-    if (cardW > minCardW + 1) cardW = Math.max(minCardW, cardW - 6);
-    else {
-      cols -= 1;
-      cardW = Math.min(maxCardW, Math.max(minCardW, pc ? 140 : 96));
-    }
-    plan = planOf();
-  }
-  if (plan.used + minGap > innerW) {
-    const room = Math.max(64, innerW - minGap);
-    plan.leftGroupW = Math.max(56, Math.min(plan.leftGroupW, room * 0.34));
-    plan.rightGroupW = Math.max(56, room - plan.leftGroupW);
-    cardW = cols <= 1 ? plan.rightGroupW : (plan.rightGroupW - (cols - 1) * gridGap) / cols;
-    plan.used = plan.leftGroupW + plan.rightGroupW;
-  }
-  const manyRows = Math.ceil(count / cols);
-  const gap = Math.max(minGap, innerW - plan.used);
-  const total = plan.leftGroupW + gap + plan.rightGroupW;
-  const originX = -total / 2;
-  const leftCenter = originX + plan.leftGroupW / 2;
-  const rightOrigin = originX + plan.leftGroupW + gap;
-  const rightCenter = rightOrigin + plan.rightGroupW / 2;
   const carry = spec.carry ?? one.page;
   const carryTitle = handbookTitle(carry);
   const carryText = carryTitle ? `Page ${carry}  ${carryTitle}  ?` : `Page ${carry}  ?`;
   const carrySize = literalSize(scene, carryText, fontFloor);
-  const sheetH = showSheet ? Math.max(pc ? 36 : 30, Math.ceil(carrySize.height + 12)) : 0;
-  const sheetGap = showSheet ? 8 : 0;
+  const sheetH = showSheet ? Math.max(pc ? 32 : 28, Math.ceil(carrySize.height + 10)) : 0;
   const actorFloor = h * (pc ? 0.34 : 0.26);
   let s = actorFloor / 3.87;
-  const castSpan = Math.abs(rightCenter - leftCenter);
-  if (castSpan < s * 2.3 + 8) s = Math.max(2, (castSpan - 8) / 2.3);
   const minActor = (h * (pc ? 0.325 : 0.22)) / 3.87;
   const regionOf = (scale) => {
     const nextFace = feet - 1.59 * scale;
@@ -1324,20 +1290,85 @@ function paintTake(scene, card, g, w, h, spec, step) {
       regionH: nextRegionBottom - nextRegionTop,
     };
   };
-  const blockFor = (slip) => {
-    const rowsH = manyRows * slip + Math.max(0, manyRows - 1) * gridGap;
-    const liftH = showLift ? slip + liftGap : 0;
-    return labelH + labelGap + liftH + rowsH + sheetGap + sheetH;
+  let liftGapNow = liftGap;
+  let labelGapNow = labelGap;
+  let region = regionOf(s);
+  const stackH = (slip, colN, below) => {
+    const rows = Math.ceil(count / Math.max(1, colN));
+    const rowsH = rows * slip + Math.max(0, rows - 1) * gridGap;
+    const liftH = showLift ? slip + liftGapNow : 0;
+    return labelH + labelGapNow + liftH + rowsH + (below ? 8 + sheetH : 0);
   };
-  let slipH = Math.min(pc ? 88 : 68, Math.max(minSlipH, cardW * 0.55));
-  guard = 0;
-  while (guard < 28 && blockFor(slipH) > regionOf(s).regionH - 2) {
+  let cols = Math.min(count, 3);
+  let slipH = Math.min(pc ? 88 : 68, Math.max(minSlipH, (pc ? 148 : 96) * 0.55));
+  let guard = 0;
+  while (guard < 36 && stackH(slipH, cols, showSheet) > region.regionH - 2) {
     guard += 1;
     if (slipH > minSlipH + 0.5) slipH = Math.max(minSlipH, slipH - 4);
-    else if (s > minActor + 0.15) s = Math.max(minActor, s - 0.35);
-    else break;
+    else if (liftGapNow > 8) liftGapNow = 8;
+    else if (labelGapNow > 4) labelGapNow = 4;
+    else if (cols < count && stackH(minSlipH, cols + 1, false) + 1 < stackH(minSlipH, cols, false)) cols += 1;
+    else if (s > minActor + 0.15) {
+      s = Math.max(minActor, s - 0.35);
+      region = regionOf(s);
+    } else break;
   }
-  const region = regionOf(s);
+  const sheetBelow = showSheet && stackH(slipH, cols, true) <= region.regionH - 2;
+  const planWithin = (limit) => {
+    let colN = Math.min(count, Math.max(1, cols));
+    let nextW = Math.min(maxCardW, Math.max(minCardW, pc ? 148 : 96));
+    const measure = () => {
+      const rightGroupW = colN * nextW + Math.max(0, colN - 1) * gridGap;
+      const leftGroupW = Math.min(maxCardW, Math.max(minCardW, nextW));
+      return { rightGroupW, leftGroupW, used: leftGroupW + rightGroupW, cardW: nextW, cols: colN };
+    };
+    let next = measure();
+    let spins = 0;
+    while (spins < 24 && next.used + minGap > limit && colN > 1) {
+      spins += 1;
+      if (nextW > minCardW + 1) nextW = Math.max(minCardW, nextW - 6);
+      else {
+        colN -= 1;
+        nextW = Math.min(maxCardW, Math.max(minCardW, pc ? 140 : 96));
+      }
+      next = measure();
+    }
+    if (next.used + minGap > limit) {
+      const room = Math.max(minCardW + 8, limit - minGap);
+      next.leftGroupW = Math.max(minCardW, Math.min(next.leftGroupW, room * 0.36));
+      next.rightGroupW = Math.max(minCardW, room - next.leftGroupW);
+      next.cardW = colN <= 1 ? next.rightGroupW : (next.rightGroupW - (colN - 1) * gridGap) / colN;
+      next.used = next.leftGroupW + next.rightGroupW;
+      next.cols = colN;
+    }
+    return next;
+  };
+  let sheetW = 0;
+  let plan = planWithin(innerW);
+  if (showSheet && !sheetBelow) {
+    const wanted = Math.min(innerW * 0.4, Math.max(pc ? 160 : 128, Math.ceil(carrySize.width + 20)));
+    const beside = planWithin(Math.max(minCardW * 2 + minGap, innerW - wanted - 12));
+    if (beside.cardW + 1 >= minCardW && stackH(slipH, beside.cols, false) <= region.regionH - 2) {
+      plan = beside;
+      sheetW = wanted;
+    }
+  }
+  cols = plan.cols;
+  while (stackH(slipH, cols, sheetW > 0 ? false : showSheet) > region.regionH - 2 && slipH > minSlipH + 0.5) {
+    slipH = Math.max(minSlipH, slipH - 4);
+  }
+  const cardW = plan.cardW;
+  const manyRows = Math.ceil(count / cols);
+  const handsW = plan.leftGroupW + plan.rightGroupW;
+  const gap = Math.max(minGap, (sheetW ? innerW - sheetW - 12 : innerW) - handsW);
+  const bundle = handsW + gap + (sheetW ? 12 + sheetW : 0);
+  const originX = -bundle / 2;
+  const leftCenter = originX + plan.leftGroupW / 2;
+  const rightOrigin = originX + plan.leftGroupW + gap;
+  const rightCenter = rightOrigin + plan.rightGroupW / 2;
+  const castSpan = Math.abs(rightCenter - leftCenter);
+  if (castSpan < s * 2.3 + 8) s = Math.max(minActor, (castSpan - 8) / 2.3);
+  region = regionOf(s);
   const faceY = region.faceY;
   paintLobbyFrame(g, w, top, bottom, desk, { window: false });
   const blue = addActor(scene, card, leftCenter, faceY, s, "blue", "blue");
@@ -1360,10 +1391,10 @@ function paintTake(scene, card, g, w, h, spec, step) {
   addZone(scene, card, 0, desk, w - 20, 8, "desk");
 
   const rowsH = manyRows * slipH + Math.max(0, manyRows - 1) * gridGap;
-  const liftH = showLift ? slipH + liftGap : 0;
+  const liftH = showLift ? slipH + liftGapNow : 0;
   const cardsTop = region.regionTop + 2;
   const labelY = cardsTop + labelH / 2;
-  const rowTop = cardsTop + labelH + labelGap + liftH;
+  const rowTop = cardsTop + labelH + labelGapNow + liftH;
   const leftY = rowTop + slipH / 2;
   placeTakeCard(scene, card, leftCenter, leftY, plan.leftGroupW, slipH, 0xfffdf8, oneText, "one");
   addHandLabel(scene, card, leftCenter, labelY, handCountLabel(1), "hand-one", labelH);
@@ -1376,7 +1407,7 @@ function paintTake(scene, card, g, w, h, spec, step) {
     const rowStart = rightOrigin + (plan.rightGroupW - rowWidth) / 2;
     const x = rowStart + cardW / 2 + col * (cardW + gridGap);
     const restingY = rowTop + row * (slipH + gridGap) + slipH / 2;
-    const y = label.picked ? cardsTop + labelH + labelGap + slipH / 2 : restingY;
+    const y = label.picked ? cardsTop + labelH + labelGapNow + slipH / 2 : restingY;
     const slip = placeTakeCard(
       scene,
       card,
@@ -1393,9 +1424,20 @@ function paintTake(scene, card, g, w, h, spec, step) {
   });
   if (showSheet) {
     const rowsBottom = rowTop + rowsH;
-    const sheetW = Math.min(w - 28, Math.max(pc ? 240 : 180, Math.min(w * 0.5, carrySize.width + 28)));
-    const sheetY = Math.min(rowsBottom + sheetGap + sheetH / 2, region.regionBottom - sheetH / 2);
-    const sheet = placeTakeCard(scene, card, 0, sheetY, sheetW, sheetH, 0xfff1d2, carryText, "carry", { fromY: sheetY + 12 });
+    let sheetX = 0;
+    let sheetY = rowsBottom + 8 + sheetH / 2;
+    let drawnW = Math.min(w - 28, Math.max(pc ? 240 : 180, Math.min(w * 0.5, carrySize.width + 28)));
+    if (sheetW > 0) {
+      drawnW = sheetW;
+      sheetX = rightOrigin + plan.rightGroupW + 12 + sheetW / 2;
+      const blockMid = (cardsTop + rowsBottom) / 2;
+      const low = region.regionTop + sheetH / 2 + 2;
+      const high = region.regionBottom - sheetH / 2 - 2;
+      sheetY = high >= low ? Math.max(low, Math.min(high, blockMid)) : (region.regionTop + region.regionBottom) / 2;
+    } else if (sheetY + sheetH / 2 > region.regionBottom) {
+      sheetY = region.regionBottom - sheetH / 2;
+    }
+    const sheet = placeTakeCard(scene, card, sheetX, sheetY, drawnW, sheetH, 0xfff1d2, carryText, "carry", { fromY: sheetY + 12 });
     if (scene.__ragAnimate) popIn(scene, sheet);
   }
 }

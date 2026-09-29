@@ -193,7 +193,7 @@ export function setGluedText(el, text) {
   });
 }
 
-function applyKinsoku(lines, widthOf, maxWidth) {
+function applyKinsoku(lines, widthOf, maxWidth, glue = false) {
   const out = [];
   for (const line of lines) {
     let rest = line;
@@ -204,6 +204,18 @@ function applyKinsoku(lines, widthOf, maxWidth) {
         out[out.length - 1] = joined;
         rest = rest.slice(1);
         continue;
+      }
+      if (glue) {
+        const units = glueUnits(prev);
+        const last = units[units.length - 1];
+        if (last && isGluedUnit(last) && prev.endsWith(last)) {
+          const head = prev.slice(0, -last.length).replace(/\s+$/u, "");
+          if (head) {
+            out[out.length - 1] = head;
+            rest = `${last}${rest}`;
+          }
+          break;
+        }
       }
       const chars = [...prev];
       let take = 1;
@@ -242,7 +254,7 @@ export function wrapToWidth(scene, raw, size, maxWidth, styleFn = uiText, option
     lines.push(current);
     if (index < paras.length - 1) lines.push("");
   });
-  const wrapped = applyKinsoku(lines, widthOf, maxWidth).join("\n");
+  const wrapped = applyKinsoku(lines, widthOf, maxWidth, glue).join("\n");
   probe.destroy();
   return wrapped;
 }
@@ -399,11 +411,11 @@ export function wrapAtBreaks(scene, raw, size, maxWidth, styleFn = uiText, { lat
     }
     pushLine(current, currentWide);
   }
-  let next = applyKinsoku(lines, widthOf, maxWidth);
+  let next = applyKinsoku(lines, widthOf, maxWidth, useGlueFlag);
   let flags = next.length === wide.length ? wide.slice() : next.map(() => false);
   for (let pass = 0; pass < 3; pass += 1) {
     const balanced = rebalancePhrases(next, flags, widthOf, maxWidth, useGlueFlag);
-    const kin = applyKinsoku(balanced.lines, widthOf, maxWidth);
+    const kin = applyKinsoku(balanced.lines, widthOf, maxWidth, useGlueFlag);
     const kinFlags = kin.length === balanced.wide.length ? balanced.wide : kin.map(() => false);
     next = kin;
     flags = kinFlags;

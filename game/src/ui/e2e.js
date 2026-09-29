@@ -1078,7 +1078,7 @@ function collectRagStageHits(scene, origin) {
     }
     for (const mark of splitPageMarks(source, box.node.text)) {
       words += 1;
-      if (hits.length < 8) hits.push(["stage-word", mark]);
+      if (hits.length < 8) hits.push(["stage-word", mark, String(box.node.text).replace(/\n/g, "↵").slice(0, 96)]);
     }
   }
   for (const box of boxes) {
