@@ -119,12 +119,13 @@ export function planLessonHeader(scene, title) {
   }
   const titleMax = Math.max(80, v.right - TITLE_HUD_GAP - titleLeft);
   const stackedFit = fitDisplayTitle(scene, title, titleMax, Math.max(preferred, TITLE_INLINE_MIN), 20);
-  const titleRowH = Math.max(badgeH + 10, stackedFit.size + 22);
+  const shortStack = v.h < 720;
+  const titleRowH = shortStack ? Math.max(badgeH, stackedFit.size + 8) : Math.max(badgeH + 10, stackedFit.size + 22);
   const inner = Math.max(80, v.w - 32);
   const buttonRows = Math.max(1, Math.ceil((buttonW || inner) / inner));
   const buttonsBlock = buttonRows * buttonH + Math.max(0, buttonRows - 1) * 8;
-  const stackGap = v.h < 560 ? 4 : 10;
-  const stackTail = v.h < 560 ? 6 : 14;
+  const stackGap = shortStack || v.h < 560 ? 4 : 10;
+  const stackTail = shortStack ? 2 : v.h < 560 ? 6 : 14;
   const buttonTop = v.top + titleRowH + stackGap;
   placeStackedHud(scene, buttonTop);
   scene.time.delayedCall(0, () => {

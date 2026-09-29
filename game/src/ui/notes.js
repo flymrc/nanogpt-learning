@@ -1,4 +1,5 @@
 import { noteList, t } from "../i18n/locale.js";
+import { setGluedText } from "./theme.js";
 
 let mounted = false;
 let openId = "";
@@ -88,5 +89,5 @@ function renderNotes() {
   });
   const current = notes.find((item) => item.id === openId) || notes[0];
   if (term) term.textContent = current?.term || "";
-  if (detail) detail.textContent = current ? `${current.blurb}。${current.note}` : t("notesHint");
+  if (detail) setGluedText(detail, current ? `${current.blurb}。${current.note}` : t("notesHint"));
 }

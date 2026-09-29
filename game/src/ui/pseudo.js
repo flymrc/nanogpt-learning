@@ -1,4 +1,5 @@
 import { narrateBeat, narrateLine } from "../audio/narrate.js";
+import { setGluedText } from "./theme.js";
 import { unlockAudio } from "../audio/sound.js";
 import { pseudoFor } from "../data/pseudo.js";
 import { t } from "../i18n/locale.js";
@@ -81,9 +82,9 @@ function renderPseudo(beat) {
   const metaphor = document.getElementById("pseudo-metaphor");
   const code = document.getElementById("pseudo-code");
   const myth = document.getElementById("pseudo-myth");
-  if (title) title.textContent = beat?.purpose ? `${t("pseudo")} · ${beat.purpose}` : t("pseudo");
-  if (does) does.textContent = tip.does;
-  if (metaphor) metaphor.textContent = tip.metaphor;
+  if (title) setGluedText(title, beat?.purpose ? `${t("pseudo")} · ${beat.purpose}` : t("pseudo"));
+  if (does) setGluedText(does, tip.does);
+  if (metaphor) setGluedText(metaphor, tip.metaphor);
   if (code) code.textContent = tip.lines.join("\n");
-  if (myth) myth.textContent = tip.myth;
+  if (myth) setGluedText(myth, tip.myth);
 }

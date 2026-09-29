@@ -867,6 +867,12 @@ html.has-game-cursor * {
   overflow-wrap: anywhere;
 }
 
+.rag-glue,
+.voice-word[data-glue="1"] {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 html.is-mobile[data-scene="home"] #mobile-chrome {
   flex-wrap: nowrap;
   justify-content: flex-end;
@@ -916,11 +922,12 @@ html.is-pc .voice-note {
   left: 16px;
   bottom: 10px;
   z-index: 18;
-  max-width: min(420px, calc(50% - 200px));
+  max-width: min(420px, calc(50% - 210px));
   width: max-content;
   height: auto;
+  font-size: 16px;
   line-height: 1.35;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border: 2px solid #3b2a2e;
   border-radius: 8px;
   background: rgba(255, 248, 238, 0.94);
@@ -1148,4 +1155,49 @@ html.is-mobile[data-scene="lesson"] #mobile-actions .mute-toggle {
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
+}
+
+#copy-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgba(59, 42, 46, 0.35);
+  box-sizing: border-box;
+}
+
+#copy-pop[hidden] {
+  display: none;
+}
+
+.copy-pop-card {
+  width: min(520px, 100%);
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 16px 16px 12px;
+  border: 4px solid #3b2a2e;
+  border-radius: 18px;
+  background: #fffdf6;
+  color: #3b2a2e;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+#copy-pop-body {
+  margin: 0 0 12px;
+  white-space: pre-wrap;
+}
+
+#copy-pop-close {
+  min-height: 40px;
+  padding: 6px 16px;
+  border: 3px solid #3b2a2e;
+  border-radius: 999px;
+  background: #ffc43d;
+  color: #3b2a2e;
+  font-size: 15px;
 }

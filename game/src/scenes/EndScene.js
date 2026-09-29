@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { END_BEAT } from "../data/beats.js";
 import { syncPseudo } from "../ui/pseudo.js";
 import { narrateBeat } from "../audio/narrate.js";
-import { localizeBeat, t } from "../i18n/locale.js";
+import { localizeBeat, setCourse, t } from "../i18n/locale.js";
 import { retreatToPreviousChapter } from "../ui/catalog.js";
 import { syncHubChrome } from "../ui/chrome.js";
 import { rememberLesson } from "../ui/route.js";
@@ -30,6 +30,7 @@ export default class EndScene extends Phaser.Scene {
   }
 
   create() {
+    setCourse("nanogpt");
     syncHubChrome("End");
     const phone = !isWidePcTutor();
     clearPcHudStack();

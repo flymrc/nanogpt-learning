@@ -1,5 +1,20 @@
 /** Lesson scenes that can be opened from a hash or a query string. */
-const LESSON_SCENES = new Set(["Title", "End", "Level1", "Level2", "Level3", "Level4", "Level5"]);
+const LESSON_SCENES = new Set([
+  "Title",
+  "End",
+  "Level1",
+  "Level2",
+  "Level3",
+  "Level4",
+  "Level5",
+  "RagTitle",
+  "RagEnd",
+  "Rag1",
+  "Rag2",
+  "Rag3",
+  "Rag4",
+  "Rag5",
+]);
 const STORE_KEY = "nanogpt-lesson";
 
 function finite(value) {
@@ -46,6 +61,8 @@ export function readEntryTarget() {
 
 export function rememberLesson(sceneKey, beat = 0, phase = 0) {
   if (!LESSON_SCENES.has(sceneKey) || typeof location === "undefined") return;
+  const active = window.__nanoGPTGame?.scene?.getScenes?.(true)?.[0]?.sys?.settings?.key;
+  if (active && active !== sceneKey) return;
   const payload = { scene: sceneKey, beat, phase };
   try {
     sessionStorage.setItem(STORE_KEY, JSON.stringify(payload));
@@ -59,6 +76,11 @@ export function rememberLesson(sceneKey, beat = 0, phase = 0) {
 
 export function clearLessonRoute() {
   if (typeof location === "undefined") return;
+  try {
+    sessionStorage.removeItem(STORE_KEY);
+  } catch {
+    /* private mode */
+  }
   const params = new URLSearchParams(location.search);
   params.delete("scene");
   params.delete("beat");

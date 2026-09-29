@@ -14,6 +14,9 @@ import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
 import { ZH } from "../src/i18n/zh.js";
+import { RAG_JA } from "../src/i18n/rag/ja.js";
+import { RAG_ZH } from "../src/i18n/rag/zh.js";
+import { ragPagesFor } from "../src/i18n/rag/skeleton.js";
 import { pagesFor } from "../src/i18n/skeleton.js";
 
 const LEVEL_PAGES = {
@@ -23,6 +26,29 @@ const LEVEL_PAGES = {
   Level4: pagesFor(4),
   Level5: pagesFor(5),
 };
+
+const RAG_LEVEL_PAGES = {
+  Rag1: ragPagesFor(1),
+  Rag2: ragPagesFor(2),
+  Rag3: ragPagesFor(3),
+  Rag4: ragPagesFor(4),
+  Rag5: ragPagesFor(5),
+};
+
+const RAG3_SHOTS = [
+  ["r1-p9", "zh", 1440, 900, "ch1-do-zh-1440x900.png"],
+  ["r1-p9", "ja", 390, 844, "ch1-do-ja-390x844.png"],
+  ["r2-p3", "ja", 390, 844, "ch2-cut-ja-390x844.png"],
+  ["r2-p3", "zh", 1440, 900, "ch2-cut-zh-1440x900.png"],
+  ["r3-p3", "zh", 1440, 900, "ch3-score-zh-1440x900.png"],
+  ["r3-p3", "ja", 390, 844, "ch3-score-ja-390x844.png"],
+  ["r4-p6", "zh", 1440, 900, "ch4-fill-zh-1440x900.png"],
+  ["r4-p6", "ja", 390, 844, "ch4-fill-ja-390x844.png"],
+  ["r5-p4", "zh", 1440, 900, "ch5-threshold-zh-1440x900.png"],
+  ["r5-p4", "ja", 390, 844, "ch5-threshold-ja-390x844.png"],
+  ["r5-p2", "ja", 1440, 900, "ch5-take-ja-1440x900.png"],
+  ["r2-p1", "zh", 1440, 900, "ch2-cards-zh-1440x900.png"],
+];
 
 function expectedVo(lang, key, beat) {
   const pack = lang === "ja" ? JA : ZH;
@@ -97,6 +123,40 @@ async function assertVo(page, key, beat) {
   }
 }
 
+function expectedRagVo(lang, key, beat) {
+  const pack = lang === "ja" ? RAG_JA : RAG_ZH;
+  const nano = lang === "ja" ? JA : ZH;
+  const id = key === "RagTitle" ? "rtitle" : RAG_LEVEL_PAGES[key][beat].id;
+  return {
+    id,
+    prefix: nano.voiceBeat,
+    text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
+  };
+}
+
+async function assertRagVo(page, key, beat) {
+  const lang = await page.evaluate(() => (document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh");
+  const want = expectedRagVo(lang, key, beat);
+  try {
+    await page.waitForFunction((expected) => {
+      const line = String(document.getElementById("voice-line")?.textContent || "").replace(/\s+/g, " ").trim();
+      const narr = window.__nanoGPTNarration?.() || {};
+      const narrText = String(narr.text || "").replace(/\s+/g, " ").trim();
+      const pageId = window.__nanoGPTState?.().pageId || "";
+      const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
+      const source = narr.source === "clip" || narr.source === "speech";
+      return pageId === expected.id && narr.id === expected.id && source && body === expected.text && narrText === expected.text;
+    }, want, { timeout: 4000 });
+  } catch {
+    const got = await page.evaluate(() => ({
+      line: document.getElementById("voice-line")?.textContent || "",
+      narr: window.__nanoGPTNarration?.() || {},
+      pageId: window.__nanoGPTState?.().pageId || "",
+    }));
+    throw new Error(`rag vo mismatch ${key} b${beat} want=${JSON.stringify(want)} got=${JSON.stringify(got)}`);
+  }
+}
+
 async function waitTutor(page) {
   const wide = await page.evaluate(() => window.innerWidth >= 1024 && window.innerWidth > window.innerHeight);
   if (!wide) return;
@@ -150,6 +210,26 @@ function walks(spine, { allPhases }) {
   pushLevel("Level3", spine.l3, "L3");
   pushLevel("Level4", spine.l4, "L4");
   pushLevel("Level5", spine.l5, "L5");
+  return jobs;
+}
+
+function ragWalks(spine, { allPhases }) {
+  const jobs = [];
+  const pushLevel = (key, count, prefix) => {
+    for (let beat = 0; beat < count; beat += 1) {
+      const phases = allPhases ? spine.phases : 1;
+      for (let phase = 0; phase < phases; phase += 1) {
+        const p = allPhases ? phase : 2;
+        const tag = PHASE_NAMES[p] || `p${p}`;
+        jobs.push([key, beat, p, `${prefix}-b${beat}-p${p}-${tag}`]);
+      }
+    }
+  };
+  pushLevel("Rag1", spine.l1, "R1");
+  pushLevel("Rag2", spine.l2, "R2");
+  pushLevel("Rag3", spine.l3, "R3");
+  pushLevel("Rag4", spine.l4, "R4");
+  pushLevel("Rag5", spine.l5, "R5");
   return jobs;
 }
 
@@ -1469,6 +1549,10 @@ async function assertHomeViewport(page, label, lang, mobile) {
   const layout = await page.evaluate(() => window.__nanoGPTAssertLayout());
   const viewNow = page.viewportSize();
   await page.screenshot({ path: homeShot(lang, viewNow.width, viewNow.height) });
+  if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 390 && viewNow.height === 844)) {
+    mkdirSync("/opt/cursor/artifacts/rag", { recursive: true });
+    await page.screenshot({ path: `/opt/cursor/artifacts/rag/home-${lang}-${viewNow.width}x${viewNow.height}.png` });
+  }
   if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 1920 && viewNow.height === 1080)) {
     await page.screenshot({ path: home2Shot(`home-${lang}-${viewNow.width}x${viewNow.height}`) });
   }
@@ -1493,7 +1577,7 @@ async function assertHomeViewport(page, label, lang, mobile) {
   if (cards.length < 2) throw new Error(`home cards ${cards.length}`);
   const rag = cards.find((card) => card.id === "rag");
   const nano = cards.find((card) => card.id === "nanogpt");
-  if (!rag || rag.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
+  if (!rag?.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
   if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
   if (lang === "ja") {
     if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
@@ -1506,14 +1590,22 @@ async function assertHomeViewport(page, label, lang, mobile) {
     window.__nanoGPTHubLast = "";
   });
   await clickHubCard(page, "rag");
-  await page.waitForTimeout(250);
-  const afterRag = await page.evaluate(() => ({
-    scene: window.__nanoGPTState?.().scene,
-    last: window.__nanoGPTHubLast,
-  }));
-  if (afterRag.scene !== "Home" || afterRag.last !== "rag") {
-    throw new Error(`rag card navigated ${JSON.stringify(afterRag)}`);
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "RagTitle" && window.__nanoGPTState?.().pageId === "rtitle",
+    { timeout: 15000 },
+  );
+  const ragGuide = await page.evaluate(() => document.getElementById("guide-overlay")?.hidden === false);
+  if (ragGuide) {
+    await page.click("#guide-close");
+    await page.waitForFunction(() => document.getElementById("guide-overlay")?.hidden === true);
   }
+  const ragLayout = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!ragLayout?.ok) {
+    throw new Error(`rag title ${lang} ${label} ${JSON.stringify({ overlaps: ragLayout?.overlaps, overflows: ragLayout?.overflows, orphans: ragLayout?.orphans })}`);
+  }
+  await page.click("#home-toggle");
+  await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 15000 });
+  await waitHome(page, mobile);
   await clickHubCard(page, "nanogpt");
   await page.waitForFunction(
     () => window.__nanoGPTState?.().scene === "Title" && window.__nanoGPTState?.().pageId === "title",
@@ -1567,7 +1659,11 @@ async function assertHomeLang(page) {
   if (stored !== "ja") throw new Error(`lang dropped in tutorial ${stored}`);
   await page.click("#home-toggle");
   await page.waitForFunction(
-    () => window.__nanoGPTState?.().scene === "Home" && document.documentElement.lang === "ja" && window.__nanoGPTHubCopy?.().home === "ホーム",
+    () => window.__nanoGPTState?.().scene === "Home"
+      && document.documentElement.lang === "ja"
+      && window.__nanoGPTHubCopy?.().home === "ホーム"
+      && !location.hash
+      && !sessionStorage.getItem("nanogpt-lesson"),
     { timeout: 15000 },
   );
   await page.evaluate(() => localStorage.setItem("nanogpt-lang", "ja"));
@@ -1690,9 +1786,286 @@ async function assertHomeHub(browser) {
 const live2dFit = await assertLive2dPanel(browser);
 const home = await assertHomeHub(browser);
 
+function rag3ShotFor(pageId, lang, width, height, phase) {
+  if (phase !== 2) return "";
+  const spec = RAG3_SHOTS.find((row) => row[0] === pageId && row[1] === lang && row[2] === width && row[3] === height);
+  return spec ? `/opt/cursor/artifacts/rag3/${spec[4]}` : "";
+}
+
+async function playRagSteps(page, name, first) {
+  const meta = await page.evaluate(() => ({
+    steps: Number(window.__nanoGPTRagSteps || 0),
+    phase: window.__nanoGPTState?.().phase ?? 0,
+    key: window.__nanoGPTState?.().scene || "",
+  }));
+  const lesson = /^Rag[1-5]$/.test(meta.key);
+  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 };
+  const addStage = (result) => {
+    const stage = result?.stage;
+    if (!stage?.active) return;
+    tally.overlaps += stage.overlaps || 0;
+    tally.tiny += stage.tiny || 0;
+    tally.short += stage.short || 0;
+    tally.fill += stage.fill || 0;
+    tally.actors += stage.actors || 0;
+    tally.contrast += stage.contrast || 0;
+    tally.words += stage.words || 0;
+    tally.empty += stage.empty || 0;
+  };
+  if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
+  const doPhase = meta.phase === 2;
+  let mid = doPhase ? 1 : 0;
+  let checks = 1;
+  let end = first;
+  let failed = first?.ok ? null : first;
+  addStage(first);
+  for (let i = 0; i < meta.steps; i += 1) {
+    await page.evaluate(() => {
+      if (typeof window.__nanoGPTRagTap !== "function") throw new Error("missing rag tap");
+      window.__nanoGPTRagTap();
+    });
+    await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+    const isEnd = i === meta.steps - 1;
+    if (!doPhase && !isEnd) continue;
+    const result = await page.evaluate(() => window.__nanoGPTAssertLayout());
+    checks += 1;
+    if (doPhase && !isEnd) mid += 1;
+    end = result;
+    addStage(result);
+    if (!result?.ok) {
+      failed = failed || result;
+      if (isEnd) await page.screenshot({ path: `${OUT}/${name}-end.png` });
+    }
+  }
+  return { end, mid, checks, failed, tally };
+}
+
+async function jumpRag(page, key, beat, phase, name) {
+  await jumpLanded(page, key, beat, phase);
+  await page.waitForTimeout(280);
+  await assertRagVo(page, key, beat);
+  const first = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (name.startsWith("rag-mobile")) {
+    const card = await page.evaluate(() => window.__nanoGPTCard || null);
+    if (card?.truncated) throw new Error(`rag card truncated ${name}`);
+  }
+  if (!first?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
+  const play = await playRagSteps(page, name, first);
+  const end = play.end || first;
+  const failed = play.failed;
+  const pageId = end?.pageId || first?.pageId || (await page.evaluate(() => window.__nanoGPTState?.().pageId || ""));
+  const shot = rag3ShotFor(pageId, name.includes("-ja-") ? "ja" : "zh", page.viewportSize().width, page.viewportSize().height, phase);
+  if (shot) await page.screenshot({ path: shot });
+  const result = failed ? { ...end, ok: false, overlaps: failed.overlaps || end.overlaps, overflows: failed.overflows || end.overflows } : end;
+  return {
+    name,
+    ...result,
+    stageMid: play.mid,
+    stageChecks: play.checks,
+    stageTally: play.tally,
+    stage: end?.stage || first?.stage || null,
+  };
+}
+
+async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
+  const page = await browser.newPage(pageOpts);
+  await page.addInitScript((next) => {
+    localStorage.setItem("nanogpt-lang", next);
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-seen-guide-rag", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+  }, lang);
+  await ready(page);
+  await page.evaluate(() => window.__nanoGPTJump("RagTitle", 0, 0));
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "RagTitle" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(300);
+  await assertRagVo(page, "RagTitle", 0);
+  const title = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!title?.ok) {
+    await page.screenshot({ path: `${OUT}/rag-${label}-${lang}-title.png` });
+    throw new Error(`rag title ${label} ${lang} ${JSON.stringify({ overlaps: title?.overlaps, overflows: title?.overflows })}`);
+  }
+  const spine = await page.evaluate(() => window.__nanoGPTRagSpine);
+  if (spine?.l1 !== 12 || spine?.l5 !== 12 || spine?.phases !== 5) throw new Error(`rag spine ${JSON.stringify(spine)}`);
+  const jobs = ragWalks(spine, { allPhases });
+  const reports = [];
+  for (const [key, beat, phase, name] of jobs) {
+    const result = await jumpRag(page, key, beat, phase, `rag-${label}-${lang}-${name}`);
+    reports.push(result);
+    if (!result.ok) {
+      console.error(`FAIL rag ${label} ${lang} ${name} ${JSON.stringify(result.overlaps || result.overflows || result.orphans)}`);
+    } else {
+      console.log(`ok rag ${label} ${lang} ${name}`);
+    }
+  }
+  const scoring = RAG_LEVEL_PAGES.Rag3.findIndex((item) => item.id === "r3-p3");
+  const threshold = RAG_LEVEL_PAGES.Rag5.findIndex((item) => item.id === "r5-p4");
+  await openPseudoShot(page, "Rag3", scoring, 2, null);
+  await openPseudoShot(page, "Rag5", threshold, 2, null);
+  await page.click("#book-toggle");
+  await page.waitForTimeout(200);
+  const book = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!book?.ok) throw new Error(`rag book ${label} ${lang}`);
+  await page.click("#lesson-book-close");
+  await page.click("#notes-toggle");
+  await page.waitForTimeout(200);
+  const notes = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!notes?.ok) throw new Error(`rag notes ${label} ${lang} ${JSON.stringify(notes?.overlaps)}`);
+  await page.click("#notes-close");
+  if (lang === "zh") {
+    await page.click("#catalog-toggle");
+    await page.waitForSelector("#catalog-overlay:not([hidden])");
+    const count = await page.locator("#catalog-list [data-chapter]").count();
+    if (count !== 5) throw new Error(`rag chapters ${count}`);
+    await page.click("[data-chapter='Rag2']");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Rag2" && window.__nanoGPTState?.().beat === 0);
+    await page.click("#back-toggle");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Rag1" && window.__nanoGPTState?.().beat === 11);
+  }
+  await page.close();
+  return { reports, walked: jobs.length, lang, spine };
+}
+
+async function runRagViewport(browser, label, pageOpts, { allPhases }) {
+  mkdirSync("/opt/cursor/artifacts/rag3", { recursive: true });
+  const zh = await runRagLocale(browser, label, pageOpts, "zh", { allPhases });
+  const ja = await runRagLocale(browser, label, pageOpts, "ja", { allPhases });
+  const reports = [...zh.reports, ...ja.reports];
+  return {
+    ok: reports.every((item) => item.ok),
+    walked: zh.walked + ja.walked,
+    reports,
+  };
+}
+
+const ragMobile = await runRagViewport(
+  browser,
+  "mobile",
+  {
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: MOBILE_UA,
+  },
+  { allPhases: true },
+);
+const ragPc = await runRagViewport(
+  browser,
+  "pc",
+  { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+const ragPc1024 = await runRagViewport(
+  browser,
+  "pc1024",
+  { viewport: { width: 1024, height: 640 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+
+async function shootRag5(page, key, beat, phase, taps, file) {
+  await jumpLanded(page, key, beat, phase);
+  await page.waitForTimeout(240);
+  for (let i = 0; i < taps; i += 1) {
+    await page.evaluate(() => window.__nanoGPTRagTap());
+    await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+  }
+  await page.screenshot({ path: file });
+  const probe = await page.evaluate(() => window.__nanoGPTStage || null);
+  console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
+}
+
+async function saveRag5Shots(browser) {
+  const dir = "/opt/cursor/artifacts/rag5";
+  mkdirSync(dir, { recursive: true });
+  const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const jaPc = await open(1440, 900, "ja");
+  const take = beatOf("Rag5", "r5-p2");
+  await shootRag5(jaPc, "Rag5", take, 2, 1, `${dir}/r5-ch5-take-ja-1440-tap1.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 2, `${dir}/r5-ch5-take-ja-1440-tap2.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 3, `${dir}/r5-ch5-take-ja-1440-tap3.png`);
+  const ch1 = beatOf("Rag1", "r1-p9");
+  await shootRag5(jaPc, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-ja-1440.png`);
+  await jaPc.close();
+  const zhPc = await open(1440, 900, "zh");
+  const fill = beatOf("Rag4", "r4-p6");
+  await shootRag5(zhPc, "Rag4", fill, 2, 0, `${dir}/r5-ch4-fill-zh-1440-blank.png`);
+  await shootRag5(zhPc, "Rag4", fill, 2, 1, `${dir}/r5-ch4-fill-zh-1440-filled.png`);
+  await shootRag5(zhPc, "Rag3", beatOf("Rag3", "r3-p3"), 2, 1, `${dir}/r5-ch3-score-zh-1440.png`);
+  await shootRag5(zhPc, "Rag5", beatOf("Rag5", "r5-p4"), 2, 1, `${dir}/r5-ch5-threshold-zh-1440.png`);
+  await zhPc.close();
+  const zhShort = await open(1024, 640, "zh");
+  await shootRag5(zhShort, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-zh-1024.png`);
+  await zhShort.close();
+  const jaPhone = await open(390, 844, "ja", true);
+  await shootRag5(jaPhone, "Rag1", ch1, 2, 0, `${dir}/r5-ch1-do-ja-390.png`);
+  await jaPhone.close();
+}
+
+await saveRag5Shots(browser);
+
+async function saveRag6Shots(browser) {
+  const dir = "/opt/cursor/artifacts/rag6";
+  mkdirSync(dir, { recursive: true });
+  const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const jaPc = await open(1440, 900, "ja");
+  const take = beatOf("Rag5", "r5-p2");
+  await shootRag5(jaPc, "Rag5", take, 2, 1, `${dir}/r6-ch5-take-ja-1440-tap1.png`);
+  await shootRag5(jaPc, "Rag5", take, 2, 3, `${dir}/r6-ch5-take-ja-1440-tap3.png`);
+  const fillJa = beatOf("Rag4", "r4-p6");
+  await shootRag5(jaPc, "Rag4", fillJa, 2, 1, `${dir}/r6-captions-ja-1440.png`);
+  await jaPc.close();
+  const zhPhone = await open(390, 844, "zh", true);
+  await shootRag5(zhPhone, "Rag5", take, 2, 1, `${dir}/r6-ch5-take-zh-390-tap1.png`);
+  await zhPhone.close();
+  const zhPc = await open(1440, 900, "zh");
+  const fill = beatOf("Rag4", "r4-p6");
+  await shootRag5(zhPc, "Rag4", fill, 2, 1, `${dir}/r6-ch4-fill-zh-1440-filled.png`);
+  await zhPc.close();
+}
+
+await saveRag6Shots(browser);
+
 await browser.close();
 
-const summary = { mobile, pc, pc1024, speech, home };
+const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024 };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
@@ -1728,7 +2101,32 @@ const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
 const speechOk = speech?.voiced === true && speech?.missing === true;
 const live2dOk = live2dFit?.ok === true;
 const homeOk = home?.ok === true;
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk) {
+const ragWalked =
+  ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
+const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
+const stageReports = [...ragMobile.reports, ...ragPc.reports, ...ragPc1024.reports];
+const stage = stageReports.reduce(
+  (sum, report) => {
+    const tally = report.stageTally || {};
+    sum.checks += report.stageChecks || 0;
+    sum.mid += report.stageMid || 0;
+    sum.overlaps += tally.overlaps || 0;
+    sum.tiny += tally.tiny || 0;
+    sum.short += tally.short || 0;
+    sum.fill += tally.fill || 0;
+    sum.actors += tally.actors || 0;
+    sum.contrast += tally.contrast || 0;
+    sum.words += tally.words || 0;
+    sum.empty += tally.empty || 0;
+    return sum;
+  },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 },
+);
+const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
+const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.empty === 0 && stage.mid >= doPages && stage.checks > 0;
+const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
+console.log(stageLine);
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -1748,8 +2146,15 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     live2dFit,
     homeOk,
     home,
+    ragOk,
+    ragWalked,
+    stageOk,
+    stage,
+    ragMobile: ragMobile.walked,
+    ragPc: ragPc.walked,
+    ragPc1024: ragPc1024.walked,
     mobileChrome: mobile.chrome,
   });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} jaSpeech=1`);
+console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked} jaSpeech=1`);

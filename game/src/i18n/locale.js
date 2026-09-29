@@ -1,13 +1,27 @@
 import { LESSON_PHASES } from "../data/lessons.js";
 import { JA } from "./ja.js";
 import { ZH } from "./zh.js";
+import { RAG_JA } from "./rag/ja.js";
+import { RAG_ZH } from "./rag/zh.js";
 
 export const LANG_KEY = "nanogpt-lang";
 export const GUIDE_KEY = "nanogpt-seen-guide";
+export const RAG_GUIDE_KEY = "nanogpt-seen-guide-rag";
 
 const PACKS = { zh: ZH, ja: JA };
+const RAG_PACKS = { zh: RAG_ZH, ja: RAG_JA };
 
 let lang = "zh";
+let course = "nanogpt";
+
+export function setCourse(next) {
+  course = next === "rag" ? "rag" : "nanogpt";
+  if (typeof document !== "undefined") document.documentElement.dataset.course = course;
+}
+
+export function getCourse() {
+  return course;
+}
 
 export function getLang() {
   return lang;
@@ -21,9 +35,13 @@ export function readStoredLang() {
   }
 }
 
+function guideStorageKey() {
+  return getCourse() === "rag" ? RAG_GUIDE_KEY : GUIDE_KEY;
+}
+
 export function readSeenGuide() {
   try {
-    return localStorage.getItem(GUIDE_KEY) === "1";
+    return localStorage.getItem(guideStorageKey()) === "1";
   } catch {
     return false;
   }
@@ -31,7 +49,7 @@ export function readSeenGuide() {
 
 export function writeSeenGuide() {
   try {
-    localStorage.setItem(GUIDE_KEY, "1");
+    localStorage.setItem(guideStorageKey(), "1");
   } catch {
     /* private mode */
   }
@@ -49,6 +67,11 @@ export function present(value) {
 
 export function t(key) {
   if (!key) return "";
+  if (getCourse() === "rag") {
+    const rag = RAG_PACKS[lang] || RAG_ZH;
+    const ragValue = rag[key];
+    if (typeof ragValue === "string" && ragValue.length) return present(ragValue);
+  }
   const pack = PACKS[lang] || ZH;
   const value = pack[key];
   if (typeof value === "string" && value.length) return present(value);
@@ -79,7 +102,7 @@ export function resolveBeat(page) {
   const checkA = t(keys.checkA);
   const stars = [1, 2, 3].map((n) => ownedLine(page.id, `star${n}`)).filter(Boolean);
   const detail = ownedLine(page.id, "detail");
-  const isSum = String(page.id || "").endsWith("-sum");
+  const isSum = /-(sum|rev)$/.test(String(page.id || ""));
   const remember =
     isSum && stars.length
       ? stars.map((line) => `⭐ ${line}`).join("\n")
@@ -164,9 +187,10 @@ export function guideCards() {
 }
 
 export function chapterList() {
+  const rag = getCourse() === "rag";
   return [1, 2, 3, 4, 5].map((index) => ({
-    id: `Level${index}`,
-    scene: `Level${index}`,
+    id: rag ? `Rag${index}` : `Level${index}`,
+    scene: rag ? `Rag${index}` : `Level${index}`,
     playable: true,
     short: t(`chapter.${index}.short`),
     title: t(`chapter.${index}.title`),
@@ -179,7 +203,10 @@ export function chapterList() {
 }
 
 export function noteList() {
-  return ["vocab", "encode", "decode", "split", "loss", "embed", "attention", "train", "sample"].map((id) => ({
+  const ids = getCourse() === "rag"
+    ? ["memory", "ai", "rag", "finder", "writer", "card", "line"]
+    : ["vocab", "encode", "decode", "split", "loss", "embed", "attention", "train", "sample"];
+  return ids.map((id) => ({
     id,
     term: t(`note.${id}.term`),
     blurb: t(`note.${id}.blurb`),

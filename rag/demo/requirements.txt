@@ -1,0 +1,4 @@
+scikit-learn==1.9.1
+sentence-transformers==6.1.0
+# CPU torch: pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
+jieba==0.42.1
