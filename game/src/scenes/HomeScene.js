@@ -234,11 +234,27 @@ function fitLine(scene, str, maxW, size, min, styleFn) {
   return current;
 }
 
+function phraseSplit(source, body) {
+  const phrases = String(source ?? "").split(/\s+/).filter(Boolean).map((phrase) => [...phrase.replace(/\s+/g, "")]);
+  if (phrases.length < 2) return false;
+  const lines = String(body ?? "").split("\n").map((line) => [...line.replace(/\s+/g, "")]);
+  let pos = 0;
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    pos += lines[i].length;
+    let acc = 0;
+    for (const phrase of phrases) {
+      if (pos > acc && pos < acc + phrase.length) return true;
+      acc += phrase.length;
+    }
+  }
+  return false;
+}
+
 function fitBlock(scene, str, maxW, maxH, size, min, styleFn) {
   let current = size;
   let body = wrapAtBreaks(scene, str, current, maxW, styleFn);
   const probe = scene.add.text(0, 0, body, styleFn(current)).setVisible(false);
-  const crowded = () => probe.width > maxW + 1 || probe.height > maxH || orphanLines(body).length > 0;
+  const crowded = () => probe.width > maxW + 1 || probe.height > maxH || orphanLines(body).length > 0 || phraseSplit(str, body);
   while (crowded() && current > min) {
     current -= 1;
     body = wrapAtBreaks(scene, str, current, maxW, styleFn);
@@ -315,7 +331,9 @@ function buildCard(scene, spec, x, y, w, h, scale = 1) {
 
   let side = w >= 300 && h >= 168 && columnW >= 280;
   let laid = side ? compose(true, columnH) : null;
-  if (!laid || laid.blockH > columnH + 1 || laid.tW < px(72)) {
+  // A side picture is only worth it when the words still fit a whole phrase.
+  // 「うけつけで 聞く」 must not break before the space.
+  if (!laid || laid.blockH > columnH + 1 || laid.tW < Math.max(px(72), font(22) * 6)) {
     side = false;
     const words = compose(false, px(28));
     const minArt = Math.min(px(40), Math.max(px(28), columnH * 0.22));
