@@ -126,25 +126,23 @@ export function glueUnits(text) {
   return units;
 }
 
-/** Space-delimited words, with a glued run kept as one word (Page 4, 6:30–9:30). */
+/**
+ * Space-delimited phrases. A glued run stays inside its phrase, and a run
+ * that itself contains spaces (Page 4, 第 4 页) is one phrase.
+ */
 export function glueWords(text) {
-  const words = [];
-  let buf = "";
-  const flush = () => {
-    if (!buf) return;
-    words.push(...buf.split(/\s+/).filter(Boolean));
-    buf = "";
-  };
-  for (const unit of glueUnits(text)) {
-    if (isGluedUnit(unit)) {
-      flush();
-      words.push(unit);
-    } else {
-      buf += unit;
-    }
-  }
-  flush();
-  return words;
+  const src = String(text ?? "");
+  if (!src) return [];
+  const saved = [];
+  const masked = src.replace(glueRegExp(), (match) => {
+    const token = `\uE000${saved.length}\uE001`;
+    saved.push(match);
+    return token;
+  });
+  return masked
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.replace(/\uE000(\d+)\uE001/g, (_, index) => saved[Number(index)] || ""));
 }
 
 function useGlue(flag) {
