@@ -137,14 +137,18 @@ export function projectMap(coords, area, inset = 18) {
     minY = Math.min(minY, y);
     maxY = Math.max(maxY, y);
   });
-  const span = Math.max(maxX - minX, maxY - minY) || 1;
+  const spanX = Math.max(maxX - minX, 0.001);
+  const spanY = Math.max(maxY - minY, 0.001);
+  const padX = Math.min(inset, Math.max(6, area.w * 0.012));
+  const padY = Math.min(inset, Math.max(6, area.h * 0.02));
   const inner = {
-    x: area.x + inset,
-    y: area.y + inset,
-    w: Math.max(20, area.w - inset * 2),
-    h: Math.max(20, area.h - inset * 2),
+    x: area.x + padX,
+    y: area.y + padY,
+    w: Math.max(20, area.w - padX * 2),
+    h: Math.max(20, area.h - padY * 2),
   };
-  const scale = (Math.min(inner.w, inner.h) * 0.92) / span;
+  const scaleX = (inner.w * 0.98) / spanX;
+  const scaleY = (inner.h * 0.98) / spanY;
   const midX = (minX + maxX) / 2;
   const midY = (minY + maxY) / 2;
   const originX = inner.x + inner.w / 2;
@@ -153,8 +157,8 @@ export function projectMap(coords, area, inset = 18) {
   words.forEach((word) => {
     const [x, y] = coords[word];
     dots[word] = {
-      x: originX + (x - midX) * scale,
-      y: originY - (y - midY) * scale,
+      x: originX + (x - midX) * scaleX,
+      y: originY - (y - midY) * scaleY,
     };
   });
   return dots;

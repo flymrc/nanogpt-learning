@@ -2248,7 +2248,7 @@ const embedPc1024 = await runEmbedViewport(
 );
 
 async function saveEmbedShots(browser) {
-  const dir = "/opt/cursor/artifacts/emb2";
+  const dir = "/opt/cursor/artifacts/emb3";
   mkdirSync(dir, { recursive: true });
   const beatOf = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const open = async (width, height, lang, mobile = false) => {
@@ -2281,24 +2281,18 @@ async function saveEmbedShots(browser) {
     console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
   };
   const zhPc = await open(1440, 900, "zh");
-  await shoot(zhPc, "Embed1", "e1-p1", "e2-ch1-strip-zh-1440.png", 1);
-  await shoot(zhPc, "Embed2", "e2-p1", "e2-map-zh-1440.png", 1);
-  await shoot(zhPc, "Embed3", "e3-p4", "e2-ch3-ruler-zh-1440.png", 1);
-  await shoot(zhPc, "Embed5", "e5-p1", "e2-ch5-rank-zh-1440.png", 1);
+  await shoot(zhPc, "Embed1", "e1-p1", "e3-ch1-strip-zh-1440.png", 1);
+  await shoot(zhPc, "Embed2", "e2-p2", "e3-ch2-podium-zh-1440.png", 1);
+  await shoot(zhPc, "Embed3", "e3-p4", "e3-ch3-ruler-zh-1440.png", 1);
   await zhPc.close();
   const jaPc = await open(1440, 900, "ja");
-  await shoot(jaPc, "Embed2", "e2-p1", "e2-map-ja-1440.png", 1);
-  await shoot(jaPc, "Embed2", "e2-p2", "e2-ch2-podium-ja-1440.png", 1);
-  await shoot(jaPc, "Embed4", "e4-p3", "e2-ch4-lift-ja-1440.png", 1);
+  await shoot(jaPc, "Embed2", "e2-p1", "e3-map-ja-1440.png", 1);
+  await shoot(jaPc, "Embed4", "e4-p3", "e3-ch4-lift-ja-1440.png", 1);
+  await shoot(jaPc, "Embed5", "e5-p1", "e3-ch5-rank-ja-1440.png", 1);
   await jaPc.close();
-  const zhShort = await open(1024, 640, "zh");
-  await shoot(zhShort, "Embed3", "e3-p4", "e2-ch3-zh-1024.png", 1);
-  await zhShort.close();
-  const zhPhone = await open(390, 844, "zh", true);
-  await shoot(zhPhone, "Embed2", "e2-p1", "e2-map-zh-390.png", 1);
-  await zhPhone.close();
   const jaPhone = await open(390, 844, "ja", true);
-  await shoot(jaPhone, "Embed1", "e1-p1", "e2-ch1-ja-390.png", 1);
+  await shoot(jaPhone, "Embed3", "e3-p4", "e3-ch3-ja-390.png", 1);
+  await shoot(jaPhone, "Embed2", "e2-p1", "e3-map-ja-390.png", 1);
   await jaPhone.close();
 }
 

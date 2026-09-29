@@ -4,7 +4,7 @@ import { EMBED_FACTS } from "../data/embed-facts.js";
 import { getLang } from "../i18n/locale.js";
 import { isWidePcTutor } from "../tutor/bus.js";
 import { markCaption } from "./components.js";
-import { placeStickers, projectMap } from "./embed-layout.js";
+import { placeStickers, projectMap, rectsOverlap } from "./embed-layout.js";
 import { ctaCeiling, keepStageAboveCta, layerBottom } from "./lesson.js";
 import { CAPTION_CLEAR, STICKER_SHADOW_Y } from "./layout.js";
 import { C, uiText, wrapAtBreaks } from "./theme.js";
@@ -244,16 +244,45 @@ function plate(scene, parent, x, y, w, h, fill) {
 }
 
 function helperRect(w, h) {
-  const phone = !isWidePcTutor();
-  const ah = phone ? Math.min(84, Math.max(64, h * 0.28)) : Math.max(108, h * 0.36);
-  const aw = Math.min(phone ? 70 : ah * 0.58, w * 0.2);
+  const ah = Math.round(h * 0.34);
+  const aw = Math.round(Math.min(w * 0.3, Math.max(68, ah * 0.66)));
   return { x: -w / 2 + 8, y: h / 2 - ah - 8, w: aw, h: ah };
 }
 
+function addSolid(scene, parent, x, y, w, h, id) {
+  const zone = scene.add.zone(x + w / 2, y + h / 2, w, h);
+  zone.setData("stageRole", "solid");
+  zone.setData("stageId", id);
+  zone.setData("width", w);
+  zone.setData("height", h);
+  parent.add(zone);
+  return zone;
+}
+
+function seatNear(x, y, w, h, taken, bounds) {
+  let best = null;
+  const step = 10;
+  const y0 = bounds.y + h / 2 + 2;
+  const y1 = bounds.y + bounds.h - h / 2 - 2;
+  const x0 = bounds.x + w / 2 + 2;
+  const x1 = bounds.x + bounds.w - w / 2 - 2;
+  for (let py = y0; py <= y1; py += step) {
+    for (let px = x0; px <= x1; px += step) {
+      const rect = { x: px - w / 2, y: py - h / 2, w, h };
+      if (taken.some((ob) => rectsOverlap(rect, ob, 6))) continue;
+      const dist = Math.hypot(px - x, py - y);
+      if (!best || dist < best.dist) best = { x: px, y: py, dist };
+    }
+  }
+  if (!best) return { x, y };
+  taken.push({ x: best.x - w / 2, y: best.y - h / 2, w, h });
+  return best;
+}
+
 function contentRect(w, h, block) {
-  const x = block.x + block.w + 10;
   const y = -h / 2 + 8;
-  return { x, y, w: Math.max(80, w / 2 - 8 - x), h: Math.max(80, h - 16) };
+  const bottom = block.y - 8;
+  return { x: -w / 2 + 8, y, w: Math.max(80, w - 16), h: Math.max(64, bottom - y) };
 }
 
 function backdrop(g, w, h, look) {
@@ -262,10 +291,8 @@ function backdrop(g, w, h, look) {
     g.fillRoundedRect(-w / 2, -h / 2, w, h * 0.72, 18);
     g.fillStyle(0xc9845a, 1);
     g.fillRect(-w / 2, h * 0.18, w, h * 0.32);
-    g.fillStyle(0x8fd0ff, 1);
-    g.fillRoundedRect(w * 0.18, -h * 0.42, w * 0.22, h * 0.28, 8);
-    g.fillStyle(0xffe566, 1);
-    g.fillCircle(-w * 0.32, -h * 0.3, Math.min(22, h * 0.06));
+  g.fillStyle(0xffe566, 1);
+  g.fillCircle(-w * 0.32, -h * 0.3, Math.min(22, h * 0.06));
     return;
   }
   if (look === "night") {
@@ -306,27 +333,96 @@ function backdrop(g, w, h, look) {
   g.fillEllipse(-w * 0.22, h * 0.38, w * 0.46, h * 0.16);
 }
 
-function robot(scene, parent, rect) {
+function drawKid(g, w, h, pose) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const headR = Math.min(w * 0.32, h * 0.15);
+  const headCy = -hh + Math.max(headR + 6, h * 0.24);
+  const inkW = Math.max(3, h * 0.014);
+  g.fillStyle(0x1d4ed8, 1);
+  g.fillRoundedRect(-headR * 0.42, -hh + 1, headR * 0.84, Math.max(8, headCy - headR - (-hh) - 1), 4);
+  g.fillStyle(0x3b82f6, 1);
+  g.fillRoundedRect(-headR * 1.2, headCy - headR - h * 0.045, headR * 2.4, h * 0.07, 5);
+  g.lineStyle(inkW, INK_N, 1);
+  g.strokeRoundedRect(-headR * 1.2, headCy - headR - h * 0.045, headR * 2.4, h * 0.07, 5);
+  g.fillStyle(0xffe1c4, 1);
+  g.fillCircle(0, headCy, headR);
+  g.lineStyle(inkW, INK_N, 1);
+  g.strokeCircle(0, headCy, headR);
+  g.fillStyle(INK_N, 1);
+  g.fillCircle(-headR * 0.34, headCy - headR * 0.08, Math.max(2.2, headR * 0.12));
+  g.fillCircle(headR * 0.34, headCy - headR * 0.08, Math.max(2.2, headR * 0.12));
+  g.lineStyle(inkW, 0xe24b57, 1);
+  g.beginPath();
+  g.arc(0, headCy + headR * 0.18, headR * 0.42, 0.25, Math.PI - 0.25, false);
+  g.strokePath();
+  const bodyTop = headCy + headR * 0.62;
+  const bodyW = Math.min(w * 0.86, headR * 3.1);
+  const bodyH = Math.max(18, hh - 8 - bodyTop - h * 0.16);
+  g.fillStyle(0x5eb3ff, 1);
+  g.fillRoundedRect(-bodyW / 2, bodyTop, bodyW, bodyH, 12);
+  g.lineStyle(inkW, INK_N, 1);
+  g.strokeRoundedRect(-bodyW / 2, bodyTop, bodyW, bodyH, 12);
+  g.fillStyle(0xfffdf8, 1);
+  g.fillRoundedRect(-bodyW * 0.28, bodyTop + bodyH * 0.28, bodyW * 0.56, bodyH * 0.42, 6);
+  g.lineStyle(Math.max(2, inkW * 0.7), INK_N, 1);
+  g.strokeRoundedRect(-bodyW * 0.28, bodyTop + bodyH * 0.28, bodyW * 0.56, bodyH * 0.42, 6);
+  const legTop = bodyTop + bodyH - 2;
+  const legW = Math.max(8, bodyW * 0.24);
+  const legH = Math.max(8, hh - 2 - legTop);
+  g.fillStyle(0x1e3a8a, 1);
+  g.fillRoundedRect(-bodyW * 0.32, legTop, legW, legH, 5);
+  g.fillRoundedRect(bodyW * 0.32 - legW, legTop, legW, legH, 5);
+  g.fillStyle(0x3b2a2e, 1);
+  g.fillRoundedRect(-bodyW * 0.36, hh - 7, legW + 4, 6, 3);
+  g.fillRoundedRect(bodyW * 0.36 - legW - 4, hh - 7, legW + 4, 6, 3);
+  const shoulderX = bodyW * 0.46;
+  const shoulderY = bodyTop + bodyH * 0.22;
+  let handX = hw - 3;
+  let handY = -hh + h * 0.58;
+  if (pose === "point") {
+    handX = hw - 2;
+    handY = -hh + h * 0.16;
+  } else if (pose === "protractor") {
+    handX = hw - 3;
+    handY = -hh + 6;
+  } else if (pose === "hold" || pose === "crank") {
+    handX = hw - 4;
+    handY = -hh + h * 0.56;
+  }
+  const arm = Math.max(6, h * 0.045);
+  g.lineStyle(arm, 0xffe1c4, 1);
+  g.beginPath();
+  g.moveTo(shoulderX * 0.2, shoulderY);
+  g.lineTo(handX, handY);
+  g.strokePath();
+  g.fillStyle(0xffe1c4, 1);
+  g.fillCircle(handX, handY, Math.max(5, h * 0.04));
+  g.lineStyle(Math.max(2, inkW * 0.7), INK_N, 1);
+  g.strokeCircle(handX, handY, Math.max(5, h * 0.04));
+  if (pose === "crank") {
+    g.lineStyle(Math.max(3, h * 0.02), INK_N, 1);
+    g.strokeCircle(handX, handY, Math.max(9, h * 0.055));
+    g.beginPath();
+    g.moveTo(handX, handY);
+    g.lineTo(handX + Math.min(14, w * 0.12), handY - Math.min(16, h * 0.08));
+    g.strokePath();
+  }
+  if (pose === "protractor") {
+    g.lineStyle(arm, 0xffe1c4, 1);
+    g.beginPath();
+    g.moveTo(-shoulderX * 0.15, shoulderY);
+    g.lineTo(handX - w * 0.22, handY + h * 0.06);
+    g.strokePath();
+    g.fillStyle(0xffe1c4, 1);
+    g.fillCircle(handX - w * 0.22, handY + h * 0.06, Math.max(5, h * 0.035));
+  }
+}
+
+function robot(scene, parent, rect, pose = "point") {
   const box = scene.add.container(rect.x + rect.w / 2, rect.y + rect.h / 2);
   const g = scene.add.graphics();
-  const s = Math.min(rect.w, rect.h);
-  g.fillStyle(0x5eb3ff, 1);
-  g.fillRoundedRect(-s * 0.28, -s * 0.08, s * 0.56, s * 0.42, 10);
-  g.fillStyle(0xfffdf8, 1);
-  g.fillRoundedRect(-s * 0.16, s * 0.02, s * 0.32, s * 0.2, 5);
-  g.lineStyle(3, INK_N, 1);
-  g.strokeRoundedRect(-s * 0.16, s * 0.02, s * 0.32, s * 0.2, 5);
-  g.fillStyle(0xffe1c4, 1);
-  g.fillCircle(0, -s * 0.22, s * 0.18);
-  g.fillStyle(0x3b82f6, 1);
-  g.fillRoundedRect(-s * 0.22, -s * 0.46, s * 0.44, s * 0.14, 6);
-  g.fillStyle(INK_N, 1);
-  g.fillCircle(-s * 0.06, -s * 0.24, Math.max(2, s * 0.025));
-  g.fillCircle(s * 0.06, -s * 0.24, Math.max(2, s * 0.025));
-  g.lineStyle(3, 0xe24b57, 1);
-  g.beginPath();
-  g.arc(0, -s * 0.16, s * 0.055, 0.25, Math.PI - 0.25, false);
-  g.strokePath();
+  drawKid(g, rect.w, rect.h, pose);
   box.add(g);
   box.setData("width", rect.w);
   box.setData("height", rect.h);
@@ -363,7 +459,12 @@ function machine(g, x, y, w, h, { open = true, lit = true } = {}) {
   g.fillCircle(x + w * 0.82, y + h * 0.22, Math.min(12, h * 0.08));
   g.lineStyle(2, INK_N, 1);
   g.strokeCircle(x + w * 0.82, y + h * 0.22, Math.min(12, h * 0.08));
-  return { x: winX, y: winY, w: winW, h: winH, cx: winX + winW / 2, cy: winY + winH / 2 };
+  const crank = { x: x + Math.min(18, w * 0.08), y: y + h * 0.62 };
+  g.lineStyle(Math.max(4, h * 0.025), INK_N, 1);
+  g.strokeCircle(crank.x, crank.y, Math.min(16, h * 0.07));
+  g.fillStyle(0xfff1d2, 1);
+  g.fillCircle(crank.x, crank.y, Math.min(6, h * 0.03));
+  return { x: winX, y: winY, w: winW, h: winH, cx: winX + winW / 2, cy: winY + winH / 2, crank };
 }
 
 function cells(g, x, y, list, size, count = null) {
@@ -392,14 +493,14 @@ function ray(cx, cy, radius, degrees) {
   return { x: cx + Math.sin(rad) * radius, y: cy - Math.cos(rad) * radius };
 }
 
-function arrowTo(g, x0, y0, x1, y1, color) {
-  g.lineStyle(5, color, 1);
+function arrowTo(g, x0, y0, x1, y1, color, width = 5) {
+  g.lineStyle(width, color, 1);
   g.beginPath();
   g.moveTo(x0, y0);
   g.lineTo(x1, y1);
   g.strokePath();
   const ang = Math.atan2(y1 - y0, x1 - x0);
-  const ah = 11;
+  const ah = Math.max(12, width * 2.1);
   g.fillStyle(color, 1);
   g.fillTriangle(
     x1,
@@ -411,15 +512,15 @@ function arrowTo(g, x0, y0, x1, y1, color) {
   );
 }
 
-function wedge(g, cx, cy, radius, degrees, color) {
-  const end = (Math.min(90, Math.max(0, degrees)) * Math.PI) / 180;
-  g.fillStyle(color, 0.28);
+function wedge(g, cx, cy, radius, degrees, color, width = 4) {
+  const end = (Math.min(170, Math.max(0, degrees)) * Math.PI) / 180;
+  g.fillStyle(color, 0.3);
   g.beginPath();
   g.moveTo(cx, cy);
   g.arc(cx, cy, radius, -Math.PI / 2, -Math.PI / 2 + end, false);
   g.closePath();
   g.fillPath();
-  g.lineStyle(4, color, 1);
+  g.lineStyle(width, color, 1);
   const start = ray(cx, cy, radius, 0);
   const stop = ray(cx, cy, radius, degrees);
   g.beginPath();
@@ -482,17 +583,120 @@ function rowsFromItems(items, step) {
   }));
 }
 
-function stripBudget(areaH) {
-  let machine = 156;
-  let cell = 36;
-  let tail = 34;
-  const band = 32;
+function paintStripScene(scene, host, g, w, h, spec, step) {
+  const strip = spec.kind === "strip";
+  const into = step > 0 && strip;
+  const face = fonts();
+  const margin = 10;
+  const ah = Math.round(Math.min(h - 16, h * 0.36));
+  const aw = Math.round(Math.min(w * 0.26, Math.max(70, ah * 0.64)));
+  let machineH = Math.round(strip ? Math.min(h * 0.4, Math.max(ah + 4, h * 0.36)) : Math.min(h * 0.62, Math.max(ah + 8, h * 0.52)));
+  let machineW = Math.round(Math.min(w * 0.46, Math.max(160, machineH * 1.2)));
+  if (aw + machineW > w - margin * 2) machineW = Math.max(120, w - margin * 2 - aw + 8);
+  const hatStick = machineH * 0.24;
+  const outputTail = strip ? 36 + 26 + 24 : 0;
+  const outputCell = strip ? Math.max(36, Math.min(h * 0.22, Math.floor((w - margin * 2 - 42) / 8))) : 0;
+  const blockH = hatStick + machineH + (strip ? 8 + outputCell + outputTail : 0);
+  const top = strip ? -h / 2 + margin : Math.max(-h / 2 + hatStick + 4, -blockH / 2);
+  const machineY = top + (strip ? hatStick : 0);
+  const mx = Math.round(-machineW / 2 + aw * 0.2);
+  const crankX = mx + Math.min(18, machineW * 0.08);
+  const crankY = machineY + machineH * 0.62;
+  const kid = {
+    x: Math.max(-w / 2 + 4, Math.min(w / 2 - aw - 4, crankX - aw + 4)),
+    y: Math.max(-h / 2 + 4, Math.min(h / 2 - ah - 4, crankY - ah * 0.56)),
+    w: aw,
+    h: ah,
+  };
+  robot(scene, host, kid, strip ? "crank" : "hold");
+  const win = machine(g, mx, machineY, machineW, machineH, { open: true, lit: into || spec.kind === "hat" || step > 0 });
+  addSolid(scene, host, mx, machineY, machineW, machineH, "machine");
+  if (!into) {
+    const tagW = 62;
+    const tagH = 28;
+    const tag = plate(scene, host, mx + machineW - tagW / 2 - 12, machineY + machineH - tagH / 2 - 12, tagW, tagH, 0xffc43d);
+    tag.setData("stageId", "machine-tag");
+    addText(scene, tag, 0, 0, lang() === "ja" ? "まど" : "小窗", 14, tagW - 10, { bg: "#ffc43d" });
+  }
+  const word = spec.item?.label || (lang() === "ja" ? "朝ごはん〔breakfast〕" : "早饭");
+  const parts = glossParts(word);
+  const cardW = Math.min(160, Math.max(104, Math.min(win.w - 8, aw)));
+  const cardH = parts.sub ? 56 : 44;
+  const handX = kid.x + kid.w - 4;
+  const handY = kid.y + ah * 0.56;
+  let homeX = handX;
+  let homeY = handY - cardH * 0.15;
+  homeX = Math.max(-w / 2 + cardW / 2 + 4, Math.min(w / 2 - cardW / 2 - 4, homeX));
+  homeY = Math.max(-h / 2 + cardH / 2 + 4, Math.min(machineY + machineH * 0.42, homeY));
+  const flyW = Math.min(cardW, Math.max(88, win.w - 8));
+  const card = plate(
+    scene,
+    host,
+    into ? win.cx : homeX,
+    into ? win.cy : homeY,
+    into ? flyW : cardW,
+    cardH,
+    0xfffdf8,
+  );
+  card.setData("stageId", "word-card");
+  labelBlock(scene, card, 0, 0, (into ? flyW : cardW) - 14, parts);
+  if (scene.__embedAnimate && into) {
+    card.setPosition(homeX, homeY);
+    trackTween(scene, { targets: card, x: win.cx, y: win.cy, duration: 420, ease: "Cubic.in" });
+  }
+  if (!strip) return;
+  const bands = spec.item?.cells || [];
+  const tailH = 36;
+  const rulerH = 24;
   const gap = 8;
-  const need = () => machine + gap + cell + gap + tail + gap + band;
-  while (need() > areaH && machine > 100) machine -= 6;
-  while (need() > areaH && cell > 22) cell -= 2;
-  while (need() > areaH && machine > 78) machine -= 4;
-  return { machine, cell, tail, band, gap };
+  const bandTop = machineY + machineH + gap;
+  const bandBottom = h / 2 - margin;
+  const chrome = tailH + rulerH + gap * 2;
+  const cellCap = Math.max(32, bandBottom - bandTop - chrome);
+  const size = Math.max(28, Math.min(cellCap, Math.floor((w - margin * 2 - 7 * 6) / 8)));
+  const rowW = 8 * size + 7 * 6;
+  const sx = -rowW / 2;
+  const sy = bandTop;
+  g.fillStyle(0xfff6e4, 1);
+  g.fillRoundedRect(sx - 8, sy - 6, rowW + 16, size + 12, 12);
+  g.lineStyle(3, INK_N, 1);
+  g.strokeRoundedRect(sx - 8, sy - 6, rowW + 16, size + 12, 12);
+  if (into) {
+    cells(g, sx, sy, bands, size, 8);
+    if (scene.__embedAnimate) {
+      for (let i = 0; i < 8; i += 1) {
+        const flash = scene.add.rectangle(sx + i * (size + 6) + size / 2, sy + size / 2, size, size, CELL[bands[i]] || CELL.p, 0);
+        host.add(flash);
+        trackTween(scene, { targets: flash, alpha: 1, duration: 140, delay: 420 + i * 50 });
+      }
+    }
+  }
+  const rest = Math.max(0, (spec.dim || 384) - 8);
+  const tail = into ? (lang() === "ja" ? `あと ${rest}` : `还有 ${rest} 个`) : (lang() === "ja" ? "まだ" : "等一下");
+  const tailY = sy + size + gap + tailH / 2;
+  const tailW = Math.min(w - margin * 2, Math.max(rowW, 180));
+  const tailBox = plate(scene, host, 0, tailY, tailW, tailH, 0xfff1d2);
+  tailBox.setData("stageId", "strip-tail");
+  addText(scene, tailBox, 0, 0, tail, face.body, tailW - 16, { bg: CREAM });
+  const badgeW = 72;
+  const rulerW = Math.max(72, Math.min(w - margin * 2 - badgeW - 12, rowW - badgeW));
+  const rulerX = -(rulerW + 10 + badgeW) / 2;
+  const rulerY = tailY + tailH / 2 + gap;
+  g.fillStyle(0xfffdf8, 1);
+  g.fillRoundedRect(rulerX, rulerY, rulerW, rulerH, 8);
+  g.lineStyle(3, INK_N, 1);
+  g.strokeRoundedRect(rulerX, rulerY, rulerW, rulerH, 8);
+  g.lineStyle(2, INK_N, 1);
+  for (let tick = 0; tick <= 8; tick += 1) {
+    const tx = rulerX + 8 + ((rulerW - 16) * tick) / 8;
+    g.beginPath();
+    g.moveTo(tx, rulerY);
+    g.lineTo(tx, rulerY + (tick % 4 === 0 ? rulerH : rulerH * 0.55));
+    g.strokePath();
+  }
+  const dimBadge = plate(scene, host, rulerX + rulerW + 10 + badgeW / 2, rulerY + rulerH / 2, badgeW, 32, 0xffc43d);
+  dimBadge.setData("stageId", "dim-badge");
+  addText(scene, dimBadge, 0, 0, String(spec.dim || 384), 16, 60, { bg: "#ffc43d" });
 }
 
 function paintDesk(scene, host, g, w, h, spec, step) {
@@ -500,65 +704,8 @@ function paintDesk(scene, host, g, w, h, spec, step) {
   const area = contentRect(w, h, block);
   const face = fonts();
   if (spec.kind === "hat" || spec.kind === "strip") {
-    const strip = spec.kind === "strip";
-    const budget = strip ? stripBudget(area.h) : { machine: Math.min(190, area.h - 8), cell: 0, tail: 0, band: 0, gap: 8 };
-    const mh = budget.machine;
-    const mw = Math.min(220, Math.max(116, area.w * 0.48));
-    const mx = area.x;
-    const my = area.y;
-    const win = machine(g, mx, my, mw, mh, { open: true, lit: step > 0 || spec.kind === "hat" });
-    const word = spec.item?.label || (lang() === "ja" ? "朝ごはん〔breakfast〕" : "早饭");
-    const cardW = Math.min(156, Math.max(92, area.x + area.w - (mx + mw + 10)));
-    const cardH = Math.min(56, Math.max(42, win.h - 8));
-    const homeX = mx + mw + 8 + cardW / 2;
-    const homeY = my + mh / 2;
-    const into = step > 0 && strip;
-    const flyW = Math.min(cardW, Math.max(80, win.w - 10));
-    const card = plate(scene, host, into ? win.cx : homeX, into ? win.cy : homeY, into ? flyW : cardW, cardH, 0xfffdf8);
-    card.setData("stageId", "word-card");
-    labelBlock(scene, card, 0, 0, (into ? flyW : cardW) - 14, glossParts(word));
-    if (scene.__embedAnimate && into) {
-      card.setPosition(homeX, homeY);
-      trackTween(scene, { targets: card, x: win.cx, y: win.cy, duration: 420, ease: "Cubic.in" });
-    }
-    if (strip) {
-      const bands = spec.item?.cells || [];
-      const size = Math.min(budget.cell, Math.max(18, Math.floor((area.w - 8 - 7 * 6) / 8)));
-      const rowW = 8 * size + 7 * 6;
-      const sx = area.x + Math.max(0, (area.w - rowW) / 2);
-      const sy = my + mh + budget.gap;
-      const shown = into ? bands : [];
-      cells(g, sx, sy, shown, size, 8);
-      if (scene.__embedAnimate && into) {
-        for (let i = 0; i < 8; i += 1) {
-          const flash = scene.add.rectangle(sx + i * (size + 6) + size / 2, sy + size / 2, size, size, CELL[bands[i]] || CELL.p, 0);
-          host.add(flash);
-          trackTween(scene, { targets: flash, alpha: 1, duration: 140, delay: 400 + i * 60 });
-        }
-      }
-      const rest = Math.max(0, (spec.dim || 384) - 8);
-      const tail = into ? (lang() === "ja" ? `あと ${rest}` : `还有 ${rest} 个`) : (lang() === "ja" ? "まだ" : "等一下");
-      const tailY = sy + size + budget.gap + budget.tail / 2;
-      const tailBox = plate(scene, host, area.x + area.w / 2, tailY, Math.max(80, area.w - 4), budget.tail, 0xfff1d2);
-      addText(scene, tailBox, 0, 0, tail, face.body, area.w - 20, { bg: CREAM });
-      const rulerY = tailY + budget.tail / 2 + budget.gap;
-      const badgeW = 72;
-      const rulerW = Math.max(48, area.w - badgeW - 12);
-      g.fillStyle(0xfffdf8, 1);
-      g.fillRoundedRect(area.x, rulerY, rulerW, 16, 8);
-      g.lineStyle(3, INK_N, 1);
-      g.strokeRoundedRect(area.x, rulerY, rulerW, 16, 8);
-      g.lineStyle(2, INK_N, 1);
-      for (let tick = 0; tick <= 8; tick += 1) {
-        const tx = area.x + 8 + ((rulerW - 16) * tick) / 8;
-        g.beginPath();
-        g.moveTo(tx, rulerY);
-        g.lineTo(tx, rulerY + (tick % 4 === 0 ? 16 : 9));
-        g.strokePath();
-      }
-      const badge = plate(scene, host, area.x + rulerW + 8 + badgeW / 2, rulerY + 8, badgeW, 30, 0xffc43d);
-      addText(scene, badge, 0, 0, String(spec.dim || 384), 16, 60, { bg: "#ffc43d" });
-    }
+    paintStripScene(scene, host, g, w, h, spec, step);
+    return;
   } else if (spec.kind === "align" || spec.kind === "compare" || spec.kind === "class") {
     const items = spec.items || [];
     const gap = 8;
@@ -680,7 +827,7 @@ function seatLines(main, sub) {
 
 function paintMap(scene, host, g, w, h, spec, step) {
   const block = helperRect(w, h);
-  const bounds = { x: -w / 2 + 6, y: -h / 2 + 6, w: w - 12, h: h - 12 };
+  const bounds = { x: -w / 2 + 4, y: -h / 2 + 4, w: w - 8, h: Math.max(120, h - block.h * 0.7) };
   const coords = EMBED_FACTS.map[spec.mapKey] || {};
   const dots = projectMap(coords, bounds, Math.min(22, bounds.w * 0.05));
   const words = Object.keys(dots);
@@ -695,7 +842,7 @@ function paintMap(scene, host, g, w, h, spec, step) {
   }
   const pairMain = `${glossParts(far?.aLabel || far?.a || "").main}–${glossParts(far?.bLabel || far?.b || "").main}`;
   const signLines = spec.kind === "lift"
-    ? { main: lifted ? `${pairMain} ${far?.points ?? ""}`.trim() : pairMain, sub: "" }
+    ? { main: pairMain, sub: "" }
     : { main: group?.name || (lang() === "ja" ? "かこむ" : "圈一圈"), sub: "" };
   const signBits = measureSticker(scene, signLines);
   const signW = Math.min(bounds.w - 16, Math.max(96, signBits.w));
@@ -704,17 +851,29 @@ function paintMap(scene, host, g, w, h, spec, step) {
   let liftGeom = null;
   if (lifted && far && dots[far.a] && dots[far.b]) {
     const degrees = angleOf(far.a, far.b, far.points);
-    const arm = Math.min(72, bounds.w * 0.16, bounds.h * 0.2);
+    let arm = Math.min(bounds.w * 0.32, bounds.h * 0.46, h * 0.38);
     const midX = (dots[far.a].x + dots[far.b].x) / 2;
     const midY = (dots[far.a].y + dots[far.b].y) / 2;
+    const topLimit = sign.y + sign.h + 30;
+    const left = bounds.x + 28;
+    const right = bounds.x + bounds.w - 28;
+    const bottom = bounds.y + bounds.h - 16;
     let ox = midX;
-    let oy = midY - 4;
-    const top = sign.y + sign.h + arm + 12;
-    if (oy - arm < top) oy = top + arm;
-    const right = bounds.x + bounds.w - 12;
-    const reach = Math.sin((degrees * Math.PI) / 180) * arm;
-    if (ox + reach > right) ox = right - reach;
-    if (ox < bounds.x + 16) ox = bounds.x + 16;
+    let oy = midY + Math.min(28, arm * 0.12);
+    for (let pass = 0; pass < 5; pass += 1) {
+      const up = ray(ox, oy, arm, 0);
+      const side = ray(ox, oy, arm, degrees);
+      if (up.y < topLimit) oy += topLimit - up.y;
+      const edge = Math.max(up.x, side.x);
+      const inner = Math.min(up.x, side.x);
+      if (edge > right) ox -= edge - right;
+      if (inner < left) ox += left - inner;
+      if (oy > bottom) {
+        oy = bottom;
+        arm *= 0.84;
+      }
+    }
+    arm = Math.max(64, arm);
     liftGeom = {
       origin: { x: ox, y: oy },
       degrees,
@@ -732,38 +891,70 @@ function paintMap(scene, host, g, w, h, spec, step) {
     w: stickers[index].w,
     h: stickers[index].h,
   }));
-  const obstacles = [block, sign];
-  let placed = placeStickers(items, bounds, obstacles, 4);
-  if (placed.some((rect) => !rect?.ok)) placed = placeStickers(items, bounds, obstacles, 2);
+  const obstacles = [{ x: block.x - 4, y: bounds.y + bounds.h - 6, w: block.w + 8, h: block.h }, sign];
+  let placed = placeStickers(items, bounds, obstacles, 6);
+  if (placed.some((rect) => !rect?.ok)) placed = placeStickers(items, bounds, obstacles, 3);
   if (placed.some((rect) => !rect?.ok)) placed = placeStickers(items, bounds, [sign], 2);
   g.fillStyle(0xfffdf8, 0.94);
   g.fillRoundedRect(bounds.x, bounds.y, bounds.w, bounds.h, 16);
   g.lineStyle(3, INK_N, 1);
   g.strokeRoundedRect(bounds.x, bounds.y, bounds.w, bounds.h, 16);
+  addSolid(scene, host, bounds.x, bounds.y, bounds.w, bounds.h, "map-paper");
+  const houseSize = Math.max(18, Math.min(28, bounds.w * 0.03));
   (groups.length ? groups : [{ words: [] }]).forEach((entry, index) => {
     const pts = (entry.words || []).map((item) => dots[item.word]).filter(Boolean);
     if (!pts.length) return;
     const cx = pts.reduce((sum, pt) => sum + pt.x, 0) / pts.length;
     const cy = pts.reduce((sum, pt) => sum + pt.y, 0) / pts.length;
-    house(g, cx, cy - 16, 11, HOUSE[index % HOUSE.length]);
+    house(g, cx, cy - houseSize * 0.8, houseSize, HOUSE[index % HOUSE.length]);
+  });
+  const stickerOf = words.map((word, index) => {
+    const anchor = items[index];
+    const rect = placed[index]?.ok ? placed[index] : { x: anchor.ax + 6, y: anchor.ay + 6, w: stickers[index].w, h: stickers[index].h };
+    return { word, index, rect, flying: Boolean(liftGeom?.tips[word]) };
+  });
+  stickerOf.forEach((entry) => {
+    const from = dots[entry.word];
+    const lx = entry.rect.x + entry.rect.w / 2;
+    const ly = entry.rect.y + entry.rect.h / 2;
+    const dim = lifted && !hot.has(entry.word);
+    g.lineStyle(2, dim ? 0xd9c7bc : 0x8b6b5c, 1);
+    g.beginPath();
+    g.moveTo(from.x, from.y);
+    g.lineTo(lx, ly);
+    g.strokePath();
+    g.fillStyle(hot.has(entry.word) ? 0xe24b57 : (dim ? 0xc5b4aa : 0x1d4ed8), 1);
+    g.fillCircle(from.x, from.y, hot.has(entry.word) ? 7 : 5);
+    g.lineStyle(2, 0xfffdf8, 1);
+    g.strokeCircle(from.x, from.y, hot.has(entry.word) ? 7 : 5);
+    if (entry.flying) {
+      g.fillStyle(0x141824, 0.28);
+      g.fillEllipse(from.x + 6, from.y + 16, 48, 16);
+    }
+    const dot = scene.add.container(from.x, from.y);
+    dot.setData("stageRole", "prop");
+    dot.setData("stageId", `map-dot:${entry.word}`);
+    dot.setData("width", 14);
+    dot.setData("height", 14);
+    host.add(dot);
   });
   if (group) {
-    const pts = (group.words || []).map((item) => dots[item.word]).filter(Boolean);
-    if (pts.length) {
-      const minX = Math.min(...pts.map((pt) => pt.x));
-      const maxX = Math.max(...pts.map((pt) => pt.x));
-      const minY = Math.min(...pts.map((pt) => pt.y));
-      const maxY = Math.max(...pts.map((pt) => pt.y));
+    const rects = stickerOf.filter((entry) => hot.has(entry.word)).map((entry) => entry.rect);
+    if (rects.length) {
+      const minX = Math.min(...rects.map((rect) => rect.x)) - 20;
+      const maxX = Math.max(...rects.map((rect) => rect.x + rect.w)) + 20;
+      const minY = Math.min(...rects.map((rect) => rect.y)) - 18;
+      const maxY = Math.max(...rects.map((rect) => rect.y + rect.h)) + 18;
       const lasso = scene.add.graphics();
-      const lw = Math.max(64, maxX - minX + 48);
-      const lh = Math.max(48, maxY - minY + 36);
-      lasso.fillStyle(0xe24b57, 0.14);
-      lasso.fillEllipse((minX + maxX) / 2, (minY + maxY) / 2, lw, lh);
-      lasso.lineStyle(4, 0xe24b57, 1);
-      lasso.strokeEllipse((minX + maxX) / 2, (minY + maxY) / 2, lw, lh);
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      lasso.fillStyle(0xe24b57, 0.18);
+      lasso.fillEllipse(cx, cy, Math.max(80, maxX - minX), Math.max(64, maxY - minY));
+      lasso.lineStyle(7, 0xe24b57, 1);
+      lasso.strokeEllipse(cx, cy, Math.max(80, maxX - minX), Math.max(64, maxY - minY));
       host.add(lasso);
       if (scene.__embedAnimate) {
-        lasso.setAlpha(0.4);
+        lasso.setAlpha(0.45);
         trackTween(scene, {
           targets: lasso,
           alpha: 1,
@@ -775,58 +966,51 @@ function paintMap(scene, host, g, w, h, spec, step) {
       }
     }
   }
-  if (liftGeom && far) {
-    [far.a, far.b].forEach((word) => {
-      g.fillStyle(0x141824, 0.28);
-      g.fillEllipse(dots[word].x + 6, dots[word].y + 12, 30, 12);
-    });
-    wedge(g, liftGeom.origin.x, liftGeom.origin.y, liftGeom.arm, liftGeom.degrees, 0xe24b57);
-    arrowTo(g, liftGeom.origin.x, liftGeom.origin.y, liftGeom.tips[far.a].x, liftGeom.tips[far.a].y, 0x1d4ed8);
-    arrowTo(g, liftGeom.origin.x, liftGeom.origin.y, liftGeom.tips[far.b].x, liftGeom.tips[far.b].y, 0xe24b57);
-  }
-  words.forEach((word, index) => {
-    const anchor = items[index];
-    const rect = placed[index]?.ok ? placed[index] : { x: anchor.ax + 6, y: anchor.ay + 6, w: stickers[index].w, h: stickers[index].h };
-    const lx = rect.x + rect.w / 2;
-    const ly = rect.y + rect.h / 2;
-    const flying = Boolean(liftGeom?.tips[word]);
-    if (!flying) {
-      g.lineStyle(2, 0x8b6b5c, 1);
-      g.beginPath();
-      g.moveTo(anchor.ax, anchor.ay);
-      g.lineTo(lx, ly);
-      g.strokePath();
-      g.fillStyle(hot.has(word) ? 0xe24b57 : 0x1d4ed8, 1);
-      g.fillCircle(anchor.ax, anchor.ay, hot.has(word) ? 7 : 5);
-      g.lineStyle(2, 0xfffdf8, 1);
-      g.strokeCircle(anchor.ax, anchor.ay, hot.has(word) ? 7 : 5);
-    } else {
-      g.lineStyle(2, 0x8b6b5c, 1);
-      g.beginPath();
-      g.moveTo(anchor.ax, anchor.ay);
-      g.lineTo(lx, ly);
-      g.strokePath();
-    }
-    const dot = scene.add.container(anchor.ax, anchor.ay);
-    dot.setData("stageRole", "prop");
-    dot.setData("stageId", `map-dot:${word}`);
-    dot.setData("width", 14);
-    dot.setData("height", 14);
-    host.add(dot);
-    const sticker = plate(scene, host, lx, ly, rect.w, rect.h, hot.has(word) ? 0xfff1d2 : 0xfffdf8);
-    sticker.setData("stageId", `map-sticker:${word}`);
-    const bits = stickers[index];
+  const placeSticker = (entry) => {
+    const lx = entry.rect.x + entry.rect.w / 2;
+    const ly = entry.rect.y + entry.rect.h / 2;
+    const dim = lifted && !hot.has(entry.word);
+    const sticker = plate(scene, host, lx, ly, entry.rect.w, entry.rect.h, hot.has(entry.word) ? 0xfff1d2 : 0xfffdf8);
+    sticker.setData("stageId", `map-sticker:${entry.word}`);
+    if (dim) sticker.setAlpha(0.38);
+    const bits = stickers[entry.index];
     sticker.add(bits.main);
     if (bits.sub) sticker.add(bits.sub);
-    bits.main.setData("stageId", `map-label:${word}`);
-    bits.main.setData("stageBg", hot.has(word) ? CREAM : PAPER);
-    if (bits.sub) bits.sub.setData("stageBg", hot.has(word) ? CREAM : PAPER);
+    bits.main.setData("stageId", `map-label:${entry.word}`);
+    bits.main.setData("stageBg", hot.has(entry.word) ? CREAM : PAPER);
+    if (bits.sub) bits.sub.setData("stageBg", hot.has(entry.word) ? CREAM : PAPER);
     seatLines(bits.main, bits.sub);
-    if (scene.__embedAnimate && flying) {
-      sticker.setPosition(dots[word].x, dots[word].y);
+    if (scene.__embedAnimate && entry.flying) {
+      sticker.setPosition(dots[entry.word].x, dots[entry.word].y);
       trackTween(scene, { targets: sticker, x: lx, y: ly, duration: 520, ease: "Sine.out" });
     }
-  });
+  };
+  stickerOf.filter((entry) => !entry.flying).forEach(placeSticker);
+  if (liftGeom && far) {
+    const ink = scene.add.graphics();
+    host.add(ink);
+    [far.a, far.b].forEach((word) => {
+      const spot = stickerOf.find((entry) => entry.word === word);
+      if (!spot) return;
+      ink.fillStyle(0x141824, 0.4);
+      ink.fillEllipse(spot.rect.x + spot.rect.w / 2 + 8, spot.rect.y + spot.rect.h + 6, Math.max(64, spot.rect.w * 0.8), 18);
+    });
+    wedge(ink, liftGeom.origin.x, liftGeom.origin.y, liftGeom.arm, liftGeom.degrees, 0xe24b57, 8);
+    arrowTo(ink, liftGeom.origin.x, liftGeom.origin.y, liftGeom.tips[far.a].x, liftGeom.tips[far.a].y, 0x1d4ed8, 10);
+    arrowTo(ink, liftGeom.origin.x, liftGeom.origin.y, liftGeom.tips[far.b].x, liftGeom.tips[far.b].y, 0xe24b57, 10);
+  }
+  stickerOf.filter((entry) => entry.flying).forEach(placeSticker);
+  if (liftGeom && far) {
+    const taken = stickerOf.map((entry) => ({ ...entry.rect })).concat([
+      sign,
+      { x: block.x, y: block.y, w: block.w, h: block.h },
+    ]);
+    const at = ray(liftGeom.origin.x, liftGeom.origin.y, Math.max(36, liftGeom.arm * 0.42), liftGeom.degrees / 2);
+    const picture = { x: -w / 2 + 4, y: -h / 2 + 4, w: w - 8, h: h - 8 };
+    const seat = seatNear(at.x, at.y, 58, 34, taken, picture);
+    const badge = scorePill(scene, host, seat.x, seat.y, far.points);
+    badge.setData("stageId", "lift-score");
+  }
   const signBox = plate(scene, host, sign.x + sign.w / 2, sign.y + sign.h / 2, sign.w, sign.h, 0xfff1d2);
   signBox.setData("stageId", "map-sign");
   signBox.add(signBits.main);
@@ -834,7 +1018,7 @@ function paintMap(scene, host, g, w, h, spec, step) {
   signBits.main.setData("stageBg", CREAM);
   if (signBits.sub) signBits.sub.setData("stageBg", CREAM);
   seatLines(signBits.main, signBits.sub);
-  robot(scene, host, block);
+  robot(scene, host, block, "point");
 }
 
 function paintPodium(scene, host, g, w, h, spec, step) {
@@ -978,8 +1162,6 @@ function paintAngles(scene, host, g, w, h, spec, step) {
 }
 
 function paintRuler(scene, host, g, w, h, spec, step) {
-  const block = helperRect(w, h);
-  const area = contentRect(w, h, block);
   const items = spec.items || [];
   const chosenIndex = step > 0 ? Math.min(step - 1, items.length - 1) : -1;
   const chosen = chosenIndex >= 0 ? items[chosenIndex] : null;
@@ -990,59 +1172,126 @@ function paintRuler(scene, host, g, w, h, spec, step) {
     hot: index === chosenIndex,
   }));
   if (spec.card) chips.push({ lines: glossParts(spec.card.label), points: spec.card.points, hot: false });
-  const wide = area.w >= 480 && area.h >= 220;
-  const chipH = Math.max(44, 36) * chips.length + 8 * Math.max(0, chips.length - 1);
-  const dialH = wide ? area.h : Math.max(132, Math.min(area.h * 0.46, area.h - chipH - 8));
-  const dial = wide
-    ? { x: area.x, y: area.y, w: Math.max(180, area.w * 0.52), h: area.h }
-    : { x: area.x, y: area.y, w: area.w, h: dialH };
-  const side = wide
-    ? { x: dial.x + dial.w + 10, y: area.y, w: Math.max(120, area.w - dial.w - 10), h: area.h }
-    : { x: area.x, y: area.y + dial.h + 8, w: area.w, h: Math.max(80, area.h - dial.h - 8) };
-  const markW = 40;
-  const markH = 26;
-  const radius = Math.max(58, Math.min(dial.w * 0.34, dial.h * 0.46, (dial.w - markW - 24) / 2, dial.h - markH - 36));
-  const cx = dial.x + (wide ? radius + markW / 2 + 4 : Math.min(dial.w * 0.42, dial.w - radius - markW / 2 - 6));
-  const cy = dial.y + dial.h - markH / 2 - 8;
-  g.lineStyle(5, INK_N, 1);
+  const margin = 8;
+  const ah = Math.round(h * 0.34);
+  const aw = Math.round(Math.min(w * 0.22, Math.max(64, ah * 0.66)));
+  const wantSide = Math.min(230, Math.max(188, w * 0.24));
+  const beside = w >= 760 && w - wantSide >= 220;
+  const side = beside
+    ? { x: w / 2 - margin - wantSide, y: -h / 2 + margin, w: wantSide, h: h - margin * 2 }
+    : {
+      x: -w / 2 + margin,
+      y: h / 2 - margin - Math.min(h * 0.32, Math.max(1, chips.length) * 48),
+      w: w - margin * 2,
+      h: Math.min(h * 0.32, Math.max(1, chips.length) * 48),
+    };
+  const dialRight = beside ? side.x - 14 : w / 2 - margin;
+  const dialBottom = beside ? h / 2 - 4 : side.y - 8;
+  const dialTop = -h / 2 + margin;
+  const dialLeft = -w / 2 + margin;
+  const dialW = Math.max(72, dialRight - dialLeft);
+  const dialH = Math.max(72, dialBottom - dialTop);
+  // Quarter-circle hero. Wide pictures keep it at least 60% of the picture
+  // and centred in the sky; the kid stands under the corner and may overlap the dial.
+  let radius = Math.min(dialW - 8, dialH - 8, beside ? h * 0.86 : h * 0.58);
+  if (beside) radius = Math.max(radius, Math.min(h * 0.6, dialW - 8, dialH - 8));
+  radius = Math.max(56, radius);
+  let cx = dialLeft + Math.max(4, (dialW - radius) / 2);
+  let cy = dialTop + radius;
+  let kid = {
+    x: cx - aw + 6,
+    y: cy - 4,
+    w: aw,
+    h: ah,
+  };
+  const minX = dialLeft;
+  const maxX = Math.max(minX, dialRight - aw - 4);
+  const minY = dialTop;
+  const maxY = Math.max(minY, dialBottom - ah);
+  const shiftX = Math.max(minX, Math.min(maxX, kid.x)) - kid.x;
+  const shiftY = Math.max(minY, Math.min(maxY, kid.y)) - kid.y;
+  kid.x += shiftX;
+  kid.y += shiftY;
+  cx += shiftX;
+  cy += shiftY;
+  radius = Math.max(56, Math.min(radius, cy - dialTop - 2, dialRight - cx - 4));
+  const recentre = dialLeft + Math.max(4, (dialW - radius) / 2) - cx;
+  if (kid.x + recentre >= minX && kid.x + recentre <= maxX) {
+    cx += recentre;
+    kid.x += recentre;
+  }
+  robot(scene, host, kid, "protractor");
+  g.fillStyle(0xfff3c4, 1);
+  g.beginPath();
+  g.moveTo(cx, cy);
+  g.arc(cx, cy, radius, -Math.PI / 2, 0, false);
+  g.closePath();
+  g.fillPath();
+  g.lineStyle(8, INK_N, 1);
+  g.beginPath();
+  g.moveTo(cx, cy - radius);
+  g.lineTo(cx, cy);
+  g.lineTo(cx + radius, cy);
+  g.strokePath();
   g.beginPath();
   g.arc(cx, cy, radius, -Math.PI / 2, 0, false);
   g.strokePath();
   g.lineStyle(2, 0x8b6b5c, 1);
   for (let tick = 0; tick <= 90; tick += 15) {
-    const inner = ray(cx, cy, radius - 8, tick);
-    const outer = ray(cx, cy, radius + 2, tick);
+    const inner = ray(cx, cy, radius - 12, tick);
+    const outer = ray(cx, cy, radius - 1, tick);
     g.beginPath();
     g.moveTo(inner.x, inner.y);
     g.lineTo(outer.x, outer.y);
     g.strokePath();
   }
-  const marks = [
+  const taken = [
+    { x: side.x - 4, y: side.y - 4, w: side.w + 8, h: side.h + 8 },
+    { x: kid.x - 2, y: kid.y - 2, w: kid.w + 4, h: kid.h + 4 },
+  ];
+  const seatBounds = {
+    x: -w / 2 + 4,
+    y: -h / 2 + 4,
+    w: w - 8,
+    h: Math.max(48, (beside ? h / 2 - 4 : side.y - 4) - (-h / 2 + 4)),
+  };
+  const markW = 42;
+  const markH = 26;
+  [
     { deg: 0, text: "100" },
     { deg: 60, text: "50" },
     { deg: 90, text: "0" },
-  ];
-  marks.forEach((mark) => {
-    const at = ray(cx, cy, radius, mark.deg);
-    const box = plate(scene, host, at.x, at.y, markW, markH, 0xfffdf8);
+  ].forEach((mark) => {
+    const at = ray(cx, cy, radius * 0.78, mark.deg);
+    const seat = seatNear(at.x, at.y, markW, markH, taken, seatBounds);
+    const box = plate(scene, host, seat.x, seat.y, markW, markH, 0xfffdf8);
     box.setData("stageId", `mark-${mark.text}`);
-    addText(scene, box, 0, 0, mark.text, 14, markW - 6);
+    addText(scene, box, 0, 0, mark.text, 14, markW - 8);
   });
-  if (chosen) wedge(g, cx, cy, radius * 0.9, degrees, 0xe24b57);
-  else {
-    const tip = ray(cx, cy, radius * 0.9, 0);
-    g.lineStyle(4, 0x1d4ed8, 1);
-    g.beginPath();
-    g.moveTo(cx, cy);
-    g.lineTo(tip.x, tip.y);
-    g.strokePath();
-  }
   if (chosen) {
-    const badge = plate(scene, host, Math.max(dial.x + 36, cx - 70), cy - 2, 64, 30, 0x1e3a8a);
-    addText(scene, badge, 0, 0, String(chosen.points), 16, 52, { color: "#ffffff", bg: NAVY });
+    wedge(g, cx, cy, radius * 0.9, degrees, 0xe24b57, 8);
+    const words = [glossParts(chosen.aLabel || chosen.a).main, glossParts(chosen.bLabel || chosen.b).main];
+    [0, degrees].forEach((deg, index) => {
+      const tip = ray(cx, cy, radius * 0.9, deg);
+      arrowTo(g, cx, cy, tip.x, tip.y, index === 0 ? 0x1d4ed8 : 0xe24b57, 8);
+      const label = words[index] || (lang() === "ja" ? "語" : "词");
+      const lw = Math.min(132, Math.max(72, label.length * 16 + 16));
+      const at = ray(cx, cy, radius * 0.52, deg);
+      const seat = seatNear(at.x, at.y, lw, 30, taken, seatBounds);
+      const box = plate(scene, host, seat.x, seat.y, lw, 30, index === 0 ? 0xfffdf8 : 0xfff1d2);
+      box.setData("stageId", `ray-${index}`);
+      addText(scene, box, 0, 0, label, 14, lw - 12, { bg: index === 0 ? PAPER : CREAM });
+    });
+    const scoreAt = ray(cx, cy, radius * 0.3, Math.max(degrees / 2, 6));
+    const scoreSeat = seatNear(scoreAt.x, scoreAt.y, 58, 30, taken, seatBounds);
+    const badge = plate(scene, host, scoreSeat.x, scoreSeat.y, 58, 30, 0x1e3a8a);
+    badge.setData("stageId", "needle");
+    addText(scene, badge, 0, 0, String(chosen.points), 16, 48, { color: "#ffffff", bg: NAVY });
+  } else {
+    const tip = ray(cx, cy, radius * 0.9, 0);
+    arrowTo(g, cx, cy, tip.x, tip.y, 0x1d4ed8, 6);
   }
   paintBarRows(scene, host, side, chips);
-  robot(scene, host, block);
 }
 
 function boardRows(spec, step) {

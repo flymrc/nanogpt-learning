@@ -934,7 +934,7 @@ function actorKey(box) {
 }
 
 function stagePairAllowed(a, b) {
-  if (a.role === "prop" || b.role === "prop" || a.role === "actor" || b.role === "actor") return true;
+  if (a.role === "prop" || b.role === "prop" || a.role === "actor" || b.role === "actor" || a.role === "solid" || b.role === "solid") return true;
   if (stageAncestor(a.node, b.node) || stageAncestor(b.node, a.node)) return true;
   const parts = new Set(["face", "body", "held"]);
   if (parts.has(a.role) && parts.has(b.role)) {
@@ -1167,6 +1167,7 @@ function collectRagStageHits(scene, origin) {
   }
   let fill = 0;
   let actors = 0;
+  const embedScene = /^Embed[1-5]$/.test(key);
   if (!phone && width > 8 && height > 8) {
     const union = unionOf(boxes);
     if (union) {
@@ -1182,13 +1183,32 @@ function collectRagStageHits(scene, origin) {
       hits.push(["stage-fill", "0", "empty"]);
     }
     const cast = boxes.filter((box) => box.role === "actor");
-    if (cast.length) {
+    if (cast.length && !embedScene) {
       const tallest = Math.max(...cast.map((box) => box.h));
       const frac = tallest / height;
       if (frac + 0.005 < 0.32) {
         actors = 1;
         hits.push(["stage-actor", frac.toFixed(3), String(Math.round(tallest))]);
       }
+    }
+  }
+  if (embedScene && height > 8) {
+    const cast = boxes.filter((box) => box.role === "actor");
+    const tallest = cast.length ? Math.max(...cast.map((box) => box.h)) : 0;
+    const frac = tallest / height;
+    if (!cast.length || frac + 0.005 < 0.32) {
+      actors = 1;
+      hits.push(["stage-actor", cast.length ? frac.toFixed(3) : "missing", String(Math.round(tallest))]);
+    }
+    const solids = boxes.filter((box) => box.role === "solid" && box.w >= 72 && box.h >= 48);
+    const content = boxes.filter((box) => box.text || box.role === "card" || box.role === "actor");
+    for (const solid of solids) {
+      const inset = { x: solid.x + 12, y: solid.y + 12, w: solid.w - 24, h: solid.h - 24 };
+      if (inset.w < 28 || inset.h < 28) continue;
+      const hit = content.some((box) => stageIntersects(inset, box));
+      if (hit) continue;
+      empty += 1;
+      if (hits.length < 8) hits.push(["stage-empty", solid.id || "solid"]);
     }
   }
   let mapMiss = 0;
