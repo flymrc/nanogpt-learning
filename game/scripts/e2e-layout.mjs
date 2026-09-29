@@ -1812,7 +1812,7 @@ async function playRagSteps(page, name, first) {
     key: window.__nanoGPTState?.().scene || "",
   }));
   const lesson = /^(Rag|Embed)[1-5]$/.test(meta.key);
-  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 };
+  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0 };
   const addStage = (result) => {
     const stage = result?.stage;
     if (!stage?.active) return;
@@ -1824,6 +1824,8 @@ async function playRagSteps(page, name, first) {
     tally.contrast += stage.contrast || 0;
     tally.words += stage.words || 0;
     tally.empty += stage.empty || 0;
+    tally.mapMiss += stage.mapMiss || 0;
+    tally.mapLabelOverlaps += stage.mapLabelOverlaps || 0;
   };
   if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
   const doPhase = meta.phase === 2;
@@ -2246,7 +2248,7 @@ const embedPc1024 = await runEmbedViewport(
 );
 
 async function saveEmbedShots(browser) {
-  const dir = "/opt/cursor/artifacts/emb1";
+  const dir = "/opt/cursor/artifacts/emb2";
   mkdirSync(dir, { recursive: true });
   const beatOf = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const open = async (width, height, lang, mobile = false) => {
@@ -2267,12 +2269,6 @@ async function saveEmbedShots(browser) {
     await ready(page);
     return page;
   };
-  const home = await open(1440, 900, "zh");
-  await home.evaluate(() => window.__nanoGPTJump("Home", 0, 0));
-  await home.waitForFunction(() => window.__nanoGPTState?.().scene === "Home", { timeout: 20000 });
-  await home.waitForTimeout(400);
-  await home.screenshot({ path: `${dir}/e1-home-zh-1440.png` });
-  await home.close();
   const shoot = async (page, key, id, file, taps = 1) => {
     await jumpLanded(page, key, beatOf(key, id), 2);
     await page.waitForTimeout(240);
@@ -2281,25 +2277,28 @@ async function saveEmbedShots(browser) {
       await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
     }
     await page.screenshot({ path: `${dir}/${file}` });
+    const probe = await page.evaluate(() => window.__nanoGPTStage || null);
+    console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
   };
   const zhPc = await open(1440, 900, "zh");
-  await shoot(zhPc, "Embed1", "e1-p1", "e1-ch1-strip-zh-1440.png");
-  await shoot(zhPc, "Embed3", "e3-p4", "e1-ch3-ruler-zh-1440.png");
-  await shoot(zhPc, "Embed5", "e5-p1", "e1-ch5-rank-zh-1440.png");
+  await shoot(zhPc, "Embed1", "e1-p1", "e2-ch1-strip-zh-1440.png", 1);
+  await shoot(zhPc, "Embed2", "e2-p1", "e2-map-zh-1440.png", 1);
+  await shoot(zhPc, "Embed3", "e3-p4", "e2-ch3-ruler-zh-1440.png", 1);
+  await shoot(zhPc, "Embed5", "e5-p1", "e2-ch5-rank-zh-1440.png", 1);
   await zhPc.close();
   const jaPc = await open(1440, 900, "ja");
-  await shoot(jaPc, "Embed2", "e2-p2", "e1-ch2-podium-ja-1440.png");
-  await shoot(jaPc, "Embed2", "e2-p1", "e1-map-ja-1440.png", 2);
-  await shoot(jaPc, "Embed4", "e4-p3", "e1-ch4-lift-ja-1440.png");
+  await shoot(jaPc, "Embed2", "e2-p1", "e2-map-ja-1440.png", 1);
+  await shoot(jaPc, "Embed2", "e2-p2", "e2-ch2-podium-ja-1440.png", 1);
+  await shoot(jaPc, "Embed4", "e4-p3", "e2-ch4-lift-ja-1440.png", 1);
   await jaPc.close();
   const zhShort = await open(1024, 640, "zh");
-  await shoot(zhShort, "Embed3", "e3-p4", "e1-ch3-ruler-zh-1024.png");
+  await shoot(zhShort, "Embed3", "e3-p4", "e2-ch3-zh-1024.png", 1);
   await zhShort.close();
   const zhPhone = await open(390, 844, "zh", true);
-  await shoot(zhPhone, "Embed1", "e1-p1", "e1-ch1-strip-zh-390.png");
+  await shoot(zhPhone, "Embed2", "e2-p1", "e2-map-zh-390.png", 1);
   await zhPhone.close();
   const jaPhone = await open(390, 844, "ja", true);
-  await shoot(jaPhone, "Embed5", "e5-p1", "e1-ch5-rank-ja-390.png");
+  await shoot(jaPhone, "Embed1", "e1-p1", "e2-ch1-ja-390.png", 1);
   await jaPhone.close();
 }
 
@@ -2383,14 +2382,16 @@ const embedStage = embedStageReports.reduce(
     sum.contrast += tally.contrast || 0;
     sum.words += tally.words || 0;
     sum.empty += tally.empty || 0;
+    sum.mapMiss += tally.mapMiss || 0;
+    sum.mapLabelOverlaps += tally.mapLabelOverlaps || 0;
     return sum;
   },
-  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0 },
 );
 const embedDoPages = embedStageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
-const embedStageOk = embedStage.overlaps === 0 && embedStage.tiny === 0 && embedStage.short === 0 && embedStage.fill === 0 && embedStage.actors === 0 && embedStage.contrast === 0 && embedStage.words === 0 && embedStage.empty === 0 && embedStage.mid >= embedDoPages && embedStage.checks > 0;
+const embedStageOk = embedStage.overlaps === 0 && embedStage.tiny === 0 && embedStage.short === 0 && embedStage.fill === 0 && embedStage.actors === 0 && embedStage.contrast === 0 && embedStage.words === 0 && embedStage.empty === 0 && embedStage.mapMiss === 0 && embedStage.mapLabelOverlaps === 0 && embedStage.mid >= embedDoPages && embedStage.checks > 0;
 const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
-const embedStageLine = `EMBED_STAGE_${embedStageOk ? "OK" : "FAIL"} checks=${embedStage.checks} mid=${embedStage.mid} overlaps=${embedStage.overlaps} tiny=${embedStage.tiny} short=${embedStage.short} fill=${embedStage.fill} actors=${embedStage.actors} contrast=${embedStage.contrast} words=${embedStage.words} empty=${embedStage.empty}`;
+const embedStageLine = `EMBED_STAGE_${embedStageOk ? "OK" : "FAIL"} checks=${embedStage.checks} mid=${embedStage.mid} overlaps=${embedStage.overlaps} tiny=${embedStage.tiny} short=${embedStage.short} fill=${embedStage.fill} actors=${embedStage.actors} contrast=${embedStage.contrast} words=${embedStage.words} empty=${embedStage.empty} mapMiss=${embedStage.mapMiss} mapLabelOverlaps=${embedStage.mapLabelOverlaps}`;
 console.log(stageLine);
 console.log(embedStageLine);
 if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk || !embedOk || !embedStageOk) {

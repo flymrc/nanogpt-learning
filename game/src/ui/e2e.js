@@ -1036,7 +1036,7 @@ function unionOf(boxes) {
 /** Faces, labels, signs, and cards inside a RAG picture. Held paper may cover its own body. */
 function collectRagStageHits(scene, origin) {
   const key = String(scene.sys?.settings?.key || "");
-  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, ratio: 1, height: 0 };
+  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, ratio: 1, height: 0 };
   if (!/^(Rag|Embed)[1-5]$/.test(key)) return [];
   const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
   if (!scheme) return [];
@@ -1191,6 +1191,29 @@ function collectRagStageHits(scene, origin) {
       }
     }
   }
+  let mapMiss = 0;
+  let mapLabelOverlaps = 0;
+  const mapDots = boxes.filter((box) => String(box.id).startsWith("map-dot:"));
+  const mapLabels = boxes.filter((box) => box.text && String(box.id).startsWith("map-label:"));
+  if (mapDots.length) {
+    for (const dot of mapDots) {
+      const word = String(dot.id).slice("map-dot:".length);
+      const label = mapLabels.find((box) => box.id === `map-label:${word}`);
+      const visible = label && label.w >= 8 && label.h >= 8 && label.font + 0.25 >= minFont;
+      if (!visible) {
+        mapMiss += 1;
+        if (hits.length < 8) hits.push(["map-label", word]);
+      }
+    }
+    for (let i = 0; i < mapLabels.length; i += 1) {
+      for (let j = i + 1; j < mapLabels.length; j += 1) {
+        if (mapLabels[i].id === mapLabels[j].id) continue;
+        if (!stageIntersects(mapLabels[i], mapLabels[j])) continue;
+        mapLabelOverlaps += 1;
+        if (hits.length < 8) hits.push(["map-label-overlap", mapLabels[i].id, mapLabels[j].id]);
+      }
+    }
+  }
   window.__nanoGPTStage = {
     active: true,
     overlaps,
@@ -1201,6 +1224,8 @@ function collectRagStageHits(scene, origin) {
     contrast,
     words,
     empty,
+    mapMiss,
+    mapLabelOverlaps,
     ratio,
     height: Math.round(height),
   };
