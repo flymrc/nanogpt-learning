@@ -468,9 +468,9 @@ function paintBarRows(scene, host, area, rows) {
     const box = plate(scene, host, area.x + area.w / 2, y, area.w, rh, hot ? 0xfff1d2 : 0xfffdf8);
     box.setData("stageId", `row-${index}`);
     const scoreW = row.points === "" || row.points == null ? 0 : 64;
-    const labelW = Math.max(64, area.w - scoreW - 28);
-    labelBlock(scene, box, -area.w / 2 + 12 + labelW / 2, 0, labelW, row.lines, { hot });
-    if (scoreW) scorePill(scene, box, area.w / 2 - scoreW / 2 - 8, 0, row.points);
+    const labelW = Math.max(24, area.w - scoreW - 36);
+    labelBlock(scene, box, -area.w / 2 + 10 + labelW / 2, 0, labelW, row.lines, { hot });
+    if (scoreW) scorePill(scene, box, area.w / 2 - 36, 0, row.points);
   });
 }
 
@@ -866,17 +866,23 @@ function paintRings(scene, host, g, w, h, spec, step) {
   const block = helperRect(w, h);
   const area = contentRect(w, h, block);
   const group = (spec.groups || [])[step % Math.max(1, (spec.groups || []).length)] || { focus: "", items: [] };
-  const cx = area.x + area.w * 0.34;
-  const cy = area.y + area.h * 0.5;
-  [0.22, 0.36, 0.5].forEach((scale, index) => {
-    g.lineStyle(3, index === step % 3 ? 0xe24b57 : 0x1d4ed8, 1);
-    g.strokeCircle(cx, cy, Math.min(area.w, area.h) * scale * 0.45);
-  });
   const rows = [
     { lines: glossParts(group.focus), points: group.items?.[0]?.points, hot: true },
     ...(group.items || []).map((item) => ({ lines: glossParts(item.label), points: item.points })),
-  ];
-  paintBarRows(scene, host, { x: area.x + area.w * 0.5, y: area.y, w: area.w * 0.5, h: area.h }, rows.slice(0, 4));
+  ].slice(0, 4);
+  const narrow = area.w < 520;
+  const dialH = narrow ? Math.min(96, area.h * 0.3) : area.h;
+  const cx = narrow ? area.x + area.w * 0.5 : area.x + area.w * 0.28;
+  const cy = narrow ? area.y + dialH * 0.55 : area.y + area.h * 0.5;
+  const reach = narrow ? dialH * 0.38 : Math.min(area.h * 0.34, area.w * 0.22);
+  [0.45, 0.72, 1].forEach((scale, index) => {
+    g.lineStyle(3, index === step % 3 ? 0xe24b57 : 0x1d4ed8, 1);
+    g.strokeCircle(cx, cy, reach * scale);
+  });
+  const list = narrow
+    ? { x: area.x, y: area.y + dialH + 6, w: area.w, h: Math.max(80, area.h - dialH - 6) }
+    : { x: area.x + area.w * 0.46, y: area.y, w: area.w * 0.54, h: area.h };
+  paintBarRows(scene, host, list, rows);
   robot(scene, host, block);
 }
 
@@ -897,10 +903,11 @@ function paintFan(scene, host, g, w, h, spec, step) {
 function paintArrows(scene, host, g, w, h, spec, step) {
   const block = helperRect(w, h);
   const area = contentRect(w, h, block);
-  const cx = area.x + area.w * 0.4;
-  const cy = area.y + area.h * 0.62;
+  const narrow = area.w < 520;
+  const cx = narrow ? area.x + area.w * 0.34 : area.x + area.w * 0.28;
+  const cy = narrow ? area.y + area.h * 0.24 : area.y + area.h * 0.58;
   const words = spec.words || [];
-  const radius = Math.min(area.w, area.h) * 0.34;
+  const radius = narrow ? Math.min(area.w, area.h) * 0.18 : Math.min(area.w, area.h) * 0.28;
   words.forEach((word, index) => {
     const show = index <= step;
     const deg = 40 + index * 50;
@@ -913,7 +920,10 @@ function paintArrows(scene, host, g, w, h, spec, step) {
   });
   g.fillStyle(INK_N, 1);
   g.fillCircle(cx, cy, 6);
-  paintBarRows(scene, host, { x: area.x + area.w * 0.55, y: area.y + 40, w: area.w * 0.45, h: area.h - 48 }, words.map((word, index) => ({
+  const list = narrow
+    ? { x: area.x, y: area.y + area.h * 0.46, w: area.w, h: area.h * 0.54 }
+    : { x: area.x + area.w * 0.55, y: area.y + 8, w: area.w * 0.45, h: area.h - 16 };
+  paintBarRows(scene, host, list, words.map((word, index) => ({
     lines: glossParts(wordFace(word)),
     points: index <= step ? spec.dim : "",
     hot: index === step % Math.max(1, words.length),
@@ -1324,6 +1334,13 @@ export function drawEmbedArt(scene, stage, page, { phase = 0 } = {}) {
     const minH = Math.ceil((window.innerHeight || 0) * 0.495);
     if (height < minH && room - minH >= 16) height = minH;
   }
+  const wrappedCap = wrapLine(scene, caption, capSize, capMaxW);
+  const capProbe = scene.add.text(0, -4000, wrappedCap, uiText(capSize, { color: C.muted, align: "left" })).setOrigin(0, 0).setVisible(false);
+  const capH = Math.ceil(capProbe.height);
+  capProbe.destroy();
+  const extra = Math.max(0, capH - capSlot + 2);
+  const floorH = !phone && (phase === 1 || phase === 2) ? Math.ceil((window.innerHeight || 0) * 0.495) : phone && phase === 2 ? Math.ceil((window.innerHeight || 0) * 0.35) : 56;
+  if (extra && height - extra >= floorH) height -= extra;
   const card = scene.add.container(stage.cx, top + height / 2);
   const g = scene.add.graphics();
   g.fillStyle(C.surface, 1);
