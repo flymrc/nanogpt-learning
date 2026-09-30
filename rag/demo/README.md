@@ -9,14 +9,15 @@ hotel. The handbook exists only so the kids' script can show real retrieval numb
 2. **Retrieve** – two retrievers, top-3 cards per guest question:
    - `word_match`: TF-IDF bag-of-words + cosine similarity (scikit-learn),
      English stop words ("what", "is", "can", "I", ...) skipped.
-   - `meaning`: small open embedding model `sentence-transformers/all-MiniLM-L6-v2` on CPU;
+   - `meaning`: small open embedding model `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
+     on CPU (since 2026-09-30; before: `all-MiniLM-L6-v2`, output kept in `results_minilm_l6.json`);
      each card/question becomes 384 numbers ("address"); score = cosine.
      This is a *dense* retriever like the RAG paper's DPR in spirit, **not** the paper's model.
 3. **Combine** – the question and the top-3 cards are joined into one text
    (`combined_input_for_a_generator`), which is what a generator would read.
 4. **Answer** – a **template**: `According to Page N (title): <card text>` using the top card,
    or `I don't know. I found no card with a score over the line. ...` (round 5 wording; earlier "No page in the handbook matches well") if the top score is under the no-card line
-   (0.10 word_match / 0.30 meaning — our own rule, picked after looking at these few
+   (0.10 word_match / 0.20 meaning since the 2026-09-30 model switch, was 0.30 — our own rule, picked after looking at these few
    questions, **not** from the paper). **No language model is run; no AI-written text.**
 
 Extra experiments (nothing is retrained in any of them):
@@ -26,16 +27,40 @@ Extra experiments (nothing is retrained in any of them):
 
 ## Rerun
 ```bash
-cd /workspace/rag/demo
+cd /workspace/rag-script/demo
 python3 -m venv .venv            # already exists on this box
 .venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch
 .venv/bin/pip install scikit-learn sentence-transformers
 .venv/bin/python rag_demo.py     # writes results.json, prints a summary
 ```
-The first run downloads all-MiniLM-L6-v2 (~90 MB) from Hugging Face. Two reruns on this box
+The first run downloads paraphrase-multilingual-MiniLM-L12-v2 (~470 MB) from Hugging Face. Two reruns on this box
 produced byte-identical `results.json`. Versions used are recorded in `results.json -> settings`.
 
-## Results (copied from results.json; scores rounded to 2 places here)
+## 2026-09-30: model switch (current results)
+`meaning` now uses the same model as `rag_demo_zh.py` and the embedding book. `word_match` is
+unchanged (the whole `word_match` block of results.json is byte-for-byte equal to the old one).
+
+| question | meaning top-3, new model (page: score) | old all-MiniLM-L6-v2 |
+|---|---|---|
+| What time is breakfast? | **4: 0.7158**, 2: 0.5214, 3: 0.4278 | 4: 0.74, 5: 0.47, 2: 0.45 |
+| What time is checkout? | **2: 0.7188** (Check-in, wrong card), 3: 0.6933, 11: 0.411 | 3: 0.69, 2: 0.56, 4: 0.47 |
+| Is there a swimming pool? | **6: 0.5734**, 7: 0.3602, 9: 0.1915 | 6: 0.54, 7: 0.26, 10: 0.25 |
+| Where can I park my car? | **9: 0.3571**, 6: 0.3195, 11: 0.2119 | 9: 0.45, 6: 0.23, 10: 0.20 |
+| Can I bring my dog? | 1: 0.1619, 12: 0.154, 10: 0.1198 | 1: 0.19, 11: 0.19, 10: 0.18 |
+| What time can I swim? | **6: 0.5282**, 2: 0.3346, 7: 0.3183 | 6: 0.59, 7: 0.38, 2: 0.33 |
+| What time are breakfast and dinner? | **4: 0.7442**, 5: 0.5526, 2: 0.4695 | 4: 0.72, 5: 0.63, 2: 0.42 |
+
+Experiments: old Page 4 → Page 4 0.7042 (was 0.71); add Page 13 → Page 13 0.2718 (was 0.37).
+Card pairs 4–5 / 4–9 / 6–7 / 6–3 / 2–3: 0.81 / 0.22 / 0.55 / 0.24 / 0.77 (were .83/.17/.48/.20/.68).
+
+**Threshold.** `settings.threshold_check_en`: lowest answerable top-1 = 0.2718 (Page 13 for the dog
+question), highest unanswerable = 0.1619 (dog, no Page 13). 0.30 no longer separates them (Page 13
+would fall under the line). zh needs a line in (0.2821, 0.3614]; en needs one in (0.1619, 0.2718];
+the ranges do not overlap, so no single line works for both. The English line is now **0.20**
+(zh stays 0.30). **Confirmed by the user on 2026-09-30** (see ../fixes-model-switch.md).
+Note: checkout is "answerable" and clears any line, but its top card is the wrong one (Check-in).
+
+## Old results with all-MiniLM-L6-v2 (results_minilm_l6.json; scores rounded to 2 places here)
 | question | word_match top-3 (page: score) | meaning top-3 (page: score) |
 |---|---|---|
 | What time is breakfast? | 3: 0.2722, 4: 0.2718, 2: 0.26 | **4: 0.74**, 5: 0.47, 2: 0.45 |
@@ -145,7 +170,7 @@ Differences from English worth knowing: with Chinese cards, word_match gets the 
 
 ### Rerun (Chinese)
 ```bash
-cd /workspace/rag/demo
+cd /workspace/rag-script/demo
 .venv/bin/pip install jieba==0.42.1
 .venv/bin/python rag_demo_zh.py   # writes results_zh.json; downloads the multilingual model (~470 MB) on first run
 ```

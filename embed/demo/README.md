@@ -32,12 +32,13 @@ Hotel Hoshi is made up. `handbook_zh.txt` and `handbook.txt` are copies of `../.
   Words can sit on top of each other on the map and still be far apart in reality (e.g., 猫 and 入住 look touching but score 35 points;
   dog and cat look touching but score 30).
 - **RAG link check:** the zh parking question recomputed here gives Page 9 0.3614, Page 11 0.3301, Page 2 0.3123.
-  This is identical to `rag-script/demo/results_zh.json`, so the model reproduces. The rag-script English meaning retriever used
-  a different model (all-MiniLM-L6-v2), so the English numbers recomputed here differ from rag-script `results.json`.
-  The kids' ja script quotes the RAG English scores from rag-script results.json and marks the difference.
+  This is identical to `rag-script/demo/results_zh.json`, so the model reproduces. Since 2026-09-30 the rag-script English
+  meaning retriever uses this same model too (before: all-MiniLM-L6-v2), so the English numbers recomputed here
+  (Page 9 0.3571, Page 6 0.3195) are identical to rag-script `results.json`. `embed_demo.py` asserts both matches
+  (parking top-3 and old/new Page 4, zh and en) before writing results.json. The ja kids' script quotes them as RAG-book scores.
 
 ## Extra checks
-- `rag_link.old_page4_recomputed_here`: the rag-script "old Page 4" experiment recomputed with this model. zh: old and new both 74 (the same as rag-script). en: old 70, new 72, both 1st (rag-script's English used another model).
+- `rag_link.old_page4_recomputed_here`: the rag-script "old Page 4" experiment recomputed with this model. zh: old and new both 74 (the same as rag-script). en: old 70, new 72, both 1st (identical to rag-script results.json since the 2026-09-30 model switch).
 - `teacher_check.py` writes `teacher_check.json`. The English-only teacher `paraphrase-MiniLM-L12-v2` gives 早饭 / 早餐 / 午饭 / 停车 100 against each other (it cannot tell Chinese words apart), 早饭–breakfast 14, and breakfast–morning meal 84. The multilingual student gives 早饭–breakfast 98 and 早餐–breakfast 99. This check backs the zh c1-p5 wording.
 
 ## Rerun

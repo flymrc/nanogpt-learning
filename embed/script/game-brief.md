@@ -38,7 +38,7 @@
 
 - **zh:** Chinese word set (`words.zh`) and Chinese cards. RAG links use `rag:` numbers; this is valid because it is the same model.
 - **ja:** English word set (`words.en`), shown on cards as **日本語 big + English small**, e.g. 朝ごはん〔breakfast〕. The gloss table is `ja_gloss` in `demo/embed_demo.py`. The model reads only the English. The Japanese words that are fed in as-is are the cross-language pairs (`pairs.cross_language`: 朝ごはん, 犬, いぬ, 猫, ねこ, 駐車場, ちゅうしゃじょう, プール).
-- **ja rule (user decision):** no RAG-book scores and no "second number-maker". Every ja number comes from `results.json`. RAG is referred to only qualitatively. In c3-p5 and c5-p4 the strip is made differently from the RAG book's, measuring by angle is the same, and "1st place is the same" is only claimed for that question.
+- **ja rule (updated 2026-09-30, model switch):** the RAG ja book now uses the same model, so ja quotes RAG-book scores directly (`rag:` = `rag-script/demo/results.json`, English cards). No "second number-maker" and no "re-measured" caveat. The ja RAG no-card line is **20** (`rag: settings.no_card_threshold.meaning` = 0.20, pending user confirmation); zh stays 30.
 - The page count and order are identical; only the numbers differ.
 
 ## 3. Assets
@@ -65,7 +65,7 @@ Data path shorthand: `pairs.zh[a|b]` = the entry in `pairs.zh` with a=a and b=b 
 | e1-p2 | Every word gives 384 | `dimension` | drag 3 strips together: the ends line up | Ends snap together; 384 tag lights |
 | e1-p3 | Similar meaning, similar strip | zh: 早饭 / 早餐 / 停车 first 8 (identical / different). ja: breakfast / morning meal / parking (5 and 2 same colours) | zh: drag 停车 under 早饭 and tap differing cells to mark ✗. ja: tap same-colour cells to mark ○ | ✓ / ✗ marks pop |
 | e1-p4 | Name it: 向量 / 词向量 (ja ベクトル / 単語ベクトル) = 意思的地址 | – | drag 3 labels onto strips | Labels drift down like leaves, "ding" |
-| e1-p5 | Teacher and student | Maker only: `demo/teacher_check.json`. zh page: 早饭 and breakfast strips 7/8 same colour (`raw_example`). No numbers on the ja page | tap 「下一题」: teacher shows an English card, student builds a strip; stars grow with similarity | Student's cells recolour towards the teacher's |
+| e1-p5 | Teacher and student | Maker only: `demo/teacher_check.json`. zh page: 早饭 and breakfast strips 7/8 same colour (`raw_example`). No numbers on the ja page; ja adds one sentence: the number-maker in the RAG book's window is this same one | tap 「下一题」: teacher shows an English card, student builds a strip; stars grow with similarity | Student's cells recolour towards the teacher's |
 | e1-sum / e1-rev | Summary + ⭐ self-check | – | tap stars | – |
 
 ### Chapter 2: similar meaning lives close (意思像，就住得近 / いみが にて いれば、近くに すむ)
@@ -89,11 +89,11 @@ The e2-p2 caption must keep "same shape as the RAG table, but single words, so t
 | e3-p1 | Each word is one arrow from the centre (it lives where there are 384 rulers; paper has 2) | `dimension` | tap a word: its arrow shoots out | Arrows burst like fireworks |
 | e3-p2 | Make arrows the same length, compare direction only | Raw lengths, maker only: zh 早饭 5.75 < 早餐 6.65; ja breakfast 6.74 > parking 6.25 (`raw_example.*.raw_length`) | drag arrow tips onto the circle | Tips drop onto the circle |
 | e3-p3 | Smaller angle means closer | Draw real angles, zh 7.3° / 46.8° / 81.0°, ja 27.6° / 43.8° / 82.0° (`pairs.*[..].angle_deg`) | pinch two arrows to open or close the angle | Book corner next to the last pair |
-| e3-p4 | Angle becomes points: overlap 100, right angle ≈ 0; the scale is **not even** (45° ≈ 71, 60° = 50) | zh 99 / 68 / 16; ja 89 / 72 / 14. zh also: RAG whole-card 早饭卡–晚饭卡 80 (`rag: meaning.card_pair_closeness`) | drag arrow pairs onto the angle ruler; the needle stops at the score | Ruler marks computed from cos, not linear |
-| e3-p5 | RAG link: the whole question's arrow vs whole cards' arrows | zh: word match all 0 (`rag: word_match.questions[q4_parking]`); meaning P9 36 / P11 33 / P2 31 (`rag_link.parking_recomputed_here.zh`, same as `rag:`); side pairs 车–停车场 60, 游泳–游泳池 80, 带狗–小狗 85 (`pairs.rag_link_words`). ja: word match all 0 (RAG en `word_match`, counting method); meaning P9 36 / P6 32 (`rag_link.parking_recomputed_here.en`); side pairs park–parking 47, swim–swimming 97, dog–dogs 91 | tap the whole question: a red arrow appears among 12 card arrows; P9 lights up, 2nd place blinks | Smallest angle wins, but only just |
+| e3-p4 | Angle becomes points: overlap 100, right angle ≈ 0; the scale is **not even** (45° ≈ 71, 60° = 50) | zh 99 / 68 / 16; ja 89 / 72 / 14. zh also: RAG whole-card 早饭卡–晚饭卡 80 (`rag(zh): meaning.card_pair_closeness`); ja also: 朝ごはん card–夕ごはん card 81 (`rag(en): meaning.card_pair_closeness` pages [4,5]) | drag arrow pairs onto the angle ruler; the needle stops at the score | Ruler marks computed from cos, not linear |
+| e3-p5 | RAG link: the whole question's arrow vs whole cards' arrows | zh: word match all 0 (`rag: word_match.questions[q4_parking]`); meaning P9 36 / P11 33 / P2 31 (`rag_link.parking_recomputed_here.zh`, same as `rag:`); side pairs 车–停车场 60, 游泳–游泳池 80, 带狗–小狗 85 (`pairs.rag_link_words`). ja: word match all 0 (RAG en `word_match`, counting method); meaning P9 36 / P6 32 (`rag_link.parking_recomputed_here.en`, same as `rag(en):`, shown as "RAG の 本と 同じ 点数"); side pairs park–parking 47, swim–swimming 97, dog–dogs 91 | tap the whole question: a red arrow appears among 12 card arrows; P9 lights up, 2nd place blinks | Smallest angle wins, but only just |
 
 - zh e3-p5 must keep: one word alone may not find the card (see ch. 5), and 36 beats 33 by only 3.
-- ja e3-p5 must keep the note: strips are made differently from the RAG book's; measuring by angle is the same; in this question 1st is still Page 9. No RAG numbers.
+- ja e3-p5: same question as RAG ja ch. 5 p. 3, same scores (36 / 32). No caveat needed any more.
 
 ### Chapter 4: the map is squashed (地图是压扁的 / 地図は ぺちゃんこ)
 
@@ -113,8 +113,8 @@ The e2-p2 caption must keep "same shape as the RAG table, but single words, so t
 | e5-intro | Twins mix-up | same | – | Eyes spiral |
 | e5-p1 | 猫's nearest: 车位 40 > 小狗 39 > 车 38; 猫–狗 34 (`nearest_neighbours.zh.猫`). "We don't know why" | cat's nearest: car 35 > dog 30 > dogs 28 (`nearest_neighbours.en.cat`); car and cat differ by one letter, but the reason is unknown | guess first, then flip the ranking | Winner on the podium; cat tilts its head |
 | e5-p2 | 停车's nearest: 入住 87, 退房 78, 车位 77; 停车场 73 (`nearest_neighbours.zh.停车`, `pairs.zh`) | Hiragana is weak in the 3 words tested: 犬–dog 98 vs いぬ–dog 35; 猫–cat 99 vs ねこ–cat 40; 駐車場–parking lot 91 vs ちゅうしゃじょう 22; いぬ–犬 42 (`pairs.cross_language`). This book's cards use the English, so they are unaffected | drop kanji and hiragana cards in turn and compare | いぬ card stalls halfway |
-| e5-p3 | 停车 alone: P12 40, P11 40, P2 39, P9 not in top 3; all over the 30 line (`word_to_nearest_cards.zh.停车`, `rag: settings.no_card_threshold.meaning`). Whole question P9 36, only 3 ahead | car alone: P9 16 (`word_to_nearest_cards.en.car`). Whole question P9 36, P6 32, only 4 ahead, so take several cards (`rag_link.parking_recomputed_here.en`) | drop the word, then the sentence, into the window and compare the needles | ja: P6 needle rises to 32 right behind P9 |
-| e5-p4 | Old and new Page 4 both 74 (`rag_link.old_page4_recomputed_here.zh`, same as `rag:`) | Re-measured with this book's strips: old 70, new 72, both 1st (`rag_link.old_page4_recomputed_here.en`); "in this experiment" | put the two cards on a balance | Old time greys out, new time glows |
+| e5-p3 | 停车 alone: P12 40, P11 40, P2 39, P9 not in top 3; all over the zh 30 line (`word_to_nearest_cards.zh.停车`, `rag(zh): results_zh.json settings.no_card_threshold.meaning`). Whole question P9 36, only 3 ahead | car alone: P9 16 (`word_to_nearest_cards.en.car`), under the RAG ja line 20 (`rag(en): settings.no_card_threshold.meaning`), so the fill-in sheet would say わかりません. Whole question P9 36, P6 32, only 4 ahead, so take several cards (`rag_link.parking_recomputed_here.en`) | drop the word, then the sentence, into the window and compare the needles | ja: P6 needle rises to 32 right behind P9 |
+| e5-p4 | Old and new Page 4 both 74 (`rag_link.old_page4_recomputed_here.zh`, same as `rag:`) | Same as the RAG book: old 70, new 72, both 1st (`rag_link.old_page4_recomputed_here.en` = `rag(en): meaning.experiment_old_page4` / `questions[q1_breakfast]`) | put the two cards on a balance | Old time greys out, new time glows |
 | e5-p5 | 4 rules: ① points not map, ② top score can be wrong, ③ ask a whole sentence and take several cards, ④ close ≠ correct, keep cards fresh | same | match 4 scenes to rules | Rules light up; salute |
 
 ## 5. End scene and catalog

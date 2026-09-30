@@ -1036,7 +1036,7 @@ function unionOf(boxes) {
 /** Faces, labels, signs, and cards inside a RAG picture. Held paper may cover its own body. */
 function collectRagStageHits(scene, origin) {
   const key = String(scene.sys?.settings?.key || "");
-  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, ratio: 1, height: 0 };
+  window.__nanoGPTStage = { active: false, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, mapDrift: 0, lassoOut: 0, ratio: 1, height: 0 };
   if (!/^(Rag|Embed)[1-5]$/.test(key)) return [];
   const scheme = (scene.frame?.stage?.list || []).find((child) => child.getData?.("artPart") === "scheme");
   if (!scheme) return [];
@@ -1213,6 +1213,8 @@ function collectRagStageHits(scene, origin) {
   }
   let mapMiss = 0;
   let mapLabelOverlaps = 0;
+  let mapDrift = 0;
+  let lassoOut = 0;
   const mapDots = boxes.filter((box) => String(box.id).startsWith("map-dot:"));
   const mapLabels = boxes.filter((box) => box.text && String(box.id).startsWith("map-label:"));
   if (mapDots.length) {
@@ -1234,6 +1236,53 @@ function collectRagStageHits(scene, origin) {
       }
     }
   }
+  const mapPaper = boxes.find((box) => box.id === "map-paper");
+  mapLabels.forEach((label) => {
+    const word = String(label.id).slice("map-label:".length);
+    const dot = mapDots.find((item) => item.id === `map-dot:${word}`);
+    if (!dot) return;
+    const dx = (label.x + label.w / 2) - (dot.x + dot.w / 2);
+    const dy = (label.y + label.h / 2) - (dot.y + dot.h / 2);
+    const dist = Math.hypot(dx, dy);
+    if (dist > 176) {
+      mapDrift += 1;
+      if (hits.length < 8) hits.push(["map-drift", word, String(Math.round(dist))]);
+    }
+  });
+  boxes.filter((box) => box.id === "map-lasso").forEach((lasso) => {
+    const outside = mapPaper && (
+      lasso.x < mapPaper.x - 2
+      || lasso.y < mapPaper.y - 2
+      || lasso.x + lasso.w > mapPaper.x + mapPaper.w + 2
+      || lasso.y + lasso.h > mapPaper.y + mapPaper.h + 2
+    );
+    if (outside) {
+      lassoOut += 1;
+      if (hits.length < 8) hits.push(["map-lasso", "outside"]);
+    }
+    const words = String(lasso.node?.getData?.("lassoWords") || "").split("|").filter(Boolean);
+    const members = words.map((word) => mapDots.find((item) => item.id === `map-dot:${word}`)).filter(Boolean);
+    if (!words.length || members.length !== words.length) {
+      lassoOut += 1;
+      if (hits.length < 8) hits.push(["map-lasso", "missing-word"]);
+    }
+    members.forEach((dot) => {
+      const cx = dot.x + dot.w / 2;
+      const cy = dot.y + dot.h / 2;
+      if (cx < lasso.x - 8 || cy < lasso.y - 8 || cx > lasso.x + lasso.w + 8 || cy > lasso.y + lasso.h + 8) {
+        lassoOut += 1;
+        if (hits.length < 8) hits.push(["map-lasso", "misses", String(dot.id)]);
+      }
+    });
+    if (members.length) {
+      const cx = members.reduce((sum, dot) => sum + dot.x + dot.w / 2, 0) / members.length;
+      const cy = members.reduce((sum, dot) => sum + dot.y + dot.h / 2, 0) / members.length;
+      if (Math.hypot(lasso.x + lasso.w / 2 - cx, lasso.y + lasso.h / 2 - cy) > 120) {
+        lassoOut += 1;
+        if (hits.length < 8) hits.push(["map-lasso", "away"]);
+      }
+    }
+  });
   window.__nanoGPTStage = {
     active: true,
     overlaps,
@@ -1246,6 +1295,8 @@ function collectRagStageHits(scene, origin) {
     empty,
     mapMiss,
     mapLabelOverlaps,
+    mapDrift,
+    lassoOut,
     ratio,
     height: Math.round(height),
   };

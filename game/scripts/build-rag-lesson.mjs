@@ -3,6 +3,7 @@
  * Numbers on screen are copied from results.json / results_zh.json.
  * Run: node game/scripts/build-rag-lesson.mjs
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -164,8 +165,21 @@ function packFacts(data) {
   const countValues = Object.values(counts).map((n) => Number(n));
   const wordLine = data.settings.no_card_threshold.word_match;
   const meaningLine = data.settings.no_card_threshold.meaning;
-  if (wordLine !== 0.1 || meaningLine !== 0.3) {
+  if (wordLine !== 0.1 || (meaningLine !== 0.2 && meaningLine !== 0.3)) {
     throw new Error(`unexpected thresholds ${wordLine} ${meaningLine}`);
+  }
+  const enCheck = data.settings.threshold_check_en;
+  if (enCheck) {
+    if (enCheck.threshold_used_separates !== true) throw new Error("en meaning line does not separate");
+    if (Number(enCheck.threshold_used) !== meaningLine) {
+      throw new Error(`en threshold_check ${enCheck.threshold_used} != ${meaningLine}`);
+    }
+  }
+  const zhCheck = data.settings.threshold_check_zh;
+  if (zhCheck) {
+    if (zhCheck.threshold_0_30_separates !== true || meaningLine !== 0.3) {
+      throw new Error("zh meaning line must stay 0.30");
+    }
   }
   const grab = (bucket, id) => {
     const q = question(data, bucket, id);
@@ -188,8 +202,8 @@ function packFacts(data) {
     countMin: Math.min(...countValues),
     countMax: Math.max(...countValues),
     address: data.meaning.address_info.numbers_per_address,
-    wordLine: 10,
-    meaningLine: 30,
+    wordLine: Math.round(wordLine * 100),
+    meaningLine: Math.round(meaningLine * 100),
     old: {
       text: data.old_page4.text,
       items: barsOf(data.meaning.experiment_old_page4.result),
@@ -281,7 +295,9 @@ function pictureFor(id, lang, facts) {
     "r4-p6": { kind: "cite", page: q.breakfast.items[0].page, line: q.breakfast.template },
     "r4-p7": { kind: "cite", page: 4, line: lang === "ja" ? "Page 4" : "第4页" },
     "r4-p8": { kind: "pair", left: { title: lang === "ja" ? "本を 見た" : "查过再答", body: lang === "ja" ? "より ほんとう" : "更常是真的" }, right: { title: lang === "ja" ? "きおくだけ" : "只靠记忆", body: lang === "ja" ? "はずれる" : "会编" } },
-    "r4-p9": { kind: "flow", steps: lang === "ja" ? ["聞く", "さがす", "つなぐ", "書く", "ページ"] : ["问", "找", "接上", "写", "第几页"] },
+    "r4-p9": lang === "ja"
+      ? { kind: "bars", items: visibleBars(q.pool.items) }
+      : { kind: "flow", steps: ["问", "找", "接上", "写", "第几页"] },
     "r5-intro": { kind: "pair", left: { title: lang === "ja" ? "本に ある" : "手册里有", body: "○" }, right: { title: lang === "ja" ? "本に ない" : "手册里没有", body: "×" } },
     "r5-p4": { kind: "line", items: q.dog.items, meaningLine: facts.meaningLine, wordLine: facts.wordLine },
     "r5-p5": { kind: "cite", page: 0, line: q.dog.template },
@@ -537,8 +553,15 @@ const CHROME = {
   },
 };
 
+function lineNote(lang, facts) {
+  if (lang === "ja") {
+    return `同じ 語を 数える ときは ${facts.wordLine}てん。意味の 住所は ${facts.meaningLine}てん。線の 下は、この やり方では 見つからなかった、ということです。`;
+  }
+  return `数一样的词是${facts.wordLine}分。意思的地址是${facts.meaningLine}分。线下面是这个办法没找到。`;
+}
+
 function buildLocale(lang, chapters, facts) {
-  const pack = { ...CHROME[lang] };
+  const pack = { ...CHROME[lang], "note.line.note": lineNote(lang, facts) };
   const pages = [];
   chapters.forEach((chapter, index) => {
     const chapterNo = index + 1;
@@ -676,4 +699,25 @@ if (!Object.values(jaBuilt.pack).join("\n").includes("I don't know") && !jaBuilt
   const jaJoined = JSON.stringify(jaBuilt.pages);
   if (!jaJoined.includes("I don't know")) throw new Error("english template missing from pictures");
 }
+const jaLine = jaFacts.meaningLine;
+const zhLine = zhFacts.meaningLine;
+const jaPic = (id) => jaBuilt.pages.find((page) => page.id === id)?.picture;
+const zhPic = (id) => zhBuilt.pages.find((page) => page.id === id)?.picture;
+if (jaLine !== 20 || zhLine !== 30) throw new Error(`lines ja=${jaLine} zh=${zhLine}`);
+if (jaPic("r5-p4")?.meaningLine !== jaLine || zhPic("r5-p4")?.meaningLine !== zhLine) {
+  throw new Error("threshold picture drifted from its locale json");
+}
+if (jaPic("r4-p9")?.items?.[0]?.page !== 6 || jaPic("r4-p9")?.items?.[0]?.score !== jaFacts.q.pool.items[0].score) {
+  throw new Error("ja pool conveyor is not the meaning top card");
+}
+const jaKid = Object.values(jaBuilt.pack).join("\n");
+if (/(?<![\d.:])30てん/.test(jaKid)) throw new Error("ja still says 30てん");
+for (const needle of ["20てん", "57てん", "81てん", "27てん", "16てん"]) {
+  if (!jaKid.includes(needle)) throw new Error(`ja pack missing ${needle}`);
+}
+const verified = spawnSync("python3", ["verify_ja_scores.py"], { cwd: ragRoot, encoding: "utf8" });
+if (verified.status !== 0) {
+  throw new Error(verified.stdout || verified.stderr || "verify_ja_scores.py failed");
+}
+console.log(String(verified.stdout).trim());
 console.log(`RAG_BUILD pages=${skeleton.length} zhKeys=${Object.keys(zhBuilt.pack).length} jaKeys=${Object.keys(jaBuilt.pack).length}`);

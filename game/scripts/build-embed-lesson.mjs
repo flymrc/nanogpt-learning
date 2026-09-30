@@ -764,8 +764,8 @@ function assertCopy(text, lang, allowed, label) {
   if (lang === "ja") {
     for (const line of kid.split("\n")) {
       if (line.includes("度で")) continue;
-      for (const n of [45, 71, 74, 83]) {
-        if (new RegExp(`(?<!\\d)${n}\\s*てん`).test(line)) throw new Error(`${label} ja rag score ${n}`);
+      for (const n of [45, 71, 83, 37]) {
+        if (new RegExp(`(?<!\\d)${n}\\s*てん`).test(line)) throw new Error(`${label} old ja rag score ${n}`);
       }
     }
   }
@@ -789,10 +789,8 @@ function assertPicture(spec, allowed, lang, id) {
   visit(spec);
   if (lang === "ja") {
     const blob = JSON.stringify(spec);
-    for (const n of [45, 71, 74, 83]) {
-      if (new RegExp(`(?<!\\d)${n}(?!\\d)`).test(blob) && /points":45|points":71|points":74|points":83|"old":74|"fresh":74/.test(blob)) {
-        throw new Error(`${id} ja shows ${n}`);
-      }
+    for (const n of [45, 71, 83, 37]) {
+      if (new RegExp(`"points":${n}(?!\\d)`).test(blob)) throw new Error(`${id} ja shows old ${n}`);
     }
   }
 }
@@ -880,7 +878,11 @@ if (zhBook.length !== 5 || jaBook.length !== 5) throw new Error(`chapters zh=${z
 
 const allowed = pointSet(data);
 pointSet(ragZh).forEach((n) => allowed.add(n));
-for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 50, 100, 384, 45, 70, 71, 74, 80, 83]) allowed.add(n);
+pointSet(ragEn).forEach((n) => allowed.add(n));
+allowed.add(Math.round(ragEn.settings.no_card_threshold.meaning * 100));
+allowed.add(Math.round(ragZh.settings.no_card_threshold.meaning * 100));
+allowed.add(Math.round(ragEn.settings.no_card_threshold.word_match * 100));
+for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 50, 71, 100, 384]) allowed.add(n);
 const zhScript = readFileSync(join(embedRoot, "script/zh.md"), "utf8");
 const jaScript = readFileSync(join(embedRoot, "script/ja.md"), "utf8");
 assertCopy(zhScript, "zh", allowed, "zh.md");
@@ -896,6 +898,28 @@ const ragOld = ragZh.meaning.experiment_old_page4.result.top3[0].score_x100;
 if (zhOld !== ragOld) throw new Error(`old page4 drift ${zhOld} ${ragOld}`);
 if (ragEn.word_match.questions.find((item) => item.id === "q4_parking").top3.some((row) => row.score_x100 !== 0)) {
   throw new Error("en word match not zero");
+}
+const enPark = ragEn.meaning.questions.find((item) => item.id === "q4_parking").top3.map((row) => row.score_x100);
+const embedPark = data.rag_link.parking_recomputed_here.en.top3.map((row) => row.score_x100);
+if (enPark.join(",") !== embedPark.join(",")) throw new Error(`en parking drift rag=${enPark} embed=${embedPark}`);
+const enOld = ragEn.meaning.experiment_old_page4.result.top3[0].score_x100;
+const enNew = ragEn.meaning.questions.find((item) => item.id === "q1_breakfast").top3[0].score_x100;
+const embedOld = data.rag_link.old_page4_recomputed_here.en.with_old_page4_top3[0].score_x100;
+const embedNew = data.rag_link.old_page4_recomputed_here.en.with_new_page4_top3[0].score_x100;
+if (enOld !== embedOld || enNew !== embedNew) throw new Error(`en page4 drift rag=${enOld}/${enNew} embed=${embedOld}/${embedNew}`);
+const pair45 = ragEn.meaning.card_pair_closeness.find((pair) => pair.pages[0] === 4 && pair.pages[1] === 5);
+if (!pair45) throw new Error("missing card pair 4-5");
+const jaKidBook = jaScript.split("\n").filter((line) => !line.startsWith("|") && !line.startsWith(">")).join("\n");
+const jaClaims = [
+  [`36てん`, enPark[0] === 36 && enPark[1] === 32],
+  [`32てん`, enPark[1] === 32],
+  [`古い カードは **70てん**、新しい カードは **72てん**`, enOld === 70 && enNew === 72],
+  [`81てん`, pair45.score_x100 === 81],
+  [`RAG の 本の 線（${Math.round(ragEn.settings.no_card_threshold.meaning * 100)}てん）`, true],
+];
+for (const [text, good] of jaClaims) {
+  if (!jaKidBook.includes(text)) throw new Error(`ja.md missing RAG claim ${text}`);
+  if (!good) throw new Error(`ja.md RAG claim does not match results.json ${text}`);
 }
 
 const zhBuilt = buildLocale("zh", zhBook, data, ragZh, allowed);

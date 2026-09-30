@@ -153,8 +153,8 @@ def main():
             "rag_script_results_zh_q4_parking": rag_q(rag_zh, "q4_parking"),
             "rag_script_results_en_q4_parking": rag_q(rag_en, "q4_parking"),
             "old_page4_recomputed_here": {"zh": old_page4("zh", rag_zh), "en": old_page4("en", rag_en)},
-            "note": ("rag-script zh meaning used this same model; en meaning used all-MiniLM-L6-v2, so en scores "
-                     "recomputed here with the multilingual model differ from rag-script results.json."),
+            "note": ("Since 2026-09-30 both rag-script results_zh.json and results.json (en) use this same model, "
+                     "so the *_recomputed_here numbers must equal the rag-script ones (checked below)."),
         },
     }
     # Squash check: which pairs sit closest on the flat map, and what is their REAL closeness?
@@ -173,6 +173,15 @@ def main():
     res["map_closest_pairs"] = squash
     res["map_note"] = ("map_distance_share_of_width = distance on the 2D map divided by the map's width. "
                        "Pairs can look almost on top of each other on the map yet have low real points.")
+    rl = res["rag_link"]
+    for lang, key in (("zh", "rag_script_results_zh_q4_parking"), ("en", "rag_script_results_en_q4_parking")):
+        here = [(t["page"], t["score"]) for t in rl["parking_recomputed_here"][lang]["top3"]]
+        there = [(t["page"], t["score"]) for t in rl[key]["meaning"]]
+        assert here == there, (lang, here, there)
+    for lang, r in (("zh", rag_zh), ("en", rag_en)):
+        o = rl["old_page4_recomputed_here"][lang]
+        assert o["with_old_page4_top3"][0]["score"] == r["meaning"]["experiment_old_page4"]["result"]["top3"][0]["score"], lang
+        assert o["with_new_page4_top3"][0]["score"] == r["meaning"]["questions"][0]["top3"][0]["score"], lang
     json.dump(res, open("results.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
     import matplotlib

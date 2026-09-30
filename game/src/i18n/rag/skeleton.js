@@ -1808,20 +1808,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 6,
-              "score": 59,
+              "score": 53,
               "title": "Swimming pool",
               "hot": true
-            },
-            {
-              "page": 7,
-              "score": 38,
-              "title": "Big bath",
-              "hot": false
             },
             {
               "page": 2,
               "score": 33,
               "title": "Check-in",
+              "hot": false
+            },
+            {
+              "page": 7,
+              "score": 32,
+              "title": "Big bath",
               "hot": false
             }
           ]
@@ -1879,20 +1879,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 4,
-              "score": 74,
+              "score": 72,
               "title": "Breakfast",
               "hot": true
             },
             {
-              "page": 5,
-              "score": 47,
-              "title": "Dinner",
+              "page": 2,
+              "score": 52,
+              "title": "Check-in",
               "hot": false
             },
             {
-              "page": 2,
-              "score": 45,
-              "title": "Check-in",
+              "page": 3,
+              "score": 43,
+              "title": "Checkout",
               "hot": false
             }
           ]
@@ -2151,20 +2151,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 4,
-              "score": 74,
+              "score": 72,
               "title": "Breakfast",
               "hot": true
             },
             {
-              "page": 5,
-              "score": 47,
-              "title": "Dinner",
+              "page": 2,
+              "score": 52,
+              "title": "Check-in",
               "hot": false
             },
             {
-              "page": 2,
-              "score": 45,
-              "title": "Check-in",
+              "page": 3,
+              "score": 43,
+              "title": "Checkout",
               "hot": false
             }
           ]
@@ -2224,20 +2224,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 4,
-              "score": 74,
+              "score": 72,
               "title": "Breakfast",
               "hot": true
             },
             {
-              "page": 5,
-              "score": 47,
-              "title": "Dinner",
+              "page": 2,
+              "score": 52,
+              "title": "Check-in",
               "hot": false
             },
             {
-              "page": 2,
-              "score": 45,
-              "title": "Check-in",
+              "page": 3,
+              "score": 43,
+              "title": "Checkout",
               "hot": false
             }
           ]
@@ -2369,19 +2369,19 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 4,
-              "score": 72,
+              "score": 74,
               "title": "Breakfast",
               "hot": true
             },
             {
               "page": 5,
-              "score": 63,
+              "score": 55,
               "title": "Dinner",
               "hot": false
             },
             {
               "page": 2,
-              "score": 42,
+              "score": 47,
               "title": "Check-in",
               "hot": false
             }
@@ -2540,13 +2540,26 @@ export const RAG_PAGES = [
           ]
         },
         "ja": {
-          "kind": "flow",
-          "steps": [
-            "聞く",
-            "さがす",
-            "つなぐ",
-            "書く",
-            "ページ"
+          "kind": "bars",
+          "items": [
+            {
+              "page": 6,
+              "score": 57,
+              "title": "Swimming pool",
+              "hot": true
+            },
+            {
+              "page": 7,
+              "score": 36,
+              "title": "Big bath",
+              "hot": false
+            },
+            {
+              "page": 9,
+              "score": 19,
+              "title": "Parking",
+              "hot": false
+            }
           ]
         }
       }
@@ -2848,11 +2861,11 @@ export const RAG_PAGES = [
           "kind": "pair",
           "left": {
             "title": "朝ごはん",
-            "body": "Page 4 · 74"
+            "body": "Page 4 · 72"
           },
           "right": {
             "title": "park",
-            "body": "Page 9 · 45"
+            "body": "Page 9 · 36"
           }
         }
       }
@@ -2910,24 +2923,24 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 1,
-              "score": 19,
+              "score": 16,
               "title": "Welcome",
               "hot": true
             },
             {
-              "page": 11,
-              "score": 19,
-              "title": "Bags",
+              "page": 12,
+              "score": 15,
+              "title": "Lost and found",
               "hot": false
             },
             {
               "page": 10,
-              "score": 18,
+              "score": 12,
               "title": "Towels",
               "hot": false
             }
           ],
-          "meaningLine": 30,
+          "meaningLine": 20,
           "wordLine": 10
         }
       }
@@ -3018,20 +3031,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 13,
-              "score": 37,
+              "score": 27,
               "title": "Pets",
               "hot": true
             },
             {
               "page": 1,
-              "score": 19,
+              "score": 16,
               "title": "Welcome",
               "hot": false
             },
             {
-              "page": 11,
-              "score": 19,
-              "title": "Bags",
+              "page": 12,
+              "score": 15,
+              "title": "Lost and found",
               "hot": false
             }
           ]
@@ -3089,20 +3102,20 @@ export const RAG_PAGES = [
           "items": [
             {
               "page": 4,
-              "score": 71,
+              "score": 70,
               "title": "Breakfast",
               "hot": true
             },
             {
-              "page": 5,
-              "score": 47,
-              "title": "Dinner",
+              "page": 2,
+              "score": 52,
+              "title": "Check-in",
               "hot": false
             },
             {
-              "page": 2,
-              "score": 45,
-              "title": "Check-in",
+              "page": 3,
+              "score": 43,
+              "title": "Checkout",
               "hot": false
             }
           ]

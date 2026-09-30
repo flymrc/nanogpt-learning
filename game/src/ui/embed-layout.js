@@ -80,6 +80,77 @@ export function placeStickers(items, bounds, obstacles = [], gap = 4) {
   return result;
 }
 
+/**
+ * Seat each sticker within maxDist of its anchor. A miss stays unplaced (ok:false)
+ * instead of sliding onto a reading-order shelf.
+ */
+export function placeNear(items, bounds, obstacles = [], gap = 4, maxDist = 96) {
+  const density = items.map((item) => items.filter((other) => other !== item && Math.hypot(other.ax - item.ax, other.ay - item.ay) < 80).length);
+  const order = items
+    .map((_, index) => index)
+    .sort((a, b) => density[b] - density[a] || items[b].w * items[b].h - items[a].w * items[a].h);
+  const placed = [];
+  const result = new Array(items.length);
+  for (const index of order) {
+    const item = items[index];
+    let best = null;
+    const consider = (cx, cy) => {
+      const rect = { x: cx - item.w / 2, y: cy - item.h / 2, w: item.w, h: item.h };
+      if (!rectInside(rect, bounds)) return;
+      if (obstacles.some((ob) => rectsOverlap(rect, ob, gap))) return;
+      if (placed.some((ob) => rectsOverlap(rect, ob, gap))) return;
+      const dist = Math.hypot(cx - item.ax, cy - item.ay);
+      if (dist > maxDist) return;
+      let cover = 0;
+      for (const other of items) {
+        if (other === item) continue;
+        if (pointIn(other.ax, other.ay, rect, 1)) cover += 50;
+      }
+      const score = dist + cover;
+      if (!best || score < best.score) best = { rect, score, dist };
+    };
+    consider(item.ax, item.ay);
+    const rings = Math.ceil(maxDist / 4);
+    for (let ring = 0; ring <= rings; ring += 1) {
+      const dist = 6 + ring * 4;
+      if (dist > maxDist) break;
+      const count = 14 + Math.floor(ring / 2);
+      for (let k = 0; k < count; k += 1) {
+        const ang = -Math.PI / 2 + (k / count) * Math.PI * 2;
+        consider(item.ax + Math.cos(ang) * dist, item.ay + Math.sin(ang) * dist);
+      }
+    }
+    if (!best) {
+      result[index] = { x: item.ax, y: item.ay, w: item.w, h: item.h, ok: false };
+    } else {
+      result[index] = { ...best.rect, ok: true };
+      placed.push(best.rect);
+    }
+  }
+  return result;
+}
+
+/** Data window around a cluster, padded so labels have room after projection. */
+export function mapFrame(coords, words, pad = 0.75) {
+  const pts = words.map((word) => coords[word]).filter((pt) => Array.isArray(pt) && pt.length >= 2);
+  if (!pts.length) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  pts.forEach(([x, y]) => {
+    minX = Math.min(minX, x);
+    maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  });
+  const spanX = Math.max(maxX - minX, 0.05);
+  const spanY = Math.max(maxY - minY, 0.05);
+  const padX = Math.max(0.1, spanX * pad);
+  const padY = Math.max(0.1, spanY * pad);
+  return { minX: minX - padX, maxX: maxX + padX, minY: minY - padY, maxY: maxY + padY };
+}
+
 function shelfPack(items, bounds, obstacles, gap) {
   const order = items
     .map((item, index) => ({ item, index }))
@@ -124,19 +195,26 @@ function shelfPack(items, bounds, obstacles, gap) {
 }
 
 /** Uniform PCA plot. Y grows upward in data and downward on the page. */
-export function projectMap(coords, area, inset = 18) {
+export function projectMap(coords, area, inset = 18, frame = null) {
   const words = Object.keys(coords);
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  words.forEach((word) => {
-    const [x, y] = coords[word];
-    minX = Math.min(minX, x);
-    maxX = Math.max(maxX, x);
-    minY = Math.min(minY, y);
-    maxY = Math.max(maxY, y);
-  });
+  if (frame) {
+    minX = frame.minX;
+    maxX = frame.maxX;
+    minY = frame.minY;
+    maxY = frame.maxY;
+  } else {
+    words.forEach((word) => {
+      const [x, y] = coords[word];
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    });
+  }
   const spanX = Math.max(maxX - minX, 0.001);
   const spanY = Math.max(maxY - minY, 0.001);
   const padX = Math.min(inset, Math.max(6, area.w * 0.012));

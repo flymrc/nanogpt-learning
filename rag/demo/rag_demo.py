@@ -3,7 +3,7 @@
 1) chunk:     handbook.txt -> cards (one card per "## Page N: title" block)
 2) retrieve:  two retrievers, top-3 cards per guest question
      - "word_match": TF-IDF bag-of-words + cosine (scikit-learn), English stop words skipped
-     - "meaning":    small open embedding model sentence-transformers/all-MiniLM-L6-v2 (CPU),
+     - "meaning":    small open embedding model sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2 (CPU; same as rag_demo_zh.py),
                      cosine of normalized vectors  (a dense retriever, same family of idea as
                      the RAG paper's DPR retriever, but NOT the paper's model)
 3) combine:   question + top-3 cards joined into one text (what a generator would read)
@@ -19,8 +19,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 TOP_K = 3
 # "No card" rules are OUR demo choices (not from Lewis et al. 2020). They were picked after
 # looking at the scores of these few questions, so they are illustrations, not tuned values.
-THRESHOLD = {"word_match": 0.10, "meaning": 0.30}
-MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+# 2026-09-30 model switch: with the multilingual model the English scores moved. The old meaning line
+# 0.30 no longer separates answerable from unanswerable English questions (new Page 13 for the dog
+# question scores 0.2718 < 0.30; dog without Page 13 scores 0.1619). No single value separates both
+# English and Chinese (zh needs > 0.2821, en needs <= 0.2718), so the English (ja book) line is 0.20;
+# rag_demo_zh.py keeps 0.30. Confirmed by the user 2026-09-30 (see ../fixes-model-switch.md).
+THRESHOLD = {"word_match": 0.10, "meaning": 0.20}
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"  # switched 2026-09-30 from all-MiniLM-L6-v2 (old output: results_minilm_l6.json)
 
 QUESTIONS = [
     {"id": "q1_breakfast", "text": "What time is breakfast?"},
@@ -165,12 +170,26 @@ def main():
         {"pages": [a, b], "score": round(float(me_full.d[a - 1] @ me_full.d[b - 1]), 4),
          "score_x100": int(round(float(me_full.d[a - 1] @ me_full.d[b - 1]) * 100))} for a, b in pairs]
 
+    top1 = {r["id"]: r["top3"][0]["score"] for r in me["questions"]}
+    answerable = {k: v for k, v in top1.items() if k != "q5_dog"}
+    answerable["old_page4:q1"] = me["experiment_old_page4"]["result"]["top3"][0]["score"]
+    answerable["add_page13:q5_dog"] = me["experiment_add_page13"]["result"]["top3"][0]["score"]
+    lo, hi = min(answerable.values()), top1["q5_dog"]
+    threshold_check = {
+        "meaning_top1_answerable": answerable, "meaning_top1_unanswerable": {"q5_dog": hi},
+        "lowest_answerable": lo, "highest_unanswerable": hi,
+        "old_threshold_0_30_separates": bool(hi < 0.30 <= lo),
+        "threshold_used": THRESHOLD["meaning"],
+        "threshold_used_separates": bool(hi < THRESHOLD["meaning"] <= lo),
+        "note": "zh (rag_demo_zh.py) needs a line in (0.2821, 0.3614]; en needs one in (0.1619, 0.2718]; they do not overlap."}
+
     import sentence_transformers, torch
     results = {
         "note": ("FICTIONAL hotel handbook (Hotel Hoshi is made up). Retrieval scores are real outputs "
                  "of rag_demo.py. Answers are TEMPLATES quoting the top card; no language model was run."),
         "settings": {"top_k": TOP_K, "no_card_threshold": THRESHOLD,
                      "threshold_note": "our own demo rule, NOT from Lewis et al. 2020",
+                     "threshold_check_en": threshold_check,
                      "word_match": "TfidfVectorizer(stop_words='english') + cosine_similarity",
                      "meaning": MODEL_NAME + " (CPU), cosine of normalized embeddings",
                      "python": platform.python_version(), "scikit_learn": sklearn.__version__,

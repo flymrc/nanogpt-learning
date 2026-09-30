@@ -3232,18 +3232,18 @@
       "meaning": [
         {
           "page": 9,
-          "score": 0.4483,
-          "score_x100": 45
+          "score": 0.3571,
+          "score_x100": 36
         },
         {
           "page": 6,
-          "score": 0.2286,
-          "score_x100": 23
+          "score": 0.3195,
+          "score_x100": 32
         },
         {
-          "page": 10,
-          "score": 0.1973,
-          "score_x100": 20
+          "page": 11,
+          "score": 0.2119,
+          "score_x100": 21
         }
       ]
     },
@@ -3339,7 +3339,7 @@
         ]
       }
     },
-    "note": "rag-script zh meaning used this same model; en meaning used all-MiniLM-L6-v2, so en scores recomputed here with the multilingual model differ from rag-script results.json."
+    "note": "Since 2026-09-30 both rag-script results_zh.json and results.json (en) use this same model, so the *_recomputed_here numbers must equal the rag-script ones (checked below)."
   },
   "map_closest_pairs": {
     "zh": [

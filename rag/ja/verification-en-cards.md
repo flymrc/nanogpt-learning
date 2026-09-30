@@ -2,7 +2,8 @@
 
 > 日本語版は 英語の カード（demo/handbook.txt）と demo/results.json を つかいます。
 > 中国語版は 中国語の カード（handbook_zh.txt／results_zh.json）に かわったので、中国語版の 付録は もう 日本語版の 確認には つかえません。
-> 下の 表は、中国語版が まだ 英語カードを つかって いた ときの 付録（round 3 の 版）を そのまま うつした ものです（表の 中の ことばは 中国語）。数字は すべて results.json と 一致します。
+> 下の 表は、中国語版が まだ 英語カードを つかって いた ときの 付録（round 3 の 版）を うつした ものです（表の 中の ことばは 中国語）。
+> **2026-09-30 モデル切りかえ**：meaning（いみの じゅうしょ）を all-MiniLM-L6-v2 から paraphrase-multilingual-MiniLM-L12-v2 に かえました（中国語版・単語ベクトルの 本と 同じ）。meaning の 行は 新しい results.json に あわせて 書きかえました（古い 値は results_minilm_l6.json、変更一覧は ../fixes-model-switch.md）。word_match の 行は かわりません。
 
 ## 1しょう（もとの 中国語版 01-chapter1.md 付録）
 | 画面里的内容 | 来源 / 核对 |
@@ -52,31 +53,31 @@
 | Page 2 上 starts .464、tell .464（各只在 1 张卡上，`cards_per_word`=1）；Page 3 上没有只出现在它自己身上的词 | `card_word_shares["2"]`、`cards_per_word` |
 | swim 问题：其余全 0 | results.json `word_match.questions[q6_swim].top3[2]` = 0.0 |
 | swim（数词）：Page 3 42、Page 2 40、其余全 0 | results.json `word_match.questions[q6_swim].top3`（0.4178 / 0.3988 / 0.0） |
-| swim（地址）：Page 6 59、Page 7 38、Page 2 33 | results.json `meaning.questions[q6_swim].top3`（0.5899 / 0.3811 / 0.3293） |
-| breakfast（地址）：Page 4 74、Page 5 47、Page 2 45 | results.json `meaning.questions[q1_breakfast].top3`（0.7364 / 0.4724 / 0.4546） |
+| swim（地址）：Page 6 53、Page 2 33、Page 7 32 | results.json `meaning.questions[q6_swim].top3`（0.5282 / 0.3346 / 0.3183） |
+| breakfast（地址）：Page 4 72、Page 2 52、Page 3 43 | results.json `meaning.questions[q1_breakfast].top3`（0.7158 / 0.5214 / 0.4278） |
 | 384 个数字（画成彩色小方块，示意） | results.json `meaning.address_info.numbers_per_address`；不再显示具体数值 |
 | 地图 | **示意图**，位置不是算出来的 |
-| 两张卡有多近：4–5 83、4–9 17、6–7 48、6–3 20 | results.json `meaning.card_pair_closeness` |
+| 两张卡有多近：4–5 81、4–9 22、6–7 55、6–3 24 | results.json `meaning.card_pair_closeness` |
 | 分数 = 余弦 × 100 | score_x100；我们的显示方式 |
 | 研究：问题和资料都变成数字，内积最大的前 K 个（MIPS） | 论文 §2.2（DPR bi-encoder；d(z)=BERT_d(z)，q(x)=BERT_q(x)；top-k 是 MIPS 问题）；Figure 1 图注 |
 | 蓝帽子里的两个「变数字的人」（query encoder / document encoder） | 论文 §2.2 |
 | 资料的数字提前算好建成索引，训练时保持不变 | 论文 §2.4（"keep the document encoder (and index) fixed"）；§3（FAISS 索引） |
 | 训练时取前 5 或 10 段 | 论文 §3（k ∈ {5, 10}）。我们游戏取 3，是**我们的选择** |
 | 数词（BM25）vs 学出来的检索：多数任务后者好，FEVER 上 BM25 最好 | 论文 §4.5 Retrieval Ablations；Table 6 |
-| 我们蓝帽子里的「变数字的人」 | sentence-transformers/all-MiniLM-L6-v2，**不是**论文的 DPR/BERT；同一个模型同时编码问题和卡片 |
+| 我们蓝帽子里的「变数字的人」 | sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2（2026-09-30 起；之前是 all-MiniLM-L6-v2），**不是**论文的 DPR/BERT；同一个模型同时编码问题和卡片；384 个数字不变 |
 | 图书馆书架 | 本地化类比，不算分 |
 
 ## 4しょう（もとの 中国語版 04-chapter4.md 付録）
 | 画面里的内容 | 来源 / 核对 |
 |---|---|
-| 早饭前 3 张：Page 4 74、Page 5 47、Page 2 45 | results.json `meaning.questions[q1_breakfast].top3` |
+| 早饭前 3 张：Page 4 72、Page 2 52、Page 3 43（c4-p4 的「不对的卡」因此是入住、退房） | results.json `meaning.questions[q1_breakfast].top3` |
 | 接在一起的一段（逐字） | results.json `meaning.questions[q1_breakfast].combined_input_for_a_generator` |
-| 早饭和晚饭：Page 4 72、Page 5 63、Page 2 42 | results.json `meaning.questions[q7_two_meals].top3`（0.7235 / 0.6305 / 0.4171） |
+| 早饭和晚饭：Page 4 74、Page 5 55、Page 2 47 | results.json `meaning.questions[q7_two_meals].top3`（0.7442 / 0.5526 / 0.4695） |
 | 模板只搬第 1 张 → 漏掉晚饭 | results.json `q7_two_meals.template_answer`（只引用 Page 4） |
-| 模板回答原文（早饭、退房）；中文句子只是意思翻译 | results.json `template_answer`；**不是模型输出** |
+| 模板回答原文（早饭、游泳池）；中文句子只是意思翻译 | results.json `template_answer`；**不是模型输出** |
 | 填空纸只搬第 1 张 | rag_demo.py `ask()`：`best = top[0]` |
-| c4-p9 标明「意思的地址」；第 3 章 59 分来自数词 | results.json `meaning…q2_checkout`（0.6902）vs `word_match…q2_checkout`（0.5909） |
-| 退房：Page 3 69、Page 2 56、Page 4 47 | results.json `meaning.questions[q2_checkout].top3`（0.6902 / 0.5604 / 0.4722） |
+| c4-p9 标明「意思的地址」；括号里的 51 分来自数词 | results.json `meaning…q3_pool`（0.5734）vs `word_match…q3_pool`（0.5142） |
+| c4-p7、c4-p9 改用游泳池题：Page 6 57、Page 7 36、Page 9 19；模板回答 Page 6 | results.json `meaning.questions[q3_pool]`（0.5734 / 0.3602 / 0.1915）。**不再用退房题**：新模型下退房第 1 名是 Page 2 入住 0.7188 > Page 3 退房 0.6933，填空纸会搬错卡 |
 | 问题和资料直接接在一起 | 论文 §2.3（"To combine the input x with the retrieved content z … we simply concatenate them"） |
 | 生成器根据问题、资料和已写的字写下一个字 | 论文 §2（generator pθ(yi | x, z, y1:i−1)） |
 | 一会儿看这张、一会儿看那张（合用几段资料） | 论文 §2.1 RAG-Token（"can predict each target token based on a different document"）；§4.3 + Figure 2（两段资料分别对应两本书名） |
@@ -97,12 +98,12 @@
 | 填空纸搬第 1 张（数词时答退房） | results.json `word_match.questions[q1_breakfast].template_answer` |
 | 早饭（数词）模板回答搬了 Page 3 | results.json `word_match.questions[q1_breakfast].template_answer` |
 | 停车（数词）：全 0；park ≠ parking | results.json `word_match.questions[q4_parking]`：`question_words_known` 为空，前 3 都 0.0 |
-| 早饭（地址）Page 4 74；停车（地址）Page 9 45 | results.json `meaning.questions` q1（0.7364）、q4（0.4483） |
-| 小狗（地址）：Page 1 约 19、Page 11 约 19、Page 10 约 18 | results.json `meaning.questions[q5_dog].top3`（0.192 / 0.1856 / 0.1794；画面说「看起来都是大约 19 分，其实第 1 名多一根头发丝」） |
-| 30 分线；「我不知道」模板 | results.json `settings.no_card_threshold.meaning` = 0.30；**我们自己定的**（看过这几题分数后定的），不是论文的；「我不知道」也**不是**论文内容 |
-| 加 Page 13 后：Page 13 37 分，回答原文 | results.json `meaning.experiment_add_page13.result`（0.3678）。37 离 30 分线不远，要诚实看待 |
+| 早饭（地址）Page 4 72；停车（地址）Page 9 36 | results.json `meaning.questions` q1（0.7158）、q4（0.3571） |
+| 小狗（地址）：Page 1 16、Page 12 15、Page 10 12 | results.json `meaning.questions[q5_dog].top3`（0.1619 / 0.154 / 0.1198） |
+| 20 分线（ja；zh 仍是 30）；「我不知道」模板 | results.json `settings.no_card_threshold.meaning` = 0.20（`settings.threshold_check_en`：有答案的第 1 名最低 0.2718，狗题 0.1619；旧线 0.30 已分不开）；用户已确认（2026-09-30）；**我们自己定的**（看过这几题分数后定的），不是论文的；「我不知道」也**不是**论文内容 |
+| 加 Page 13 后：Page 13 27 分，回答原文 | results.json `meaning.experiment_add_page13.result`（0.2718）。27 离 20 分线只有 7 分，要诚实看待 |
 | 加 Page 13 后数词还是 0（dog vs dogs） | results.json `word_match.experiment_add_page13.result`（全 0.0） |
-| 旧 Page 4：71 分、答 7:00–10:00；新 Page 4：74 分 | results.json `meaning.experiment_old_page4.result`（0.7058）；`meaning.questions[q1_breakfast]`（0.7364） |
+| 旧 Page 4：70 分、答 7:00–10:00；新 Page 4：72 分 | results.json `meaning.experiment_old_page4.result`（0.7042）；`meaning.questions[q1_breakfast]`（0.7158） |
 | 多拿几张更可能包含对的资料 | 论文 §4.4：FEVER 上第 1 名来自正确文章 71%，前 10 名里 90%（画面不写数字） |
 | 按意思找 vs 数词 | 论文 §4.5 Retrieval Ablations / Table 6（多数任务 dense 更好，FEVER 上 BM25 更好）。我们的两题只是例子 |
 | 换卡片盒（论文里是换索引）→ 答案跟着变，不用重新训练 | 论文 §4.5 Index hot-swapping：2016 与 2018 维基百科索引，82 位变动过的世界领导人；对应索引答对 70% / 68%，错配 12% / 4%；§6 "without requiring any retraining"。「两年前」＝2016 对 2018 |
