@@ -27,7 +27,12 @@ const STORE_KEY = "nanogpt-lesson";
 function finite(value) {
   if (value == null || value === "") return null;
   const n = Number(value);
-  return Number.isFinite(n) ? n : null;
+  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : null;
+}
+
+function decodedHash() {
+  try { return decodeURIComponent(location.hash.replace(/^#/, '').replace(/^\//, '')); }
+  catch { return ''; }
 }
 
 export function readSavedLesson() {
@@ -52,7 +57,7 @@ export function readSavedLesson() {
 export function readEntryTarget() {
   if (typeof location === "undefined") return null;
   const params = new URLSearchParams(location.search);
-  const hash = decodeURIComponent(location.hash.replace(/^#/, "").replace(/^\//, ""));
+  const hash = decodedHash();
   const [hashScene, hashBeat, hashPhase] = hash.split(/[/?]/);
   const scene = params.get("scene") || hashScene || "";
   if (!LESSON_SCENES.has(scene)) return null;
@@ -93,7 +98,7 @@ export function clearLessonRoute() {
   params.delete("beat");
   params.delete("phase");
   const search = params.toString();
-  const hashBody = decodeURIComponent(location.hash.replace(/^#/, ""));
+  const hashBody = decodedHash();
   const hashScene = hashBody.split(/[/?]/)[0];
   const keepHash = hashBody && !LESSON_SCENES.has(hashScene) ? `#${hashBody}` : "";
   const next = `${location.pathname}${search ? `?${search}` : ""}${keepHash}`;

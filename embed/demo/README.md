@@ -1,7 +1,7 @@
 # Word-vector demo for the kids' tutorial (FICTIONAL hotel)
 
 This demo computes the real numbers behind "search by meaning" (意思的地址 / いみの じゅうしょ) in the RAG tutorial.
-Hotel Hoshi is made up. `handbook_zh.txt` and `handbook.txt` are copies of `../../rag-script/demo/`.
+Hotel Hoshi is made up. `handbook_zh.txt` and `handbook.txt` are copies of `../../rag/demo/`.
 
 ## What it does (`embed_demo.py` → `results.json`, `map_zh.png`, `map_en.png`, `map_ja.png`)
 - **Model:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` on CPU. This is the same model the RAG tutorial's
@@ -43,7 +43,7 @@ Hotel Hoshi is made up. `handbook_zh.txt` and `handbook.txt` are copies of `../.
 
 ## Rerun
 ```bash
-cd /workspace/embed-script/demo
+cd embed/demo
 python3 -m venv .venv
 .venv/bin/pip install --index-url https://download.pytorch.org/whl/cpu torch==2.14.0
 .venv/bin/pip install scikit-learn==1.9.1 sentence-transformers==6.1.0 matplotlib adjustText

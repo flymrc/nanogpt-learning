@@ -167,7 +167,7 @@ async function boot() {
         ]
       : [];
     await Promise.race([
-      Promise.all([document.fonts.ready, ...loads]),
+      Promise.allSettled([document.fonts.ready, ...loads]),
       new Promise((resolve) => window.setTimeout(resolve, 8000)),
     ]);
   }

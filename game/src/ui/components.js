@@ -381,7 +381,17 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
     idText.setFontSize(idSize);
     guard += 1;
   }
-  const textOk = layoutChipText(ch, idText, height, stripeH) && idSize >= MIN_ID_FONT;
+  let textOk = layoutChipText(ch, idText, height, stripeH) && idSize >= MIN_ID_FONT;
+  // Short landscape cards can fit a glyph and ID side by side, but cannot
+  // fit two font line boxes above the stripe. Keep the 12px font minimum.
+  if (!textOk && ch.width + idText.width + 10 <= width) {
+    const top = -height / 2 + 2;
+    const bottom = height / 2 - stripeH - 2;
+    const total = ch.width + 6 + idText.width;
+    ch.setPosition(-total / 2 + ch.width / 2, (top + bottom) / 2);
+    idText.setPosition(total / 2 - idText.width / 2, (top + bottom) / 2);
+    textOk = Math.max(ch.height, idText.height) <= bottom - top && idSize >= MIN_ID_FONT;
+  }
   const parts = [g, ch, idText];
   if (height >= 56) {
     const clipH = Math.max(6, height * 0.1);

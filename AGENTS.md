@@ -1,5 +1,11 @@
 # Agent notes — nanoGPT 闯关 (`game/`)
 
+## Default reader and retained animations
+
+The default entry is now `game/src/learning/reader.js`: 15 bilingual chapters with native HTML exercises. See `game/LEARNING_MAP.md` for the complete mapping to all 149 original pages and sources. Changes to this path must pass `npm run check`, `npm run e2e:reader`, and `npm run e2e:regressions`. Reading text and controls stay at least 16px, and viewing a page never counts as passing its check.
+
+The Phaser requirements below still apply to the retained animation mode (`?animation=1` or existing scene deep links); `npm run e2e` explicitly enters that mode and keeps all original page and intermediate-frame checks. Do not remove the animation checks when changing the default reader. Audio is loaded on demand; reviewed corrections in `speech-fallbacks.json` use current Web Speech text while historical recordings are retained. Build once before browser suites and keep `dist/` unchanged during those suites.
+
 This repo is a Phaser lesson. Layout bugs on a phone are **your** bugs.
 **Do not ask the user to find layout bugs.** If overlaps exist, **fail the PR**.
 
@@ -22,7 +28,7 @@ On mobile, the CTA is pinned in the footer. **Every Phaser label / bar / chip mu
 
 1. `cd game && npm run build` must pass.
 2. Run the visual E2E below. **If any overlap exists, the PR fails.** Do not merge and do not deploy.
-3. Deploy `game/` to `gh-pages` (orphan + `.nojekyll`) **only after E2E passes and the user explicitly asks.**
+3. Deploy the tested `game/dist/` to the existing `gh-pages` branch root, preserving `.nojekyll` and branch history, **only after E2E passes and the user explicitly asks.** Fetch first and use a fast-forward push; never force-push over concurrent changes.
 
 ## E2E visual checks (mandatory)
 

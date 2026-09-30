@@ -37,9 +37,8 @@ export function preloadAudio(scene) {
   AUDIO_KEYS.forEach((key) => {
     scene.load.audio(key, [`audio/${key}.ogg`, `audio/${key}.mp3`]);
   });
-  eachVoClip().forEach(({ cacheKey, url }) => {
-    scene.load.audio(cacheKey, url);
-  });
+  // Lesson clips are loaded on demand. Preloading both languages and all
+  // courses decoded 350+ MiB before the learner even chose a course.
 }
 
 /** Resume AudioContext on the current user gesture. Do not start clips here. */
@@ -270,6 +269,7 @@ if (typeof window !== "undefined") {
 }
 
 export function cueNarration(scene, payload) {
+  clipRequest += 1;
   const next = {
     text: String(payload?.text || ""),
     lang: payload?.lang || "zh-CN",
@@ -296,6 +296,10 @@ export function flushNarration(scene) {
   if (!next || readMuted()) return;
   scene.game.registry.set("pendingNarration", null);
   const clipReady = next.clip && scene.cache?.audio?.exists(next.clip);
+  if (next.clip && !clipReady) {
+    loadNarrationClip(scene, next);
+    return;
+  }
   if (clipReady) {
     if (typeof window !== "undefined") window.__nanoGPTUtterance = { text: next.text };
     speak(scene, next.clip);
@@ -303,6 +307,45 @@ export function flushNarration(scene) {
     return;
   }
   speakSynthesis(scene, next);
+}
+
+const clipUrls = new Map(eachVoClip().map(({ cacheKey, url }) => [cacheKey, url]));
+let clipRequest = 0;
+const retainedClips = [];
+function loadNarrationClip(scene, next) {
+  const url = clipUrls.get(next.clip);
+  if (!url) { speakSynthesis(scene, next); return; }
+  const request = ++clipRequest;
+  stopClip(scene);
+  cancelSpeech();
+  const event = `filecomplete-audio-${next.clip}`;
+  const cleanup = () => {
+    scene.load.off(event, complete);
+    scene.load.off('loaderror', failed);
+    scene.events.off('shutdown', shutdown);
+  };
+  const shutdown = () => { cleanup(); if (request === clipRequest) clipRequest++; };
+  const complete = () => {
+    cleanup();
+    retainedClips.push(next.clip);
+    while (retainedClips.length > 6) {
+      const key = retainedClips.shift();
+      if (key !== next.clip) scene.cache.audio.remove(key);
+    }
+    if (request !== clipRequest || !scene.sys.isActive() || readMuted()) return;
+    scene.game.registry.set('pendingNarration', next);
+    flushNarration(scene);
+  };
+  const failed = file => {
+    if (file?.key !== next.clip) return;
+    cleanup();
+    if (request === clipRequest && scene.sys.isActive() && !readMuted()) speakSynthesis(scene, next);
+  };
+  scene.load.once(event, complete);
+  scene.load.on('loaderror', failed);
+  scene.events.once('shutdown', shutdown);
+  scene.load.audio(next.clip, url);
+  if (!scene.load.isLoading()) scene.load.start();
 }
 
 export function cancelSpeech() {

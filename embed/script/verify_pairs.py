@@ -1,5 +1,7 @@
 import re, json
-r = json.load(open('demo/results.json'))
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[2]
+r = json.loads((ROOT / 'embed/demo/results.json').read_text(encoding='utf-8'))
 P = {}
 for grp in r['pairs'].values():
     for p in grp: P[(p['a'], p['b'])] = p['points']; P[(p['b'], p['a'])] = p['points']
@@ -10,7 +12,7 @@ ja = {'朝ごはん':'breakfast','朝の 食事':'morning meal','昼ごはん':'
 bad = 0
 for f, pat in (('zh.md', r'([\u4e00-\u9fffA-Za-z ]+?) 和 ([\u4e00-\u9fffA-Za-z ]+?)：\*\*(\d+) 分'),
                ('ja.md', r'([^\s：／]+(?: 食事)?)(?:〔[^〕]*〕)? と ([^\s：／]+(?: lot| pool| meal)?)(?:〔[^〕]*〕)?：\*\*(\d+)てん')):
-    for m in re.finditer(pat, open(f).read()):
+    for m in re.finditer(pat, (Path(__file__).parent / f).read_text(encoding='utf-8')):
         a, b, n = m.group(1).strip().split('　')[-1], m.group(2).strip(), int(m.group(3))
         a = re.sub(r'（[^）]*）$', '', a); b = re.sub(r'（[^）]*）$', '', b)  # strip furigana readings
         key = (a, b)

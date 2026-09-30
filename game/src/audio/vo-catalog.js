@@ -1,6 +1,7 @@
 import embedManifest from "./embed-vo-manifest.json";
 import manifest from "./vo-manifest.json";
 import ragManifest from "./rag-vo-manifest.json";
+import speechFallbacks from './speech-fallbacks.json';
 
 function clipOf(lang, key, hash, folder) {
   return {
@@ -12,6 +13,7 @@ function clipOf(lang, key, hash, folder) {
 export function voCacheKey(lang, id) {
   if (!id) return null;
   const key = `${id}.vo`;
+  if (speechFallbacks[`${lang}:${key}`]) return null;
   const hash = manifest?.[lang]?.[key] || ragManifest?.[lang]?.[key] || embedManifest?.[lang]?.[key];
   if (!hash) return null;
   return `vo:${lang}:${key}:${hash}`;
@@ -21,14 +23,17 @@ export function eachVoClip() {
   const clips = [];
   for (const lang of ["zh", "ja"]) {
     for (const [key, hash] of Object.entries(manifest[lang] || {})) {
+      if (speechFallbacks[`${lang}:${key}`]) continue;
       if (typeof hash !== "string" || !/^[0-9a-f]{12}$/.test(hash)) continue;
       clips.push(clipOf(lang, key, hash, "vo"));
     }
     for (const [key, hash] of Object.entries(ragManifest[lang] || {})) {
+      if (speechFallbacks[`${lang}:${key}`]) continue;
       if (typeof hash !== "string" || !/^[0-9a-f]{12}$/.test(hash)) continue;
       clips.push(clipOf(lang, key, hash, "vo-rag"));
     }
     for (const [key, hash] of Object.entries(embedManifest[lang] || {})) {
+      if (speechFallbacks[`${lang}:${key}`]) continue;
       if (typeof hash !== "string" || !/^[0-9a-f]{12}$/.test(hash)) continue;
       clips.push(clipOf(lang, key, hash, "vo-embed"));
     }

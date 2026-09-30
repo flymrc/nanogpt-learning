@@ -118,6 +118,7 @@ function parseChapter(markdown) {
 }
 
 function parseBook(markdown) {
+  markdown = markdown.replace(/\r\n?/g, '\n');
   return markdown
     .split(/\n(?=# )/)
     .filter((chunk) => /^#\s+第/.test(chunk))

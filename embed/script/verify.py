@@ -1,6 +1,8 @@
 import re, json, sys
-r = json.load(open('demo/results.json'))
-rz = json.load(open('/workspace/rag-script/demo/results_zh.json'))
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[2]
+r = json.loads((ROOT / 'embed/demo/results.json').read_text(encoding='utf-8'))
+rz = json.loads((ROOT / 'rag/demo/results_zh.json').read_text(encoding='utf-8'))
 pts = set()
 def walk(o):
     if isinstance(o, dict):
@@ -17,7 +19,7 @@ for lang, m in r['similarity_matrix'].items():
 extra = {70: 'about cos45 (ruler note)', 50: 'cos60 animation note', 1: 'difference 40-39', 3: 'difference 36-33', 4: 'difference 36-32', 5: 'difference 35-30', 100: 'max', 0: 'zero/right angle', 45: 'RAG ja q4', 71: 'RAG ja old p4', 74: 'RAG p4', 80: 'RAG zh card pair', 83: 'RAG ja card pair', 30: 'RAG zh line', 20: 'RAG en (ja) line', 81: 'RAG en card pair 4-5', 72: 'RAG en new p4', 70: 'RAG en old p4', 36: 'rag', 33: 'rag', 31: 'rag', 32: 'rag'}
 ok = True
 for f, unit in (('zh.md', '分'), ('ja.md', 'てん')):
-    s = open(f).read()
+    s = (Path(__file__).parent / f).read_text(encoding='utf-8')
     kid = []
     for line in s.splitlines():
         if line.startswith('|') or line.startswith('>'): continue
@@ -34,7 +36,7 @@ for f, unit in (('zh.md', '分'), ('ja.md', 'てん')):
 # ja may quote RAG-book scores (same model since 2026-09-30), but every number on a line that
 # mentions the RAG book must be a real score in the CURRENT rag-script results.json (or its line),
 # and the old all-MiniLM-L6-v2 values must not come back.
-re_ = json.load(open('/workspace/rag-script/demo/results.json'))
+re_ = json.loads((ROOT / 'rag/demo/results.json').read_text(encoding='utf-8'))
 rag_pts = set()
 def walk2(o):
     if isinstance(o, dict):
@@ -45,7 +47,7 @@ def walk2(o):
         for x in o: walk2(x)
 walk2(re_)
 rag_line = int(round(re_['settings']['no_card_threshold']['meaning'] * 100))
-jakid = '\n'.join(l for l in open('ja.md').read().splitlines() if not l.startswith('|') and not l.startswith('>'))
+jakid = '\n'.join(l for l in (Path(__file__).parent / 'ja.md').read_text(encoding='utf-8').splitlines() if not l.startswith('|') and not l.startswith('>'))
 for l in jakid.splitlines():
     if 'RAG' not in l or '度で' in l: continue
     for m in re.finditer(r'(?<![\d:.])(\d+)\s*\**\s*てん', l):

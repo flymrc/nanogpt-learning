@@ -10,12 +10,17 @@
     "preview": "vite preview",
     "i18n": "node scripts/i18n-parity.mjs",
     "vo": "node scripts/generate-lesson-vo.mjs",
-    "e2e": "node scripts/i18n-parity.mjs && node scripts/e2e-layout.mjs"
+    "e2e": "node scripts/i18n-parity.mjs && node scripts/e2e-layout.mjs",
+    "test": "node --test scripts/content.test.mjs",
+    "e2e:reader": "node scripts/e2e-reader.mjs",
+    "e2e:regressions": "node scripts/e2e-regressions.mjs",
+    "check": "npm run test && npm run i18n && npm run build"
   },
   "dependencies": {
     "phaser": "^3.88.2"
   },
   "devDependencies": {
+    "playwright": "1.58.2",
     "vite": "^6.3.5"
   }
 }

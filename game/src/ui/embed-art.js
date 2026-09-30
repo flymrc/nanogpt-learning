@@ -734,15 +734,19 @@ function paintDesk(scene, host, g, w, h, spec, step) {
       const y = area.y + rh / 2 + index * (rh + gap);
       const boxH = Math.max(48, rh - 2);
       const box = plate(scene, host, area.x + area.w / 2, y, area.w, boxH, 0xfffdf8);
-      const labelW = Math.max(72, area.w - 108);
-      labelBlock(scene, box, -area.w / 2 + 12 + labelW / 2, -boxH * 0.22, labelW, glossParts(item.label));
-      const badge = spec.kind === "class" && spec.showSame && index === 0 ? `${spec.same}/${spec.cells}` : String(spec.dim || 384);
-      const pill = plate(scene, box, area.w / 2 - 42, -boxH * 0.22, 68, 30, 0xffc43d);
-      addText(scene, pill, 0, 0, badge, 14, 58, { bg: "#ffc43d" });
       const size = Math.min(26, Math.max(14, Math.floor((area.w - 24 - 7 * 6) / 8)));
       const cellsW = 8 * size + 7 * 6;
-      const sx = -cellsW / 2;
-      const sy = Math.min(boxH * 0.18, boxH / 2 - size - 4);
+      // Short desktop rows cannot stack a bilingual label above the cells.
+      // Use the available width while retaining both labels and their font size.
+      const compact = boxH < 80 && area.w >= 400;
+      const labelW = Math.max(72, area.w - (compact ? cellsW + 120 : 108));
+      const labelY = compact ? 0 : -boxH * 0.22;
+      labelBlock(scene, box, -area.w / 2 + 12 + labelW / 2, labelY, labelW, glossParts(item.label));
+      const badge = spec.kind === "class" && spec.showSame && index === 0 ? `${spec.same}/${spec.cells}` : String(spec.dim || 384);
+      const pill = plate(scene, box, area.w / 2 - 42, labelY, 68, 30, 0xffc43d);
+      addText(scene, pill, 0, 0, badge, 14, 58, { bg: "#ffc43d" });
+      const sx = compact ? area.w / 2 - 92 - cellsW : -cellsW / 2;
+      const sy = compact ? -size / 2 : Math.min(boxH * 0.18, boxH / 2 - size - 4);
       cells(box.list[0], sx, sy, item.cells || [], size);
       if (spec.kind === "compare" && index > 0) {
         const first = items[0]?.cells || [];
@@ -1638,7 +1642,9 @@ export function drawEmbedArt(scene, stage, page, { phase = 0 } = {}) {
   const room = Math.max(48, ceiling - stage.top - 2);
   let height = Math.max(56, room - block);
   const width = Math.max(96, stage.w - 4);
-  const top = stage.top + 2;
+  // The stage already includes the body clearance. Adding another 2px
+  // squeezed the caption against the card on short Japanese desktops.
+  const top = stage.top;
   const caption = (CAPTION[lang()] || CAPTION.zh)[spec.kind] || (lang() === "ja" ? "え" : "图");
   const voice = voiceNoteWorld(scene);
   const voiceGap = 10;
@@ -1686,7 +1692,7 @@ export function drawEmbedArt(scene, stage, page, { phase = 0 } = {}) {
   card.setData("height", height);
   card.setData("shadow", true);
   card.setData("artPart", "scheme");
-  card.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+  card.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
   card.on("pointerdown", (_pointer, _x, _y, event) => {
     event?.stopPropagation?.();
     playSfx(scene, "sfx-tap", 0.28);

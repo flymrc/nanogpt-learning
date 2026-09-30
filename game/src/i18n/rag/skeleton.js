@@ -18,7 +18,7 @@ export const RAG_PAGES = [
         "ja": {
           "kind": "board",
           "covered": "きょうの きゅうしょく",
-          "open": "ごはん"
+          "open": "ごはん・さばの みそに・みそしる"
         }
       }
     },

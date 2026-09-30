@@ -61,8 +61,8 @@ export function takeSceneProgress(scene, registryKey, maxBeat) {
   const saved = fromData || fromReg;
   if (!saved) return null;
   return {
-    beat: Math.min(maxBeat, Math.max(0, Number(saved.beat) || 0)),
-    phase: Math.min(PHASE_COUNT - 1, Math.max(0, Number(saved.phase) || 0)),
+    beat: Math.trunc(Math.min(maxBeat, Math.max(0, Number(saved.beat) || 0))),
+    phase: Math.trunc(Math.min(PHASE_COUNT - 1, Math.max(0, Number(saved.phase) || 0))),
   };
 }
 

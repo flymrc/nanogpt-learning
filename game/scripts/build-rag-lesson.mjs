@@ -93,7 +93,7 @@ function linesOf(body) {
 
 function firstSentence(text) {
   const cleanText = clean(text).replace(/\s+/g, " ");
-  const cut = cleanText.split(/[。！？]/)[0];
+  const cut = cleanText.split(/(?<=[^「『])(?:[。！？])(?=[^」』]|$)/u)[0];
   return (cut || cleanText).trim();
 }
 
@@ -127,6 +127,7 @@ function shareBoards(data, qid) {
 }
 
 function parseChapter(markdown) {
+  markdown = markdown.replace(/\r\n?/g, '\n');
   const h1 = (markdown.match(/^#\s+(.+)$/m) || [, ""])[1];
   const chunks = markdown.split(/\n(?=## )/);
   const sections = [];
@@ -249,7 +250,7 @@ function pictureFor(id, lang, facts) {
   if (id.endsWith("-sum")) return { kind: "rules", lines: [] };
   if (id.endsWith("-rev")) return { kind: "stars", n: 3 };
   const table = {
-    "r1-intro": { kind: "board", covered: lang === "ja" ? "きょうの きゅうしょく" : "今天的午饭", open: lang === "ja" ? "ごはん" : "米饭和番茄炒蛋" },
+    "r1-intro": { kind: "board", covered: lang === "ja" ? "きょうの きゅうしょく" : "今天的午饭", open: lang === "ja" ? "ごはん・さばの みそに・みそしる" : "米饭和番茄炒蛋" },
     "r1-p1": { kind: "sign", title: lang === "ja" ? "ホテル・ホシ" : "星星酒店", sub: "Hotel Hoshi" },
     "r1-p2": { kind: "memory", line: lang === "ja" ? "7:00–10:00" : "7:00–10:00", caption: lang === "ja" ? "あたまの 中" : "脑袋里的旧话" },
     "r1-p3": { kind: "book", page: 4, line: breakfastCard.text, badge: lang === "ja" ? "いまの 本" : "今天的手册" },
@@ -715,7 +716,7 @@ if (/(?<![\d.:])30てん/.test(jaKid)) throw new Error("ja still says 30てん")
 for (const needle of ["20てん", "57てん", "81てん", "27てん", "16てん"]) {
   if (!jaKid.includes(needle)) throw new Error(`ja pack missing ${needle}`);
 }
-const verified = spawnSync("python3", ["verify_ja_scores.py"], { cwd: ragRoot, encoding: "utf8" });
+const verified = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["verify_ja_scores.py"], { cwd: ragRoot, encoding: "utf8" });
 if (verified.status !== 0) {
   throw new Error(verified.stdout || verified.stderr || "verify_ja_scores.py failed");
 }

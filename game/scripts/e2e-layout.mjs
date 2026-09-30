@@ -8,8 +8,8 @@
  * Big-band checks alone missed that class (caption on the Second tiles, ellipsis on S).
  * Home is extra: 390×844, 1024×522, 1024×640, 1440×900, 1920×1080, zh and ja.
  */
-import { createRequire } from "node:module";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
@@ -29,6 +29,7 @@ const LEVEL_PAGES = {
   Level4: pagesFor(4),
   Level5: pagesFor(5),
 };
+const speechReplacements = JSON.parse(readFileSync(new URL('../src/audio/speech-fallbacks.json', import.meta.url), 'utf8'));
 
 const RAG_LEVEL_PAGES = {
   Rag1: ragPagesFor(1),
@@ -66,35 +67,30 @@ function expectedVo(lang, key, beat) {
   const id = key === "Title" ? "title" : LEVEL_PAGES[key][beat].id;
   return {
     id,
+    source: speechReplacements[`${lang}:${id}.vo`] ? 'speech' : 'clip',
     prefix: pack.voiceBeat,
     text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
   };
 }
 
-async function loadChromium() {
-  try {
-    return (await import("playwright")).chromium;
-  } catch {
-    const require = createRequire("/tmp/node_modules/playwright/package.json");
-    return require("playwright").chromium;
-  }
-}
-
-const OUT = process.env.E2E_OUT || "/tmp/nanogpt-e2e";
+const OUT = process.env.E2E_OUT || "output/legacy";
 mkdirSync(OUT, { recursive: true });
-const BASE = process.env.E2E_URL || "http://127.0.0.1:4182/";
+const animationBase = new URL(process.env.E2E_URL || "http://127.0.0.1:4182/");
+animationBase.searchParams.set('animation', '1');
+const BASE = animationBase.href;
 
 const PHASE_NAMES = ["aim", "look", "do", "box", "check"];
 const SNAP = /title|L1-b1-p2|L2-b0-p0|L2-b5-p0|L2-b2-p2|L1-b0-p0/;
 
-const chromium = await loadChromium();
-const browser = await chromium.launch({
-  executablePath: process.env.CHROME || "/usr/bin/google-chrome-stable",
+const launchOptions = {
+  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}),
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader"],
-});
+};
+const browser = await chromium.launch(launchOptions);
 
 async function ready(page) {
+  page.on('pageerror', error => console.error('PAGE_ERROR', error.stack));
   await page.goto(BASE, { waitUntil: "load", timeout: 60000 });
   await page.waitForFunction(() => typeof window.__nanoGPTJump === "function", { timeout: 45000 });
   await page.evaluate(() => document.fonts?.ready);
@@ -117,7 +113,7 @@ async function assertVo(page, key, beat) {
       const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
       return pageId === expected.id
         && narr.id === expected.id
-        && narr.source === "clip"
+        && narr.source === expected.source
         && body === expected.text
         && utter === expected.text
         && narrText === expected.text;
@@ -181,7 +177,10 @@ async function jumpLanded(page, key, beat, phase) {
   await page.waitForFunction(([k, b, p]) => {
     const state = window.__nanoGPTState?.();
     return state?.scene === k && state.beat === b && state.phase === p && typeof window.__nanoGPTAssertLayout === "function";
-  }, [key, beat, phase], { timeout: 15000 });
+  }, [key, beat, phase], { timeout: 15000 }).catch(async error => {
+    console.error('JUMP_TIMEOUT', { key, beat, phase, actual: await page.evaluate(()=>({state:window.__nanoGPTState?.(),visibility:document.visibilityState,reader:document.documentElement.dataset.reader,loopRunning:window.__nanoGPTGame?.loop.running})) });
+    throw error;
+  });
 }
 
 async function jumpAndAssert(page, key, beat, phase, name) {
@@ -928,7 +927,7 @@ const FIT_LEVELS = [
 const C3_P3_BEAT = LEVEL_PAGES.Level3.findIndex((page) => page.id === "c3-p3");
 
 async function assertLive2dPanel(browser) {
-  const shotDir = "/opt/cursor/artifacts/live2d-fit2";
+  const shotDir = `${OUT}/live2d-fit2`;
   mkdirSync(shotDir, { recursive: true });
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
@@ -1440,6 +1439,7 @@ async function assertHiddenBackdrop(page) {
   }
 }
 
+const nanoRun = (async () => {
 const mobile = await runViewport(
   "mobile",
   {
@@ -1471,16 +1471,21 @@ const pc1024 = await runViewport(
   { allPhases: false },
 );
 
+const live2dFit = await assertLive2dPanel(browser);
+const home = await assertHomeHub(browser);
+return { mobile, pc, pc1024, live2dFit, home };
+})();
+
 function homeShot(lang, width, height) {
-  return `/opt/cursor/artifacts/home/home-${lang}-${width}x${height}.png`;
+  return `${OUT}/home/home-${lang}-${width}x${height}.png`;
 }
 
 function lessonShot(lang, width, height) {
-  return `/opt/cursor/artifacts/home/lesson-${lang}-${width}x${height}.png`;
+  return `${OUT}/home/lesson-${lang}-${width}x${height}.png`;
 }
 
 function home2Shot(name) {
-  return `/opt/cursor/artifacts/home2/${name}.png`;
+  return `${OUT}/home2/${name}.png`;
 }
 
 const HOME3_SHOTS = new Set([
@@ -1493,7 +1498,7 @@ const HOME3_SHOTS = new Set([
 ]);
 
 function home3Shot(lang, width, height) {
-  return `/opt/cursor/artifacts/home3/home-${lang}-${width}x${height}.png`;
+  return `${OUT}/home3/home-${lang}-${width}x${height}.png`;
 }
 
 async function assertJaBunsetsu(page) {
@@ -1561,8 +1566,8 @@ async function assertHomeViewport(page, label, lang, mobile) {
   const viewNow = page.viewportSize();
   await page.screenshot({ path: homeShot(lang, viewNow.width, viewNow.height) });
   if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 390 && viewNow.height === 844)) {
-    mkdirSync("/opt/cursor/artifacts/rag", { recursive: true });
-    await page.screenshot({ path: `/opt/cursor/artifacts/rag/home-${lang}-${viewNow.width}x${viewNow.height}.png` });
+    mkdirSync(`${OUT}/rag`, { recursive: true });
+    await page.screenshot({ path: `${OUT}/rag/home-${lang}-${viewNow.width}x${viewNow.height}.png` });
   }
   if ((viewNow.width === 1440 && viewNow.height === 900) || (viewNow.width === 1920 && viewNow.height === 1080)) {
     await page.screenshot({ path: home2Shot(`home-${lang}-${viewNow.width}x${viewNow.height}`) });
@@ -1719,7 +1724,7 @@ async function assertHomeDeepLinks(page) {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
   }, null, { timeout: 30000 });
-  await openFresh(page, `${BASE}?scene=Level1&beat=2&phase=1`);
+  await openFresh(page, `${BASE}&scene=Level1&beat=2&phase=1`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level1" && state.beat === 2 && state.phase === 1;
@@ -1747,9 +1752,9 @@ async function assertHomeDeepLinks(page) {
 }
 
 async function assertHomeHub(browser) {
-  mkdirSync("/opt/cursor/artifacts/home", { recursive: true });
-  mkdirSync("/opt/cursor/artifacts/home2", { recursive: true });
-  mkdirSync("/opt/cursor/artifacts/home3", { recursive: true });
+  mkdirSync(`${OUT}/home`, { recursive: true });
+  mkdirSync(`${OUT}/home2`, { recursive: true });
+  mkdirSync(`${OUT}/home3`, { recursive: true });
   const sizes = [
     { label: "mobile", width: 390, height: 844, mobile: true },
     { label: "pc1024x522", width: 1024, height: 522, mobile: false },
@@ -1796,13 +1801,12 @@ async function assertHomeHub(browser) {
   return { ok: true, viewports: sizes.length };
 }
 
-const live2dFit = await assertLive2dPanel(browser);
-const home = await assertHomeHub(browser);
+
 
 function rag3ShotFor(pageId, lang, width, height, phase) {
   if (phase !== 2) return "";
   const spec = RAG3_SHOTS.find((row) => row[0] === pageId && row[1] === lang && row[2] === width && row[3] === height);
-  return spec ? `/opt/cursor/artifacts/rag3/${spec[4]}` : "";
+  return spec ? `${OUT}/rag3/${spec[4]}` : "";
 }
 
 async function playRagSteps(page, name, first) {
@@ -1947,7 +1951,7 @@ async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
 }
 
 async function runRagViewport(browser, label, pageOpts, { allPhases }) {
-  mkdirSync("/opt/cursor/artifacts/rag3", { recursive: true });
+  mkdirSync(`${OUT}/rag3`, { recursive: true });
   const zh = await runRagLocale(browser, label, pageOpts, "zh", { allPhases });
   const ja = await runRagLocale(browser, label, pageOpts, "ja", { allPhases });
   const reports = [...zh.reports, ...ja.reports];
@@ -1958,6 +1962,8 @@ async function runRagViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
+const ragRun = (async () => {
+const browser = await chromium.launch(launchOptions);
 const ragMobile = await runRagViewport(
   browser,
   "mobile",
@@ -1983,6 +1989,12 @@ const ragPc1024 = await runRagViewport(
   { allPhases: false },
 );
 
+await saveRag5Shots(browser);
+await saveRag6Shots(browser);
+await browser.close();
+return { ragMobile, ragPc, ragPc1024 };
+})();
+
 async function shootRag5(page, key, beat, phase, taps, file) {
   await jumpLanded(page, key, beat, phase);
   await page.waitForTimeout(240);
@@ -1996,7 +2008,7 @@ async function shootRag5(page, key, beat, phase, taps, file) {
 }
 
 async function saveRag5Shots(browser) {
-  const dir = "/opt/cursor/artifacts/rag5";
+  const dir = `${OUT}/rag5`;
   mkdirSync(dir, { recursive: true });
   const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const open = async (width, height, lang, mobile = false) => {
@@ -2039,10 +2051,10 @@ async function saveRag5Shots(browser) {
   await jaPhone.close();
 }
 
-await saveRag5Shots(browser);
+
 
 async function saveRag6Shots(browser) {
-  const dir = "/opt/cursor/artifacts/rag6";
+  const dir = `${OUT}/rag6`;
   mkdirSync(dir, { recursive: true });
   const beatOf = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const open = async (width, height, lang, mobile = false) => {
@@ -2078,7 +2090,7 @@ async function saveRag6Shots(browser) {
   await zhPc.close();
 }
 
-await saveRag6Shots(browser);
+
 
 function embedWalks(spine, { allPhases }) {
   const jobs = [];
@@ -2224,6 +2236,8 @@ async function runEmbedViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
+const embedRun = (async () => {
+const browser = await chromium.launch(launchOptions);
 const embedMobile = await runEmbedViewport(
   browser,
   "mobile",
@@ -2249,8 +2263,14 @@ const embedPc1024 = await runEmbedViewport(
   { allPhases: false },
 );
 
+await saveEmbedShots(browser);
+await saveEmb4Shots(browser);
+await browser.close();
+return { embedMobile, embedPc, embedPc1024 };
+})();
+
 async function saveEmbedShots(browser) {
-  const dir = "/opt/cursor/artifacts/emb3";
+  const dir = `${OUT}/emb3`;
   mkdirSync(dir, { recursive: true });
   const beatOf = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const open = async (width, height, lang, mobile = false) => {
@@ -2298,10 +2318,10 @@ async function saveEmbedShots(browser) {
   await jaPhone.close();
 }
 
-await saveEmbedShots(browser);
+
 
 async function saveEmb4Shots(browser) {
-  const dir = "/opt/cursor/artifacts/emb4";
+  const dir = `${OUT}/emb4`;
   mkdirSync(dir, { recursive: true });
   const embedBeat = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
   const ragBeat = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
@@ -2351,8 +2371,16 @@ async function saveEmb4Shots(browser) {
   await zhPc.close();
 }
 
-await saveEmb4Shots(browser);
 
+
+// Each course uses its own browser process so focus changes do not pause
+// another course's Phaser loop. Preserve every original
+// assertion and final count, while overlapping the three independent walks.
+const [
+  { mobile, pc, pc1024, live2dFit, home },
+  { ragMobile, ragPc, ragPc1024 },
+  { embedMobile, embedPc, embedPc1024 },
+] = await Promise.all([nanoRun, ragRun, embedRun]);
 await browser.close();
 
 const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024, embedMobile, embedPc, embedPc1024 };

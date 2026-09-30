@@ -158,7 +158,7 @@ export function drawPhaseTabs(scene, stage, phase, onPick, { h: hOverride } = {}
     const label = scene.add.text(0, 0, item.label, uiText(phone ? 11 : 12)).setOrigin(0.5);
     tab.add([g, label]);
     tab.setSize(w, h);
-    tab.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
+    tab.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     tab.input.cursor = "pointer";
     tab.on("pointerdown", (pointer, _lx, _ly, event) => {
       event?.stopPropagation?.();
@@ -380,7 +380,7 @@ function drawCompactPhaseCard(scene, stage, beat, phase, meta, copy, cardTop, wi
   more.on("pointerdown", open);
   box.add([g, stripe, title, text, more]);
   box.setSize(width, height);
-  box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+  box.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
   box.on("pointerdown", open);
   box.setData("kind", "phase-card");
   box.setData("width", width);
@@ -446,7 +446,9 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap
   const maxTextH = Math.max(16, maxH - chrome);
   const startSize = phone ? 15 : 16;
   const fit = rag ? fitComplete : fitPlain;
-  const clipCard = doPhone || pcLookDo;
+  // Long original copy is an explicit preview with a full-text control.
+  // Never scale a paragraph below the fitted font just to fit a short card.
+  const clipCard = rag;
   const shownFit = rag
     ? fitComplete(scene, copy.shown, startSize, 13, wrap, maxTextH, { keep: !clipCard })
     : fit(scene, copy.shown, startSize, 13, wrap, maxTextH);
@@ -482,7 +484,6 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap
   const textY = -height / 2 + 28;
   const text = scene.add.text(textX, textY, shownFit.wrapped, cardStyle(font)).setOrigin(0, 0);
   const textRoom = Math.max(16, height - 36 - (expandable ? 28 : 0));
-  if (rag && !clipCard && text.height > textRoom) text.setScale(textRoom / text.height);
   if (clipCard && text.height > textRoom) {
     let lines = String(text.text || "").split("\n");
     while (lines.length > 1 && text.height > textRoom) {
@@ -517,7 +518,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap
   paint(shownFit.wrapped);
   if (copy.reveal) {
     box.setSize(width, height);
-    box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+    box.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
     box.on("pointerdown", (pointer, _x, _y, event) => {
       event?.stopPropagation?.();
       paint(revealFit.wrapped);

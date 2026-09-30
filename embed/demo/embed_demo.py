@@ -117,8 +117,10 @@ def main():
     for lang in ("zh", "en"):
         pcas[lang], maps[lang] = pca(lang)
 
-    rag_zh = json.load(open("../../rag-script/demo/results_zh.json"))
-    rag_en = json.load(open("../../rag-script/demo/results.json"))
+    from pathlib import Path
+    rag_dir = Path(__file__).resolve().parents[2] / "rag" / "demo"
+    rag_zh = json.loads((rag_dir / "results_zh.json").read_text(encoding="utf-8"))
+    rag_en = json.loads((rag_dir / "results.json").read_text(encoding="utf-8"))
     def rag_q(r, qid):
         out = {}
         for m in ("word_match", "meaning"):

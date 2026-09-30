@@ -11,6 +11,19 @@ import { voHash } from "./vo-hash.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKS = { zh: ZH, ja: JA };
+const speechFallbacks = JSON.parse(readFileSync(join(root, 'src/audio/speech-fallbacks.json'), 'utf8'));
+
+function expectedClipHash(lang, key, text, recordedHash, errors) {
+  const currentHash = voHash(text);
+  const fallback = speechFallbacks[`${lang}:${key}`];
+  if (!fallback) return currentHash;
+  // A corrected line may use live speech until it is re-recorded. Verify the
+  // exact replacement text and the retained old recording; never play it.
+  if (fallback.textHash !== currentHash || fallback.retiredClip !== recordedHash || !fallback.reason) {
+    errors.push(`invalid speech fallback ${lang} ${key}`);
+  }
+  return recordedHash;
+}
 
 export function checkVoFiles() {
   const errors = [];
@@ -34,7 +47,7 @@ export function checkVoFiles() {
     }
     const expected = new Set();
     for (const key of voKeys) {
-      const hash = voHash(pack[key]);
+      const hash = expectedClipHash(lang, key, pack[key], table[key], errors);
       if (!/^[0-9a-f]{12}$/.test(hash)) errors.push(`bad hash ${lang} ${key}`);
       if (table[key] !== hash) {
         errors.push(`stale vo ${lang} ${key} file-hash=${table[key] || ""} text-hash=${hash}`);
@@ -78,7 +91,7 @@ export function checkRagVoFiles() {
     }
     const expected = new Set();
     for (const key of voKeys) {
-      const hash = voHash(packs[lang][key]);
+      const hash = expectedClipHash(lang, key, packs[lang][key], table[key], errors);
       if (table[key] !== hash) errors.push(`stale rag vo ${lang} ${key}`);
       const name = `${key}.${hash}.mp3`;
       expected.add(name);
@@ -118,7 +131,7 @@ export function checkEmbedVoFiles() {
     }
     const expected = new Set();
     for (const key of voKeys) {
-      const hash = voHash(packs[lang][key]);
+      const hash = expectedClipHash(lang, key, packs[lang][key], table[key], errors);
       if (table[key] !== hash) errors.push(`stale embed vo ${lang} ${key}`);
       const name = `${key}.${hash}.mp3`;
       expected.add(name);
