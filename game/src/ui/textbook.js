@@ -1,5 +1,5 @@
 import { LESSON_PHASES, PHASE_COUNT, lessonCaption, phaseText } from "../data/lessons.js";
-import { getCourse, getLang, t } from "../i18n/locale.js";
+import { getLang, isPictureCourse, t } from "../i18n/locale.js";
 import { syncPseudo } from "./pseudo.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { drawSticker } from "./components.js";
@@ -402,7 +402,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap
   const meta = LESSON_PHASES[phase] || LESSON_PHASES[0];
   const rhythm = lessonRhythm(scene.frame.v);
   const phone = !isWidePcTutor();
-  const rag = beat?.course === "rag" || getCourse() === "rag";
+  const rag = beat?.course === "rag" || beat?.course === "embed" || isPictureCourse();
   const cardTop = (top ?? stage.top) + (gap ?? rhythm);
   const width = phone ? Math.min(stage.w, 640) : Math.min(stage.w - 28, 920);
   const wrap = width - (phone ? 44 : 48);
@@ -547,7 +547,7 @@ export function drawPhaseCard(scene, stage, beat, phase, { top, reserve = 0, gap
 
 export function paintLessonStage(scene, beat, phase, onPick) {
   const phone = !isWidePcTutor();
-  const rag = beat?.course === "rag" || getCourse() === "rag";
+  const rag = beat?.course === "rag" || beat?.course === "embed" || isPictureCourse();
   const pcPack = rag && !phone && (phase === 1 || phase === 2);
   const artW = Math.max(80, scene.frame.stageBand.w - (phone ? 16 : 32));
   const reserve = artBandReserve(beat, phase, artW) + 12;
@@ -560,7 +560,7 @@ export function paintLessonStage(scene, beat, phase, onPick) {
     compactH: shortPack ? 28 : 36,
   });
   const band = exampleBand(scene.frame.stageBand, card.bottom, scene.frame.v, {
-    reserve: beat?.course === "rag" && phone ? 0 : undefined,
+    reserve: (beat?.course === "rag" || beat?.course === "embed") && phone ? 0 : undefined,
     gap: shortPack ? 2 : pcPack ? 6 : undefined,
   });
   scene.frame.lastTabs = { left: scene.frame.stageBand.left, top: scene.frame.stageBand.top, w: scene.frame.stageBand.w, h: tabs.height };

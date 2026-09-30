@@ -148,7 +148,7 @@ export function glueWords(text) {
 function useGlue(flag) {
   if (flag === false) return false;
   if (flag === true) return true;
-  return getCourse() === "rag";
+  return getCourse() === "rag" || getCourse() === "embed";
 }
 
 /** A glued run in `source` must occupy one rendered line. */
@@ -171,7 +171,7 @@ export function gluedRunSplits(source, rendered) {
 export function setGluedText(el, text) {
   if (!el) return;
   const value = String(text ?? "");
-  if (typeof document === "undefined" || getCourse() !== "rag") {
+  if (typeof document === "undefined" || (getCourse() !== "rag" && getCourse() !== "embed")) {
     el.textContent = value;
     return;
   }

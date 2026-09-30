@@ -1,0 +1,1460 @@
+{
+  "note": "FICTIONAL hotel handbook (Hotel Hoshi is made up). Retrieval scores are real outputs of rag_demo.py. Answers are TEMPLATES quoting the top card; no language model was run.",
+  "settings": {
+    "top_k": 3,
+    "no_card_threshold": {
+      "word_match": 0.1,
+      "meaning": 0.3
+    },
+    "threshold_note": "our own demo rule, NOT from Lewis et al. 2020",
+    "word_match": "TfidfVectorizer(stop_words='english') + cosine_similarity",
+    "meaning": "sentence-transformers/all-MiniLM-L6-v2 (CPU), cosine of normalized embeddings",
+    "python": "3.13.5",
+    "scikit_learn": "1.9.1",
+    "sentence_transformers": "6.1.0",
+    "torch": "2.14.0+cpu"
+  },
+  "n_cards": 12,
+  "card_word_counts": {
+    "1": 15,
+    "2": 15,
+    "3": 15,
+    "4": 16,
+    "5": 16,
+    "6": 18,
+    "7": 17,
+    "8": 15,
+    "9": 14,
+    "10": 16,
+    "11": 14,
+    "12": 15
+  },
+  "cards": [
+    {
+      "page": 1,
+      "title": "Welcome",
+      "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.",
+      "n_words": 15
+    },
+    {
+      "page": 2,
+      "title": "Check-in",
+      "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+      "n_words": 15
+    },
+    {
+      "page": 3,
+      "title": "Checkout",
+      "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+      "n_words": 15
+    },
+    {
+      "page": 4,
+      "title": "Breakfast",
+      "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+      "n_words": 16
+    },
+    {
+      "page": 5,
+      "title": "Dinner",
+      "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+      "n_words": 16
+    },
+    {
+      "page": 6,
+      "title": "Swimming pool",
+      "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+      "n_words": 18
+    },
+    {
+      "page": 7,
+      "title": "Big bath",
+      "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.",
+      "n_words": 17
+    },
+    {
+      "page": 8,
+      "title": "Wi-Fi",
+      "text": "Free Wi-Fi works in every room. The password is printed on your room key card.",
+      "n_words": 15
+    },
+    {
+      "page": 9,
+      "title": "Parking",
+      "text": "The parking lot is next to the hotel. Parking costs 1,000 yen per night.",
+      "n_words": 14
+    },
+    {
+      "page": 10,
+      "title": "Towels",
+      "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+      "n_words": 16
+    },
+    {
+      "page": 11,
+      "title": "Bags",
+      "text": "We can keep your bags at the front desk before check-in and after checkout.",
+      "n_words": 14
+    },
+    {
+      "page": 12,
+      "title": "Lost and found",
+      "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+      "n_words": 15
+    }
+  ],
+  "old_page4": {
+    "page": 4,
+    "title": "Breakfast",
+    "text": "Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.",
+    "n_words": 16
+  },
+  "word_match": {
+    "questions": [
+      {
+        "id": "q1_breakfast",
+        "question": "What time is breakfast?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.2722,
+            "score_x100": 27,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+            "score": 0.2718,
+            "score_x100": 27,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "breakfast"
+            ]
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.2598,
+            "score_x100": 26,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: What time is breakfast?\nCard 1 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 2 (Page 4): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 3 (Checkout): Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+        "page_used": 3
+      },
+      {
+        "id": "q2_checkout",
+        "question": "What time is checkout?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.5909,
+            "score_x100": 59,
+            "question_words_kept": [
+              "time",
+              "checkout"
+            ],
+            "question_words_known": [
+              "time",
+              "checkout"
+            ],
+            "shared_words": [
+              "checkout",
+              "time"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.3634,
+            "score_x100": 36,
+            "question_words_kept": [
+              "time",
+              "checkout"
+            ],
+            "question_words_known": [
+              "time",
+              "checkout"
+            ],
+            "shared_words": [
+              "checkout"
+            ]
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.282,
+            "score_x100": 28,
+            "question_words_kept": [
+              "time",
+              "checkout"
+            ],
+            "question_words_known": [
+              "time",
+              "checkout"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: What time is checkout?\nCard 1 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 2 (Page 11): We can keep your bags at the front desk before check-in and after checkout.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 3 (Checkout): Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+        "page_used": 3
+      },
+      {
+        "id": "q3_pool",
+        "question": "Is there a swimming pool?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 6,
+            "title": "Swimming pool",
+            "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+            "score": 0.5142,
+            "score_x100": 51,
+            "question_words_kept": [
+              "swimming",
+              "pool"
+            ],
+            "question_words_known": [
+              "swimming",
+              "pool"
+            ],
+            "shared_words": [
+              "pool",
+              "swimming"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 12,
+            "title": "Lost and found",
+            "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "swimming",
+              "pool"
+            ],
+            "question_words_known": [
+              "swimming",
+              "pool"
+            ],
+            "shared_words": []
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "swimming",
+              "pool"
+            ],
+            "question_words_known": [
+              "swimming",
+              "pool"
+            ],
+            "shared_words": []
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: Is there a swimming pool?\nCard 1 (Page 6): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.\nCard 2 (Page 12): If you lose something, ask the front desk. We keep lost things for one month.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "According to Page 6 (Swimming pool): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+        "page_used": 6
+      },
+      {
+        "id": "q4_parking",
+        "question": "Where can I park my car?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 12,
+            "title": "Lost and found",
+            "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "park",
+              "car"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 2,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "park",
+              "car"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "park",
+              "car"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: Where can I park my car?\nCard 1 (Page 12): If you lose something, ask the front desk. We keep lost things for one month.\nCard 2 (Page 11): We can keep your bags at the front desk before check-in and after checkout.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "I don't know. I found no card with a score over the line. Please ask a hotel staff member.",
+        "page_used": null
+      },
+      {
+        "id": "q5_dog",
+        "question": "Can I bring my dog?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 12,
+            "title": "Lost and found",
+            "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 2,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: Can I bring my dog?\nCard 1 (Page 12): If you lose something, ask the front desk. We keep lost things for one month.\nCard 2 (Page 11): We can keep your bags at the front desk before check-in and after checkout.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "I don't know. I found no card with a score over the line. Please ask a hotel staff member.",
+        "page_used": null
+      },
+      {
+        "id": "q6_swim",
+        "question": "What time can I swim?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.4178,
+            "score_x100": 42,
+            "question_words_kept": [
+              "time",
+              "swim"
+            ],
+            "question_words_known": [
+              "time"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.3988,
+            "score_x100": 40,
+            "question_words_kept": [
+              "time",
+              "swim"
+            ],
+            "question_words_known": [
+              "time"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          },
+          {
+            "rank": 3,
+            "page": 12,
+            "title": "Lost and found",
+            "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "time",
+              "swim"
+            ],
+            "question_words_known": [
+              "time"
+            ],
+            "shared_words": []
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: What time can I swim?\nCard 1 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 2 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.\nCard 3 (Page 12): If you lose something, ask the front desk. We keep lost things for one month.",
+        "template_answer": "According to Page 3 (Checkout): Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+        "page_used": 3
+      },
+      {
+        "id": "q7_two_meals",
+        "question": "What time are breakfast and dinner?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 5,
+            "title": "Dinner",
+            "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+            "score": 0.2257,
+            "score_x100": 23,
+            "question_words_kept": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "shared_words": [
+              "dinner"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.2169,
+            "score_x100": 22,
+            "question_words_kept": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          },
+          {
+            "rank": 3,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+            "score": 0.2166,
+            "score_x100": 22,
+            "question_words_kept": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast",
+              "dinner"
+            ],
+            "shared_words": [
+              "breakfast"
+            ]
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: What time are breakfast and dinner?\nCard 1 (Page 5): Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.\nCard 2 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 3 (Page 4): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+        "template_answer": "According to Page 5 (Dinner): Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+        "page_used": 5
+      }
+    ],
+    "experiment_old_page4": {
+      "what": "Page 4 swapped for the OLD breakfast card (7:00-10:00). Nothing retrained.",
+      "result": {
+        "id": "q1_breakfast",
+        "question": "What time is breakfast?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.",
+            "score": 0.3151,
+            "score_x100": 32,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "breakfast"
+            ]
+          },
+          {
+            "rank": 2,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.2743,
+            "score_x100": 27,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.2616,
+            "score_x100": 26,
+            "question_words_kept": [
+              "time",
+              "breakfast"
+            ],
+            "question_words_known": [
+              "time",
+              "breakfast"
+            ],
+            "shared_words": [
+              "time"
+            ]
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: What time is breakfast?\nCard 1 (Page 4): Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.\nCard 2 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 4 (Breakfast): Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.",
+        "page_used": 4
+      }
+    },
+    "experiment_add_page13": {
+      "what": "New Page 13 (pets) added to the cards. Nothing retrained.",
+      "new_card": {
+        "page": 13,
+        "title": "Pets",
+        "text": "Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk."
+      },
+      "result": {
+        "id": "q5_dog",
+        "question": "Can I bring my dog?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 13,
+            "title": "Pets",
+            "text": "Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 2,
+            "page": 12,
+            "title": "Lost and found",
+            "text": "If you lose something, ask the front desk. We keep lost things for one month.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          },
+          {
+            "rank": 3,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.0,
+            "score_x100": 0,
+            "question_words_kept": [
+              "bring",
+              "dog"
+            ],
+            "question_words_known": [],
+            "shared_words": []
+          }
+        ],
+        "threshold": 0.1,
+        "combined_input_for_a_generator": "Question: Can I bring my dog?\nCard 1 (Page 13): Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk.\nCard 2 (Page 12): If you lose something, ask the front desk. We keep lost things for one month.\nCard 3 (Page 11): We can keep your bags at the front desk before check-in and after checkout.",
+        "template_answer": "I don't know. I found no card with a score over the line. Please ask a hotel staff member.",
+        "page_used": null
+      }
+    },
+    "experiment_one_big_card": {
+      "what": "Whole handbook as ONE card (word_match), question q1",
+      "n_words": 186,
+      "result": [
+        {
+          "rank": 1,
+          "page": 0,
+          "title": "Whole handbook",
+          "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything. Check-in time starts at 3:00 PM. Please tell us your name at the front desk. Checkout time is 11:00 AM. Please give your room key back to the front desk. Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor. Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor. The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer. The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM. Free Wi-Fi works in every room. The password is printed on your room key card. The parking lot is next to the hotel. Parking costs 1,000 yen per night. Extra towels and pillows are free. Call the front desk from the phone in your room. We can keep your bags at the front desk before check-in and after checkout. If you lose something, ask the front desk. We keep lost things for one month.",
+          "score": 0.1321,
+          "score_x100": 13,
+          "question_words_kept": [
+            "time",
+            "breakfast"
+          ],
+          "question_words_known": [
+            "time",
+            "breakfast"
+          ],
+          "shared_words": [
+            "breakfast",
+            "time"
+          ]
+        }
+      ]
+    },
+    "word_rarity": [
+      {
+        "word": "desk",
+        "cards_with_word": [
+          1,
+          2,
+          3,
+          10,
+          11,
+          12
+        ],
+        "idf_weight": 1.619
+      },
+      {
+        "word": "room",
+        "cards_with_word": [
+          3,
+          8,
+          10
+        ],
+        "idf_weight": 2.179
+      },
+      {
+        "word": "time",
+        "cards_with_word": [
+          2,
+          3
+        ],
+        "idf_weight": 2.466
+      },
+      {
+        "word": "checkout",
+        "cards_with_word": [
+          3,
+          11
+        ],
+        "idf_weight": 2.466
+      },
+      {
+        "word": "breakfast",
+        "cards_with_word": [
+          4
+        ],
+        "idf_weight": 2.872
+      },
+      {
+        "word": "swimming",
+        "cards_with_word": [
+          6
+        ],
+        "idf_weight": 2.872
+      },
+      {
+        "word": "pool",
+        "cards_with_word": [
+          6
+        ],
+        "idf_weight": 2.872
+      }
+    ],
+    "important_words_per_card": {
+      "1": [
+        "welcome",
+        "hotel",
+        "hoshi",
+        "desk",
+        "open",
+        "24",
+        "hours",
+        "ask"
+      ],
+      "2": [
+        "check",
+        "time",
+        "starts",
+        "00",
+        "pm",
+        "tell",
+        "desk"
+      ],
+      "3": [
+        "checkout",
+        "time",
+        "11",
+        "00",
+        "room",
+        "key",
+        "desk"
+      ],
+      "4": [
+        "breakfast",
+        "served",
+        "30",
+        "30",
+        "restaurant",
+        "2nd",
+        "floor"
+      ],
+      "5": [
+        "dinner",
+        "served",
+        "00",
+        "pm",
+        "00",
+        "pm",
+        "restaurant",
+        "2nd",
+        "floor"
+      ],
+      "6": [
+        "swimming",
+        "pool",
+        "roof",
+        "open",
+        "10",
+        "00",
+        "00",
+        "pm",
+        "summer"
+      ],
+      "7": [
+        "big",
+        "bath",
+        "1st",
+        "floor",
+        "open",
+        "00",
+        "pm",
+        "11",
+        "00",
+        "pm"
+      ],
+      "8": [
+        "free",
+        "wi",
+        "fi",
+        "works",
+        "room",
+        "password",
+        "printed",
+        "room",
+        "key",
+        "card"
+      ],
+      "9": [
+        "parking",
+        "lot",
+        "hotel",
+        "parking",
+        "costs",
+        "000",
+        "yen",
+        "night"
+      ],
+      "10": [
+        "extra",
+        "towels",
+        "pillows",
+        "free",
+        "desk",
+        "phone",
+        "room"
+      ],
+      "11": [
+        "bags",
+        "desk",
+        "check",
+        "checkout"
+      ],
+      "12": [
+        "lose",
+        "ask",
+        "desk",
+        "lost",
+        "things",
+        "month"
+      ]
+    },
+    "card_word_shares": {
+      "1": {
+        "24": 0.396,
+        "hoshi": 0.396,
+        "hours": 0.396,
+        "welcome": 0.396,
+        "ask": 0.34,
+        "hotel": 0.34,
+        "open": 0.301,
+        "desk": 0.223
+      },
+      "2": {
+        "starts": 0.464,
+        "tell": 0.464,
+        "check": 0.399,
+        "time": 0.399,
+        "pm": 0.316,
+        "00": 0.287,
+        "desk": 0.262
+      },
+      "3": {
+        "11": 0.418,
+        "checkout": 0.418,
+        "key": 0.418,
+        "time": 0.418,
+        "room": 0.369,
+        "00": 0.3,
+        "desk": 0.274
+      },
+      "4": {
+        "30": 0.717,
+        "breakfast": 0.358,
+        "2nd": 0.308,
+        "restaurant": 0.308,
+        "served": 0.308,
+        "floor": 0.272
+      },
+      "5": {
+        "pm": 0.509,
+        "00": 0.461,
+        "dinner": 0.374,
+        "2nd": 0.321,
+        "restaurant": 0.321,
+        "served": 0.321,
+        "floor": 0.283
+      },
+      "6": {
+        "00": 0.449,
+        "10": 0.364,
+        "pool": 0.364,
+        "roof": 0.364,
+        "summer": 0.364,
+        "swimming": 0.364,
+        "open": 0.276,
+        "pm": 0.248
+      },
+      "7": {
+        "pm": 0.474,
+        "00": 0.429,
+        "1st": 0.348,
+        "bath": 0.348,
+        "big": 0.348,
+        "11": 0.299,
+        "floor": 0.264,
+        "open": 0.264
+      },
+      "8": {
+        "room": 0.485,
+        "card": 0.32,
+        "fi": 0.32,
+        "password": 0.32,
+        "printed": 0.32,
+        "wi": 0.32,
+        "works": 0.32,
+        "free": 0.275,
+        "key": 0.275
+      },
+      "9": {
+        "parking": 0.641,
+        "000": 0.32,
+        "costs": 0.32,
+        "lot": 0.32,
+        "night": 0.32,
+        "yen": 0.32,
+        "hotel": 0.275
+      },
+      "10": {
+        "extra": 0.421,
+        "phone": 0.421,
+        "pillows": 0.421,
+        "towels": 0.421,
+        "free": 0.362,
+        "room": 0.32,
+        "desk": 0.238
+      },
+      "11": {
+        "bags": 0.598,
+        "check": 0.514,
+        "checkout": 0.514,
+        "desk": 0.337
+      },
+      "12": {
+        "lose": 0.445,
+        "lost": 0.445,
+        "month": 0.445,
+        "things": 0.445,
+        "ask": 0.382,
+        "desk": 0.251
+      }
+    },
+    "question_word_shares": {
+      "q1_breakfast": {
+        "breakfast": 0.759,
+        "time": 0.652
+      },
+      "q2_checkout": {
+        "checkout": 0.707,
+        "time": 0.707
+      },
+      "q3_pool": {
+        "pool": 0.707,
+        "swimming": 0.707
+      },
+      "q4_parking": {},
+      "q5_dog": {},
+      "q6_swim": {
+        "time": 1.0
+      },
+      "q7_two_meals": {
+        "breakfast": 0.604,
+        "dinner": 0.604,
+        "time": 0.519
+      }
+    },
+    "cards_per_word": {
+      "00": 5,
+      "000": 1,
+      "10": 1,
+      "11": 2,
+      "1st": 1,
+      "24": 1,
+      "2nd": 2,
+      "30": 1,
+      "ask": 2,
+      "bags": 1,
+      "bath": 1,
+      "big": 1,
+      "breakfast": 1,
+      "card": 1,
+      "check": 2,
+      "checkout": 2,
+      "costs": 1,
+      "desk": 6,
+      "dinner": 1,
+      "extra": 1,
+      "fi": 1,
+      "floor": 3,
+      "free": 2,
+      "hoshi": 1,
+      "hotel": 2,
+      "hours": 1,
+      "key": 2,
+      "lose": 1,
+      "lost": 1,
+      "lot": 1,
+      "month": 1,
+      "night": 1,
+      "open": 3,
+      "parking": 1,
+      "password": 1,
+      "phone": 1,
+      "pillows": 1,
+      "pm": 4,
+      "pool": 1,
+      "printed": 1,
+      "restaurant": 2,
+      "roof": 1,
+      "room": 3,
+      "served": 2,
+      "starts": 1,
+      "summer": 1,
+      "swimming": 1,
+      "tell": 1,
+      "things": 1,
+      "time": 2,
+      "towels": 1,
+      "welcome": 1,
+      "wi": 1,
+      "works": 1,
+      "yen": 1
+    }
+  },
+  "meaning": {
+    "questions": [
+      {
+        "id": "q1_breakfast",
+        "question": "What time is breakfast?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+            "score": 0.7364,
+            "score_x100": 74
+          },
+          {
+            "rank": 2,
+            "page": 5,
+            "title": "Dinner",
+            "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+            "score": 0.4724,
+            "score_x100": 47
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.4546,
+            "score_x100": 45
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: What time is breakfast?\nCard 1 (Page 4): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.\nCard 2 (Page 5): Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 4 (Breakfast): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+        "page_used": 4
+      },
+      {
+        "id": "q2_checkout",
+        "question": "What time is checkout?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 3,
+            "title": "Checkout",
+            "text": "Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+            "score": 0.6902,
+            "score_x100": 69
+          },
+          {
+            "rank": 2,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.5604,
+            "score_x100": 56
+          },
+          {
+            "rank": 3,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+            "score": 0.4722,
+            "score_x100": 47
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: What time is checkout?\nCard 1 (Page 3): Checkout time is 11:00 AM. Please give your room key back to the front desk.\nCard 2 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.\nCard 3 (Page 4): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+        "template_answer": "According to Page 3 (Checkout): Checkout time is 11:00 AM. Please give your room key back to the front desk.",
+        "page_used": 3
+      },
+      {
+        "id": "q3_pool",
+        "question": "Is there a swimming pool?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 6,
+            "title": "Swimming pool",
+            "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+            "score": 0.5415,
+            "score_x100": 54
+          },
+          {
+            "rank": 2,
+            "page": 7,
+            "title": "Big bath",
+            "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.",
+            "score": 0.263,
+            "score_x100": 26
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.2466,
+            "score_x100": 25
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: Is there a swimming pool?\nCard 1 (Page 6): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.\nCard 2 (Page 7): The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "According to Page 6 (Swimming pool): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+        "page_used": 6
+      },
+      {
+        "id": "q4_parking",
+        "question": "Where can I park my car?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 9,
+            "title": "Parking",
+            "text": "The parking lot is next to the hotel. Parking costs 1,000 yen per night.",
+            "score": 0.4483,
+            "score_x100": 45
+          },
+          {
+            "rank": 2,
+            "page": 6,
+            "title": "Swimming pool",
+            "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+            "score": 0.2286,
+            "score_x100": 23
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.1973,
+            "score_x100": 20
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: Where can I park my car?\nCard 1 (Page 9): The parking lot is next to the hotel. Parking costs 1,000 yen per night.\nCard 2 (Page 6): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "According to Page 9 (Parking): The parking lot is next to the hotel. Parking costs 1,000 yen per night.",
+        "page_used": 9
+      },
+      {
+        "id": "q5_dog",
+        "question": "Can I bring my dog?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 1,
+            "title": "Welcome",
+            "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.",
+            "score": 0.192,
+            "score_x100": 19
+          },
+          {
+            "rank": 2,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.1856,
+            "score_x100": 19
+          },
+          {
+            "rank": 3,
+            "page": 10,
+            "title": "Towels",
+            "text": "Extra towels and pillows are free. Call the front desk from the phone in your room.",
+            "score": 0.1794,
+            "score_x100": 18
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: Can I bring my dog?\nCard 1 (Page 1): Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.\nCard 2 (Page 11): We can keep your bags at the front desk before check-in and after checkout.\nCard 3 (Page 10): Extra towels and pillows are free. Call the front desk from the phone in your room.",
+        "template_answer": "I don't know. I found no card with a score over the line. Please ask a hotel staff member.",
+        "page_used": null
+      },
+      {
+        "id": "q6_swim",
+        "question": "What time can I swim?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 6,
+            "title": "Swimming pool",
+            "text": "The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+            "score": 0.5899,
+            "score_x100": 59
+          },
+          {
+            "rank": 2,
+            "page": 7,
+            "title": "Big bath",
+            "text": "The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.",
+            "score": 0.3811,
+            "score_x100": 38
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.3293,
+            "score_x100": 33
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: What time can I swim?\nCard 1 (Page 6): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.\nCard 2 (Page 7): The big bath is on the 1st floor. It is open from 5:00 PM to 11:00 PM.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 6 (Swimming pool): The swimming pool is on the roof. It is open from 10:00 AM to 6:00 PM in summer.",
+        "page_used": 6
+      },
+      {
+        "id": "q7_two_meals",
+        "question": "What time are breakfast and dinner?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+            "score": 0.7235,
+            "score_x100": 72
+          },
+          {
+            "rank": 2,
+            "page": 5,
+            "title": "Dinner",
+            "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+            "score": 0.6305,
+            "score_x100": 63
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.4171,
+            "score_x100": 42
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: What time are breakfast and dinner?\nCard 1 (Page 4): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.\nCard 2 (Page 5): Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 4 (Breakfast): Breakfast is served from 6:30 AM to 9:30 AM in the restaurant on the 2nd floor.",
+        "page_used": 4
+      }
+    ],
+    "experiment_old_page4": {
+      "what": "Page 4 swapped for the OLD breakfast card (7:00-10:00). Nothing retrained.",
+      "result": {
+        "id": "q1_breakfast",
+        "question": "What time is breakfast?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 4,
+            "title": "Breakfast",
+            "text": "Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.",
+            "score": 0.7058,
+            "score_x100": 71
+          },
+          {
+            "rank": 2,
+            "page": 5,
+            "title": "Dinner",
+            "text": "Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.",
+            "score": 0.4724,
+            "score_x100": 47
+          },
+          {
+            "rank": 3,
+            "page": 2,
+            "title": "Check-in",
+            "text": "Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+            "score": 0.4546,
+            "score_x100": 45
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: What time is breakfast?\nCard 1 (Page 4): Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.\nCard 2 (Page 5): Dinner is served from 6:00 PM to 9:00 PM in the restaurant on the 2nd floor.\nCard 3 (Page 2): Check-in time starts at 3:00 PM. Please tell us your name at the front desk.",
+        "template_answer": "According to Page 4 (Breakfast): Breakfast is served from 7:00 AM to 10:00 AM in the restaurant on the 2nd floor.",
+        "page_used": 4
+      }
+    },
+    "experiment_add_page13": {
+      "what": "New Page 13 (pets) added to the cards. Nothing retrained.",
+      "new_card": {
+        "page": 13,
+        "title": "Pets",
+        "text": "Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk."
+      },
+      "result": {
+        "id": "q5_dog",
+        "question": "Can I bring my dog?",
+        "top3": [
+          {
+            "rank": 1,
+            "page": 13,
+            "title": "Pets",
+            "text": "Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk.",
+            "score": 0.3678,
+            "score_x100": 37
+          },
+          {
+            "rank": 2,
+            "page": 1,
+            "title": "Welcome",
+            "text": "Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.",
+            "score": 0.192,
+            "score_x100": 19
+          },
+          {
+            "rank": 3,
+            "page": 11,
+            "title": "Bags",
+            "text": "We can keep your bags at the front desk before check-in and after checkout.",
+            "score": 0.1856,
+            "score_x100": 19
+          }
+        ],
+        "threshold": 0.3,
+        "combined_input_for_a_generator": "Question: Can I bring my dog?\nCard 1 (Page 13): Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk.\nCard 2 (Page 1): Welcome to Hotel Hoshi. The front desk is open 24 hours. Please ask us anything.\nCard 3 (Page 11): We can keep your bags at the front desk before check-in and after checkout.",
+        "template_answer": "According to Page 13 (Pets): Small dogs and cats may stay in rooms on the 3rd floor. Please tell the front desk.",
+        "page_used": 13
+      }
+    },
+    "address_info": {
+      "numbers_per_address": 384,
+      "page4_first5": [
+        -0.02,
+        0.015,
+        0.004,
+        0.018,
+        -0.042
+      ],
+      "q1_first5": [
+        -0.027,
+        0.083,
+        0.02,
+        0.018,
+        0.019
+      ],
+      "note": "an 'address' = the normalized embedding vector; closeness score = cosine"
+    },
+    "card_pair_closeness": [
+      {
+        "pages": [
+          6,
+          7
+        ],
+        "score": 0.4788,
+        "score_x100": 48
+      },
+      {
+        "pages": [
+          4,
+          5
+        ],
+        "score": 0.8324,
+        "score_x100": 83
+      },
+      {
+        "pages": [
+          2,
+          3
+        ],
+        "score": 0.6807,
+        "score_x100": 68
+      },
+      {
+        "pages": [
+          6,
+          3
+        ],
+        "score": 0.2009,
+        "score_x100": 20
+      },
+      {
+        "pages": [
+          4,
+          9
+        ],
+        "score": 0.1652,
+        "score_x100": 17
+      }
+    ]
+  }
+}

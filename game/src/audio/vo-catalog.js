@@ -1,3 +1,4 @@
+import embedManifest from "./embed-vo-manifest.json";
 import manifest from "./vo-manifest.json";
 import ragManifest from "./rag-vo-manifest.json";
 
@@ -11,7 +12,7 @@ function clipOf(lang, key, hash, folder) {
 export function voCacheKey(lang, id) {
   if (!id) return null;
   const key = `${id}.vo`;
-  const hash = manifest?.[lang]?.[key] || ragManifest?.[lang]?.[key];
+  const hash = manifest?.[lang]?.[key] || ragManifest?.[lang]?.[key] || embedManifest?.[lang]?.[key];
   if (!hash) return null;
   return `vo:${lang}:${key}:${hash}`;
 }
@@ -26,6 +27,10 @@ export function eachVoClip() {
     for (const [key, hash] of Object.entries(ragManifest[lang] || {})) {
       if (typeof hash !== "string" || !/^[0-9a-f]{12}$/.test(hash)) continue;
       clips.push(clipOf(lang, key, hash, "vo-rag"));
+    }
+    for (const [key, hash] of Object.entries(embedManifest[lang] || {})) {
+      if (typeof hash !== "string" || !/^[0-9a-f]{12}$/.test(hash)) continue;
+      clips.push(clipOf(lang, key, hash, "vo-embed"));
     }
   }
   return clips;

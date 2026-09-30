@@ -2,17 +2,21 @@
  * Every visible string key exists in both zh and ja, nothing is empty,
  * and every skeleton page points only at keys that exist.
  */
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JA } from "../src/i18n/ja.js";
 import { PAGES } from "../src/i18n/skeleton.js";
 import { ZH } from "../src/i18n/zh.js";
+import { EMBED_JA } from "../src/i18n/embed/ja.js";
+import { EMBED_END, EMBED_PAGES, EMBED_TITLE } from "../src/i18n/embed/skeleton.js";
+import { EMBED_ZH } from "../src/i18n/embed/zh.js";
 import { RAG_JA } from "../src/i18n/rag/ja.js";
 import { RAG_END, RAG_PAGES, RAG_TITLE } from "../src/i18n/rag/skeleton.js";
 import { RAG_ZH } from "../src/i18n/rag/zh.js";
 import { END_BEAT, TITLE_BEAT } from "../src/data/lessons.js";
-import { checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
+import { checkEmbedVoFiles, checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
 
 const BANNED = [
   "纸带",
@@ -176,17 +180,34 @@ function checkRagPack() {
   if (cite("r5-p5", "ja")?.line !== enIdk) fail("rag ja cite is not the json template");
   if (cite("r3-p4", "zh")?.kind === cite("r3-p4", "ja")?.kind) fail("r3-p4 pictures must differ by locale");
   if (cite("r5-p1", "zh")?.kind === cite("r5-p1", "ja")?.kind) fail("r5-p1 pictures must differ by locale");
-  if (cite("r5-p4", "zh")?.meaningLine !== 30 || cite("r5-p4", "zh")?.wordLine !== 10) fail("zh threshold lines");
-  if (cite("r5-p4", "ja")?.meaningLine !== 30 || cite("r5-p4", "ja")?.wordLine !== 10) fail("ja threshold lines");
-  if (en.settings.no_card_threshold.word_match !== 0.1 || en.settings.no_card_threshold.meaning !== 0.3) {
+  const enLine = Math.round(en.settings.no_card_threshold.meaning * 100);
+  const zhLine = Math.round(zh.settings.no_card_threshold.meaning * 100);
+  if (cite("r5-p4", "zh")?.meaningLine !== zhLine || cite("r5-p4", "zh")?.wordLine !== 10) fail("zh threshold lines");
+  if (cite("r5-p4", "ja")?.meaningLine !== enLine || cite("r5-p4", "ja")?.wordLine !== 10) fail("ja threshold lines");
+  if (enLine !== 20 || zhLine !== 30) fail(`locale lines ja=${enLine} zh=${zhLine}`);
+  if (en.settings.no_card_threshold.word_match !== 0.1 || en.settings.no_card_threshold.meaning !== 0.2) {
     fail("en thresholds drifted");
   }
   if (zh.settings.no_card_threshold.word_match !== 0.1 || zh.settings.no_card_threshold.meaning !== 0.3) {
     fail("zh thresholds drifted");
   }
+  if (en.settings.threshold_check_en?.threshold_used_separates !== true) fail("en line does not separate");
+  const jaKid = Object.values(RAG_JA).join("\n");
+  if (/(?<![\d.:])30てん/.test(jaKid)) fail("ja rag still says 30てん");
+  for (const needle of ["20てん", "57てん", "36てん", "19てん", "81てん", "27てん"]) {
+    if (!jaKid.includes(needle)) fail(`ja rag missing ${needle}`);
+  }
+  const pool = cite("r4-p9", "ja");
+  const poolScores = (pool?.items || []).map((item) => item.score).join(",");
+  const poolJson = en.meaning.questions.find((item) => item.id === "q3_pool").top3.map((row) => row.score_x100).join(",");
+  if (pool?.kind !== "bars" || poolScores !== poolJson) fail(`ja pool picture ${poolScores} != ${poolJson}`);
+  const verified = spawnSync("python3", ["verify_ja_scores.py"], { cwd: join(root, "rag"), encoding: "utf8" });
+  if (verified.status !== 0) fail(verified.stdout || verified.stderr || "verify_ja_scores.py");
   const allowedFor = (data) => {
     const allowed = scoreSet(data);
     allowed.add(0);
+    allowed.add(Math.round(data.settings.no_card_threshold.word_match * 100));
+    allowed.add(Math.round(data.settings.no_card_threshold.meaning * 100));
     allowed.add(10);
     allowed.add(30);
     allowed.add(384);
@@ -224,14 +245,124 @@ function checkRagPack() {
   return ragZh.size;
 }
 
+function embedPointSet(data) {
+  const pts = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 20, 30, 50, 100, 384, 45, 70, 71, 74, 80, 83]);
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (typeof node.points === "number") pts.add(node.points);
+    if (typeof node.score_x100 === "number") pts.add(node.score_x100);
+    for (const value of Object.values(node)) walk(value);
+  };
+  walk(data);
+  for (const matrix of Object.values(data.similarity_matrix || {})) {
+    for (const row of Object.values(matrix)) {
+      if (!row || typeof row !== "object") continue;
+      for (const value of Object.values(row)) {
+        if (typeof value === "number") pts.add(Math.round(value * 100));
+      }
+    }
+  }
+  return pts;
+}
+
+function checkEmbedPack() {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
+  const data = JSON.parse(readFileSync(join(root, "embed/demo/results.json"), "utf8"));
+  const ragZh = JSON.parse(readFileSync(join(root, "rag/demo/results_zh.json"), "utf8"));
+  const ragEn = JSON.parse(readFileSync(join(root, "rag/demo/results.json"), "utf8"));
+  const allowed = embedPointSet(data);
+  embedPointSet(ragZh).forEach((n) => allowed.add(n));
+  embedPointSet(ragEn).forEach((n) => allowed.add(n));
+  allowed.add(Math.round(ragEn.settings.no_card_threshold.meaning * 100));
+  allowed.add(Math.round(ragZh.settings.no_card_threshold.meaning * 100));
+  const embedZh = new Set(Object.keys(EMBED_ZH));
+  const embedJa = new Set(Object.keys(EMBED_JA));
+  for (const key of embedZh) {
+    if (!embedJa.has(key)) fail(`missing embed ja key ${key}`);
+  }
+  for (const key of embedJa) {
+    if (!embedZh.has(key)) fail(`missing embed zh key ${key}`);
+  }
+  for (const [key, value] of Object.entries(EMBED_ZH)) {
+    if (typeof value !== "string" || !value.trim()) fail(`empty embed zh ${key}`);
+    if (value.includes("`") || value.includes("【") || value.includes("】") || value.includes("→")) fail(`embed zh marker ${key}`);
+    if (/\n+---\s*$/.test(value)) fail(`embed zh trailing rule ${key}`);
+  }
+  for (const [key, value] of Object.entries(EMBED_JA)) {
+    if (typeof value !== "string" || !value.trim()) fail(`empty embed ja ${key}`);
+    if (value.includes("`") || value.includes("【") || value.includes("】") || value.includes("→")) fail(`embed ja marker ${key}`);
+    if (/\n+---\s*$/.test(value)) fail(`embed ja trailing rule ${key}`);
+    for (const n of [45, 71, 83, 37]) {
+      if (new RegExp(`(?<!\\d)${n}\\s*てん`).test(value)) fail(`embed ja old rag score ${key} ${n}`);
+    }
+    if (key.endsWith(".look") || key.endsWith(".talk") || key.endsWith(".vo")) {
+      if (value.includes("はかりなお") || value.includes("RAG の 本の 人") || value.includes("べつの 人")) {
+        fail(`embed ja remeasure ${key}`);
+      }
+    }
+  }
+  const counts = [1, 2, 3, 4, 5].map((chapter) => EMBED_PAGES.filter((page) => page.chapter === chapter).length);
+  if (counts.join(",") !== "8,8,8,8,8") fail(`embed page counts ${counts.join(",")}`);
+  const pages = [...EMBED_PAGES, EMBED_TITLE, EMBED_END];
+  for (const page of pages) {
+    if (page.course !== "embed") fail(`${page.id} course`);
+    for (const key of Object.values(page.keys || {})) {
+      if (!embedZh.has(key) || !embedJa.has(key)) fail(`${page.id} references missing embed key ${key}`);
+    }
+    if (page.chapter && page.keys && !page.keys.talk && !/-(sum|rev)$/.test(page.id) && page.kind !== "intro") {
+      fail(`${page.id} missing talk key`);
+    }
+    if (String(page.id || "").startsWith("e")) {
+      for (const suffix of ["does", "metaphor", "myth", "l1", "l2", "l3", "l4"]) {
+        const key = `pseudo.${page.id}.${suffix}`;
+        if (!embedZh.has(key) || !embedJa.has(key)) fail(`missing embed pseudo ${key}`);
+      }
+    }
+  }
+  const visit = (page, loc, node, path) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => visit(page, loc, item, `${path}[${index}]`));
+      return;
+    }
+    if (!node || typeof node !== "object") return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === "kind" || key === "mapKey" || key === "word" || key === "label" || key === "a" || key === "b" || key === "aLabel" || key === "bLabel" || key === "name" || key === "title") continue;
+      if (typeof value === "number" && !allowed.has(value)) fail(`${page.id} ${loc} ${path}.${key}=${value} is not in results.json`);
+      else if (value && typeof value === "object") visit(page, loc, value, `${path}.${key}`);
+    }
+  };
+  for (const page of EMBED_PAGES) {
+    visit(page, "zh", page.shared?.locales?.zh, "pic");
+    visit(page, "ja", page.shared?.locales?.ja, "pic");
+    if (!page.keys?.talk || !EMBED_ZH[page.keys.talk]) fail(`${page.id} talk`);
+  }
+  const zhPark = data.rag_link.parking_recomputed_here.zh.top3.map((row) => row.score_x100).join(",");
+  const ragPark = ragZh.meaning.questions.find((item) => item.id === "q4_parking").top3.map((row) => row.score_x100).join(",");
+  if (zhPark !== ragPark) fail(`embed zh parking ${zhPark} != rag ${ragPark}`);
+  const enPark = data.rag_link.parking_recomputed_here.en.top3.map((row) => row.score_x100).join(",");
+  const ragEnPark = ragEn.meaning.questions.find((item) => item.id === "q4_parking").top3.map((row) => row.score_x100).join(",");
+  if (enPark !== ragEnPark) fail(`embed ja parking ${enPark} != rag ${ragEnPark}`);
+  const jaEmbed = Object.values(EMBED_JA).join("\n");
+  const enLine = Math.round(ragEn.settings.no_card_threshold.meaning * 100);
+  if (!jaEmbed.includes(`RAG の 本の 線（${enLine}てん）`)) fail("embed ja missing rag line");
+  if (!jaEmbed.includes("81てん") || !jaEmbed.includes("70てん") || !jaEmbed.includes("72てん")) {
+    fail("embed ja missing quoted rag scores");
+  }
+  const enWord = data.rag_link.parking_recomputed_here?.en;
+  void enWord;
+  return embedZh.size;
+}
+
 const ragKeys = checkRagPack();
+const embedKeys = checkEmbedPack();
 
 for (const error of checkVoFiles()) fail(error);
 for (const error of checkRagVoFiles()) fail(error);
+for (const error of checkEmbedVoFiles()) fail(error);
 
 if (errors.length) {
   console.error("I18N_FAIL");
   for (const error of errors) console.error(error);
   process.exit(1);
 }
-console.log(`I18N_OK keys=${zhKeys.size} pages=${PAGES.length} ragKeys=${ragKeys} ragPages=${RAG_PAGES.length}`);
+console.log(`I18N_OK keys=${zhKeys.size} pages=${PAGES.length} ragKeys=${ragKeys} ragPages=${RAG_PAGES.length} embedKeys=${embedKeys} embedPages=${EMBED_PAGES.length}`);

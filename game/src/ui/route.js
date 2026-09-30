@@ -14,6 +14,13 @@ const LESSON_SCENES = new Set([
   "Rag3",
   "Rag4",
   "Rag5",
+  "EmbedTitle",
+  "EmbedEnd",
+  "Embed1",
+  "Embed2",
+  "Embed3",
+  "Embed4",
+  "Embed5",
 ]);
 const STORE_KEY = "nanogpt-lesson";
 

@@ -11,6 +11,9 @@ import EndScene from "./scenes/EndScene.js";
 import RagTitleScene from "./scenes/RagTitleScene.js";
 import RagEndScene from "./scenes/RagEndScene.js";
 import { Rag1Scene, Rag2Scene, Rag3Scene, Rag4Scene, Rag5Scene } from "./scenes/RagLevelScene.js";
+import EmbedTitleScene from "./scenes/EmbedTitleScene.js";
+import EmbedEndScene from "./scenes/EmbedEndScene.js";
+import { Embed1Scene, Embed2Scene, Embed3Scene, Embed4Scene, Embed5Scene } from "./scenes/EmbedLevelScene.js";
 import { applyMute, readMuted, unlockAudio } from "./audio/sound.js";
 import { JA } from "./i18n/ja.js";
 import { setLang, toggleLang } from "./i18n/locale.js";
@@ -28,6 +31,9 @@ import { cssViewportSize, displayRatio, gamePixelSize, syncRetinaCamera } from "
 import { readSafeInsets } from "./ui/layout.js";
 import { applyLayoutMode } from "./ui/mode.js";
 import { LEVEL1_BEATS, LEVEL2_BEATS, LEVEL3_BEATS, LEVEL4_BEATS, LEVEL5_BEATS, PHASE_COUNT } from "./data/beats.js";
+import { embedPagesFor } from "./i18n/embed/skeleton.js";
+import { EMBED_JA } from "./i18n/embed/ja.js";
+import { EMBED_ZH } from "./i18n/embed/zh.js";
 import { ragPagesFor } from "./i18n/rag/skeleton.js";
 import { RAG_JA } from "./i18n/rag/ja.js";
 import { RAG_ZH } from "./i18n/rag/zh.js";
@@ -82,6 +88,13 @@ const config = {
     Rag4Scene,
     Rag5Scene,
     RagEndScene,
+    EmbedTitleScene,
+    Embed1Scene,
+    Embed2Scene,
+    Embed3Scene,
+    Embed4Scene,
+    Embed5Scene,
+    EmbedEndScene,
   ],
 };
 
@@ -138,9 +151,9 @@ function fontSample(...packs) {
 
 async function boot() {
   if (document.fonts?.ready) {
-    const zhSample = fontSample(ZH, RAG_ZH);
-    const jaSample = fontSample(JA, RAG_JA);
-    const both = fontSample(ZH, JA, RAG_ZH, RAG_JA);
+    const zhSample = fontSample(ZH, RAG_ZH, EMBED_ZH);
+    const jaSample = fontSample(JA, RAG_JA, EMBED_JA);
+    const both = fontSample(ZH, JA, RAG_ZH, RAG_JA, EMBED_ZH, EMBED_JA);
     const loads = document.fonts.load
       ? [
           document.fonts.load('700 32px "Noto Sans JP"', jaSample),
@@ -214,7 +227,7 @@ async function boot() {
     if (!scene || scene.sys.settings.key === "Boot") return;
     game.registry.set("forceSpeak", true);
     const key = scene.sys.settings.key;
-    if (/^(Level|Rag)[1-5]$/.test(key)) {
+    if (/^(Level|Rag|Embed)[1-5]$/.test(key)) {
       const payload = { beat: scene.beat || 0, phase: scene.phase || 0 };
       game.registry.set(`${key.toLowerCase()}.progress`, payload);
       scene.scene.restart(payload);
@@ -279,6 +292,15 @@ async function boot() {
     l3: ragPagesFor(3).length,
     l4: ragPagesFor(4).length,
     l5: ragPagesFor(5).length,
+    phases: PHASE_COUNT,
+  };
+
+  window.__nanoGPTEmbedSpine = {
+    l1: embedPagesFor(1).length,
+    l2: embedPagesFor(2).length,
+    l3: embedPagesFor(3).length,
+    l4: embedPagesFor(4).length,
+    l5: embedPagesFor(5).length,
     phases: PHASE_COUNT,
   };
 

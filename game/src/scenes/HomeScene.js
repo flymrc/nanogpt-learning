@@ -126,14 +126,29 @@ function hubUi(size, extra = {}) {
 
 /** Row width of the 1024×640 home (two cards + the 16px gap). Larger screens zoom that row. */
 const REF_ROW = 757;
-const REF_CARD_W = (REF_ROW - 16) / 2;
 const REF_CARD_H = 210;
+const HUB_GAP = 16;
+/** Narrowest plate that still holds a title, a blurb, and the enter badge. */
+const HUB_MIN_CARD_W = 220;
+
+function pickHubCols(v, count) {
+  const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
+  let cols = 1;
+  for (let next = Math.min(3, count); next >= 1; next -= 1) {
+    const cardW = (rowBudget - HUB_GAP * (next - 1)) / next;
+    if (cardW >= HUB_MIN_CARD_W) {
+      cols = next;
+      break;
+    }
+  }
+  return cols;
+}
 
 function layoutHub(v, top, bottom, count, blocks) {
-  const cols = v.innerW >= 720 ? Math.min(2, Math.max(1, count)) : 1;
+  const cols = pickHubCols(v, count);
   const rows = Math.ceil(count / Math.max(1, cols));
-  const gap = 16;
-  const cardGap = 16;
+  const gap = HUB_GAP;
+  const cardGap = HUB_GAP;
   const available = Math.max(120, bottom - top);
   const rowBudget = Math.max(160, v.innerW - 8 - STICKER_SHADOW_X);
   const measure = (s) => {
@@ -157,7 +172,7 @@ function layoutHub(v, top, bottom, count, blocks) {
     const titleH = Math.round(blocks.titleH * s);
     const introH = Math.round(blocks.introH * s);
     const cardH = REF_CARD_H * s;
-    const cardW = REF_CARD_W * s;
+    const cardW = (rowBudget - zoomGap * (cols - 1)) / cols;
     const cardsH = rows * cardH + (rows - 1) * zoomGap;
     const items = [
       { id: "title", h: titleH },
@@ -168,9 +183,10 @@ function layoutHub(v, top, bottom, count, blocks) {
     return { h: raw, items, gap: zoomGap, cardH, cardW, cardGap: zoomGap, cols, rows, titleSize };
   };
   const base = measure(1);
-  // Wide PC with two cards. A nearly square lesson (1920×1080) is still this
-  // row, not the phone stack. 390, 1024×522, and 1024×640 stay on measure(1).
-  const roomy = cols === 2 && v.w >= 700 && v.h >= 800 && base.h + 80 < available;
+  // Wide PC keeps one row of cards and zooms it. A nearly square lesson
+  // (1920×1080) is still this row, not the phone stack. 390 and the short
+  // 1024 viewports stay on measure(1).
+  const roomy = rows === 1 && cols >= 2 && v.w >= 700 && v.h >= 800 && base.h + 40 < available;
   const place = (chosen) => {
     const stacked = stackSlots(chosen.items, {
       top,
@@ -218,11 +234,27 @@ function fitLine(scene, str, maxW, size, min, styleFn) {
   return current;
 }
 
+function phraseSplit(source, body) {
+  const phrases = String(source ?? "").split(/\s+/).filter(Boolean).map((phrase) => [...phrase.replace(/\s+/g, "")]);
+  if (phrases.length < 2) return false;
+  const lines = String(body ?? "").split("\n").map((line) => [...line.replace(/\s+/g, "")]);
+  let pos = 0;
+  for (let i = 0; i < lines.length - 1; i += 1) {
+    pos += lines[i].length;
+    let acc = 0;
+    for (const phrase of phrases) {
+      if (pos > acc && pos < acc + phrase.length) return true;
+      acc += phrase.length;
+    }
+  }
+  return false;
+}
+
 function fitBlock(scene, str, maxW, maxH, size, min, styleFn) {
   let current = size;
   let body = wrapAtBreaks(scene, str, current, maxW, styleFn);
   const probe = scene.add.text(0, 0, body, styleFn(current)).setVisible(false);
-  const crowded = () => probe.width > maxW + 1 || probe.height > maxH || orphanLines(body).length > 0;
+  const crowded = () => probe.width > maxW + 1 || probe.height > maxH || orphanLines(body).length > 0 || phraseSplit(str, body);
   while (crowded() && current > min) {
     current -= 1;
     body = wrapAtBreaks(scene, str, current, maxW, styleFn);
@@ -251,56 +283,90 @@ function buildCard(scene, spec, x, y, w, h, scale = 1) {
   card.add(stripe);
 
   const pad = px(12);
-  const side = w >= 300 && h >= 148;
   const innerTop = -h / 2 + pad;
   const innerBottom = h / 2 - pad;
   const innerLeft = -w / 2 + px(22);
   const innerRight = w / 2 - pad;
   const columnH = Math.max(px(48), innerBottom - innerTop);
   const columnW = Math.max(px(80), innerRight - innerLeft);
-  const artH = side ? columnH : Math.round(Math.min(columnH * 0.46, px(112)));
-  const artW = side ? Math.round(Math.min(artH * 0.98, columnW * 0.46, px(168))) : columnW;
-  const art = {
-    x: innerLeft,
-    y: innerTop,
-    w: artW,
-    h: artH,
-  };
-
-  const textGap = px(side ? 12 : 8);
-  const textX = side ? art.x + art.w + px(12) : innerLeft;
-  const textRight = innerRight;
-  const textW = Math.max(px(72), textRight - textX);
+  const textGap = px(8);
   const titleBlurbGap = px(6);
   const blurbActionGap = px(8);
-  const titleBase = textW > px(210) ? 30 : side ? 24 : 22;
-  const blurbBase = textW > px(210) ? 18 : 16;
   const padX = Math.round(11 * u);
   const padY = Math.round(4 * u);
   const action = t(spec.actionKey);
-  let actionSize = fitLine(scene, action, Math.max(px(48), textW - padX * 2), font(16), 12, (size) => hubUi(size, { color: C.textDark }));
-  const actionText = scene.add.text(0, 0, action, hubUi(actionSize)).setOrigin(0, 0.5);
-  while (actionText.width + padX * 2 > textW + 0.5 && actionSize > 12) {
-    actionSize -= 1;
-    actionText.setFontSize(actionSize);
+  const titleKey = t(spec.titleKey);
+  const blurbKey = t(spec.blurbKey);
+
+  const measureAction = (textW) => {
+    let actionSize = fitLine(scene, action, Math.max(px(40), textW - padX * 2), font(16), 12, (size) => hubUi(size, { color: C.textDark }));
+    const probe = scene.add.text(0, 0, action, hubUi(actionSize)).setVisible(false);
+    while (probe.width + padX * 2 > textW + 0.5 && actionSize > 12) {
+      actionSize -= 1;
+      probe.setFontSize(actionSize);
+    }
+    const badgeW = Math.min(textW, Math.max(Math.round(64 * u), probe.width + padX * 2));
+    const badgeH = Math.max(Math.round(24 * u), probe.height + padY * 2);
+    probe.destroy();
+    return { actionSize, badgeW, badgeH };
+  };
+
+  const compose = (useSide, artHeight) => {
+    const aH = useSide ? columnH : artHeight;
+    const aW = useSide ? Math.round(Math.min(aH * 0.98, columnW * 0.42, px(168))) : columnW;
+    const tX = useSide ? innerLeft + aW + px(10) : innerLeft;
+    const tW = Math.max(px(64), innerRight - tX);
+    const titleBase = tW > px(210) ? 28 : useSide ? 22 : 20;
+    const blurbBase = tW > px(210) ? 16 : 15;
+    const act = measureAction(tW);
+    const actionSlot = Math.max(px(26), act.badgeH);
+    const textBudget = useSide ? columnH : Math.max(px(36), columnH - aH - textGap);
+    const room = Math.max(px(20), textBudget - actionSlot - blurbActionGap - titleBlurbGap);
+    const title = fitBlock(scene, titleKey, tW, Math.max(font(16), room * 0.58), font(titleBase), 12, hubDisplay);
+    const blurbMax = Math.max(font(14), room - title.height);
+    const blurb = fitBlock(scene, blurbKey, tW, blurbMax, font(blurbBase), 12, (size) => hubUi(size, { color: C.muted }));
+    const nextBlock = title.height + titleBlurbGap + blurb.height + blurbActionGap + actionSlot;
+    return { aW, aH, tX, tW, title, blurb, act, blockH: nextBlock, actionSlot };
+  };
+
+  let side = w >= 300 && h >= 168 && columnW >= 280;
+  let laid = side ? compose(true, columnH) : null;
+  // A side picture is only worth it when the words still fit a whole phrase.
+  // 「うけつけで 聞く」 must not break before the space.
+  if (!laid || laid.blockH > columnH + 1 || laid.tW < Math.max(px(72), font(22) * 6)) {
+    side = false;
+    const words = compose(false, px(28));
+    const minArt = Math.min(px(40), Math.max(px(28), columnH * 0.22));
+    let artHeight = columnH - textGap - words.blockH;
+    artHeight = Math.max(minArt, Math.min(artHeight, px(112), columnH * 0.5));
+    laid = compose(false, artHeight);
+    let guard = 0;
+    while (laid.aH + textGap + laid.blockH > columnH + 1 && artHeight > minArt + 0.5 && guard < 8) {
+      artHeight = Math.max(minArt, artHeight - px(8));
+      laid = compose(false, artHeight);
+      guard += 1;
+    }
   }
-  const badgeW = Math.max(Math.round(72 * u), actionText.width + padX * 2);
-  const badgeH = Math.max(Math.round(28 * u), actionText.height + padY * 2);
-  const actionSlot = Math.max(px(30), badgeH);
-  const textTop0 = side ? innerTop : art.y + art.h + textGap;
-  const columnTextH = Math.max(px(36), innerBottom - textTop0);
-  const room = Math.max(px(24), columnTextH - actionSlot - px(14));
-  const titleFit = fitBlock(scene, t(spec.titleKey), textW, Math.max(font(18), room * 0.62), font(titleBase), 13, hubDisplay);
-  const blurbMax = Math.max(font(16), room - titleFit.height);
-  const blurbFit = fitBlock(scene, t(spec.blurbKey), textW, blurbMax, font(blurbBase), 12, (size) => hubUi(size, { color: C.muted }));
-  const blockH = titleFit.height + titleBlurbGap + blurbFit.height + blurbActionGap + actionSlot;
+
+  const art = { x: innerLeft, y: innerTop, w: laid.aW, h: laid.aH };
+  const textW = laid.tW;
+  const textX = laid.tX;
+  const titleFit = laid.title;
+  const blurbFit = laid.blurb;
+  const actionSize = laid.act.actionSize;
+  const badgeW = laid.act.badgeW;
+  const badgeH = laid.act.badgeH;
+  const actionSlot = laid.actionSlot;
+  const blockH = laid.blockH;
   const groupH = side ? Math.max(art.h, blockH) : art.h + textGap + blockH;
   const slack = Math.max(0, columnH - groupH);
   const contentTop = innerTop + slack / 2;
   art.y = contentTop + (side ? Math.max(0, (Math.max(art.h, blockH) - art.h) / 2) : 0);
   if (spec.art === "desk") drawHotelDesk(card, art, u);
+  else if (spec.art === "map") drawMapArt(card, art, u);
   else drawTapeArt(scene, card, art, spec.id, u);
   const textTop = side ? contentTop + Math.max(0, (Math.max(art.h, blockH) - blockH) / 2) : art.y + art.h + textGap;
+  const actionText = scene.add.text(0, 0, action, hubUi(actionSize)).setOrigin(0, 0.5);
   const title = scene.add.text(textX, textTop, titleFit.body, hubDisplay(titleFit.size)).setOrigin(0, 0);
   tagText(title, spec.id, "card-title");
   title.setData("source", t(spec.titleKey));
@@ -409,6 +475,37 @@ function drawHotelDesk(card, art, unit = 1) {
   g.moveTo(bx + bw * 0.42, by + px(6));
   g.lineTo(bx + bw * 0.42, by + bh - px(6));
   g.strokePath();
+  card.add(g);
+}
+
+function drawMapArt(card, art, unit = 1) {
+  const u = unit > 1.001 ? unit : 1;
+  const px = (n) => (u === 1 ? n : n * u);
+  const g = card.scene.add.graphics();
+  const { x, y, w, h } = art;
+  g.fillStyle(0xb7e4ff, 1);
+  g.fillRoundedRect(x, y, w, h * 0.72, px(10));
+  g.fillStyle(0x86de7a, 1);
+  g.fillEllipse(x + w * 0.5, y + h * 0.78, w * 0.92, h * 0.36);
+  g.fillStyle(0xffe566, 1);
+  g.fillCircle(x + w * 0.78, y + h * 0.18, Math.max(px(6), Math.min(w, h) * 0.08));
+  const dots = [
+    [0.28, 0.42, 0xe24b57],
+    [0.4, 0.36, 0xe24b57],
+    [0.62, 0.58, 0x1d4ed8],
+    [0.48, 0.66, 0x1d4ed8],
+  ];
+  g.lineStyle(px(3), 0x3b2a2e, 1);
+  g.beginPath();
+  g.moveTo(x + w * dots[0][0], y + h * dots[0][1]);
+  g.lineTo(x + w * dots[1][0], y + h * dots[1][1]);
+  g.moveTo(x + w * dots[2][0], y + h * dots[2][1]);
+  g.lineTo(x + w * dots[3][0], y + h * dots[3][1]);
+  g.strokePath();
+  dots.forEach(([dx, dy, color]) => {
+    g.fillStyle(color, 1);
+    g.fillCircle(x + w * dx, y + h * dy, Math.max(px(4), Math.min(w, h) * 0.06));
+  });
   card.add(g);
 }
 

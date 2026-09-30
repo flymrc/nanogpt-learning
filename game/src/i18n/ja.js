@@ -38,6 +38,8 @@ export const JA = {
   "hub.nanogpt.blurb": "まえを 見て、つぎの 字を あてます。",
   "hub.rag.title": "うけつけで 聞く",
   "hub.rag.blurb": "人に 聞いて、本で 答えを さがします。",
+  "hub.embed.title": "いみで さがす ひみつ",
+  "hub.embed.blurb": "ことばが 数字の ならびに なる",
   "subtitle": "まえを見て、つぎをあてる",
   "bubble": "つぎは なにかな？",
   "tapeCaption": "一つの字、一つのマス",

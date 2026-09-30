@@ -14,6 +14,9 @@ import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
 import { ZH } from "../src/i18n/zh.js";
+import { EMBED_JA } from "../src/i18n/embed/ja.js";
+import { EMBED_ZH } from "../src/i18n/embed/zh.js";
+import { embedPagesFor } from "../src/i18n/embed/skeleton.js";
 import { RAG_JA } from "../src/i18n/rag/ja.js";
 import { RAG_ZH } from "../src/i18n/rag/zh.js";
 import { ragPagesFor } from "../src/i18n/rag/skeleton.js";
@@ -33,6 +36,14 @@ const RAG_LEVEL_PAGES = {
   Rag3: ragPagesFor(3),
   Rag4: ragPagesFor(4),
   Rag5: ragPagesFor(5),
+};
+
+const EMBED_LEVEL_PAGES = {
+  Embed1: embedPagesFor(1),
+  Embed2: embedPagesFor(2),
+  Embed3: embedPagesFor(3),
+  Embed4: embedPagesFor(4),
+  Embed5: embedPagesFor(5),
 };
 
 const RAG3_SHOTS = [
@@ -1574,11 +1585,13 @@ async function assertHomeViewport(page, label, lang, mobile) {
   }
   const copy = await page.evaluate(() => window.__nanoGPTHubCopy?.() || {});
   const cards = await page.evaluate(() => window.__nanoGPTHubCards?.() || []);
-  if (cards.length < 2) throw new Error(`home cards ${cards.length}`);
+  if (cards.length < 3) throw new Error(`home cards ${cards.length}`);
   const rag = cards.find((card) => card.id === "rag");
   const nano = cards.find((card) => card.id === "nanogpt");
+  const embedCard = cards.find((card) => card.id === "embed");
   if (!rag?.enabled) throw new Error(`rag card ${JSON.stringify(rag)}`);
   if (!nano?.enabled) throw new Error(`nanogpt card ${JSON.stringify(nano)}`);
+  if (!embedCard?.enabled) throw new Error(`embed card ${JSON.stringify(embedCard)}`);
   if (lang === "ja") {
     if (copy.soon !== "準備中" || copy.home !== "ホーム") throw new Error(`ja home copy ${JSON.stringify(copy)}`);
     await assertJaBunsetsu(page);
@@ -1798,8 +1811,8 @@ async function playRagSteps(page, name, first) {
     phase: window.__nanoGPTState?.().phase ?? 0,
     key: window.__nanoGPTState?.().scene || "",
   }));
-  const lesson = /^Rag[1-5]$/.test(meta.key);
-  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 };
+  const lesson = /^(Rag|Embed)[1-5]$/.test(meta.key);
+  const tally = { overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, mapDrift: 0, lassoOut: 0 };
   const addStage = (result) => {
     const stage = result?.stage;
     if (!stage?.active) return;
@@ -1811,6 +1824,10 @@ async function playRagSteps(page, name, first) {
     tally.contrast += stage.contrast || 0;
     tally.words += stage.words || 0;
     tally.empty += stage.empty || 0;
+    tally.mapMiss += stage.mapMiss || 0;
+    tally.mapLabelOverlaps += stage.mapLabelOverlaps || 0;
+    tally.mapDrift += stage.mapDrift || 0;
+    tally.lassoOut += stage.lassoOut || 0;
   };
   if (!lesson) return { end: first, mid: 0, checks: 0, failed: first?.ok ? null : first, tally };
   const doPhase = meta.phase === 2;
@@ -2063,9 +2080,282 @@ async function saveRag6Shots(browser) {
 
 await saveRag6Shots(browser);
 
+function embedWalks(spine, { allPhases }) {
+  const jobs = [];
+  const pushLevel = (key, count, prefix) => {
+    for (let beat = 0; beat < count; beat += 1) {
+      const phases = allPhases ? spine.phases : 1;
+      for (let phase = 0; phase < phases; phase += 1) {
+        const p = allPhases ? phase : 2;
+        const tag = PHASE_NAMES[p] || `p${p}`;
+        jobs.push([key, beat, p, `${prefix}-b${beat}-p${p}-${tag}`]);
+      }
+    }
+  };
+  pushLevel("Embed1", spine.l1, "E1");
+  pushLevel("Embed2", spine.l2, "E2");
+  pushLevel("Embed3", spine.l3, "E3");
+  pushLevel("Embed4", spine.l4, "E4");
+  pushLevel("Embed5", spine.l5, "E5");
+  return jobs;
+}
+
+function expectedEmbedVo(lang, key, beat) {
+  const pack = lang === "ja" ? EMBED_JA : EMBED_ZH;
+  const nano = lang === "ja" ? JA : ZH;
+  const id = key === "EmbedTitle" ? "etitle" : key === "EmbedEnd" ? "eend" : EMBED_LEVEL_PAGES[key][beat].id;
+  return {
+    id,
+    prefix: nano.voiceBeat,
+    text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
+  };
+}
+
+async function assertEmbedVo(page, key, beat) {
+  const lang = await page.evaluate(() => (document.documentElement.lang || "").toLowerCase().startsWith("ja") ? "ja" : "zh");
+  const want = expectedEmbedVo(lang, key, beat);
+  try {
+    await page.waitForFunction((expected) => {
+      const line = String(document.getElementById("voice-line")?.textContent || "").replace(/\s+/g, " ").trim();
+      const narr = window.__nanoGPTNarration?.() || {};
+      const narrText = String(narr.text || "").replace(/\s+/g, " ").trim();
+      const pageId = window.__nanoGPTState?.().pageId || "";
+      const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
+      const source = narr.source === "clip" || narr.source === "speech";
+      return pageId === expected.id && narr.id === expected.id && source && body === expected.text && narrText === expected.text;
+    }, want, { timeout: 4000 });
+  } catch {
+    const got = await page.evaluate(() => ({
+      line: document.getElementById("voice-line")?.textContent || "",
+      narr: window.__nanoGPTNarration?.() || {},
+      pageId: window.__nanoGPTState?.().pageId || "",
+    }));
+    throw new Error(`embed vo mismatch ${key} b${beat} want=${JSON.stringify(want)} got=${JSON.stringify(got)}`);
+  }
+}
+
+async function jumpEmbed(page, key, beat, phase, name) {
+  await jumpLanded(page, key, beat, phase);
+  await page.waitForTimeout(280);
+  await assertEmbedVo(page, key, beat);
+  const first = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!first?.ok) await page.screenshot({ path: `${OUT}/${name}.png` });
+  const play = await playRagSteps(page, name, first);
+  const end = play.end || first;
+  const failed = play.failed;
+  const result = failed ? { ...end, ok: false, overlaps: failed.overlaps || end.overlaps, overflows: failed.overflows || end.overflows } : end;
+  return {
+    name,
+    ...result,
+    stageMid: play.mid,
+    stageChecks: play.checks,
+    stageTally: play.tally,
+    stage: end?.stage || first?.stage || null,
+  };
+}
+
+async function runEmbedLocale(browser, label, pageOpts, lang, { allPhases }) {
+  const page = await browser.newPage(pageOpts);
+  await page.addInitScript((next) => {
+    localStorage.setItem("nanogpt-lang", next);
+    localStorage.setItem("nanogpt-seen-guide", "1");
+    localStorage.setItem("nanogpt-seen-guide-rag", "1");
+    localStorage.setItem("nanogpt-seen-guide-embed", "1");
+    localStorage.setItem("nanogpt-game-muted", "1");
+  }, lang);
+  await ready(page);
+  await page.evaluate(() => window.__nanoGPTJump("EmbedTitle", 0, 0));
+  await page.waitForFunction(
+    () => window.__nanoGPTState?.().scene === "EmbedTitle" && typeof window.__nanoGPTAssertLayout === "function",
+    { timeout: 20000 },
+  );
+  await page.waitForTimeout(300);
+  await assertEmbedVo(page, "EmbedTitle", 0);
+  const title = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!title?.ok) {
+    await page.screenshot({ path: `${OUT}/embed-${label}-${lang}-title.png` });
+    throw new Error(`embed title ${label} ${lang} ${JSON.stringify({ overlaps: title?.overlaps, overflows: title?.overflows })}`);
+  }
+  const spine = await page.evaluate(() => window.__nanoGPTEmbedSpine);
+  if (spine?.l1 !== 8 || spine?.l5 !== 8 || spine?.phases !== 5) throw new Error(`embed spine ${JSON.stringify(spine)}`);
+  const jobs = embedWalks(spine, { allPhases });
+  const reports = [];
+  for (const [key, beat, phase, name] of jobs) {
+    const result = await jumpEmbed(page, key, beat, phase, `embed-${label}-${lang}-${name}`);
+    reports.push(result);
+    if (!result.ok) {
+      console.error(`FAIL embed ${label} ${lang} ${name} ${JSON.stringify(result.overlaps || result.overflows || result.orphans || result.stage)}`);
+    } else {
+      console.log(`ok embed ${label} ${lang} ${name}`);
+    }
+  }
+  await page.click("#book-toggle");
+  await page.waitForTimeout(200);
+  const book = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!book?.ok) throw new Error(`embed book ${label} ${lang}`);
+  await page.click("#lesson-book-close");
+  await page.click("#notes-toggle");
+  await page.waitForTimeout(200);
+  const notes = await page.evaluate(() => window.__nanoGPTAssertLayout());
+  if (!notes?.ok) throw new Error(`embed notes ${label} ${lang} ${JSON.stringify(notes?.overlaps)}`);
+  await page.click("#notes-close");
+  if (lang === "zh") {
+    await page.click("#catalog-toggle");
+    await page.waitForSelector("#catalog-overlay:not([hidden])");
+    const count = await page.locator("#catalog-list [data-chapter]").count();
+    if (count !== 5) throw new Error(`embed chapters ${count}`);
+    await page.click("[data-chapter='Embed2']");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Embed2" && window.__nanoGPTState?.().beat === 0);
+    await page.click("#back-toggle");
+    await page.waitForFunction(() => window.__nanoGPTState?.().scene === "Embed1" && window.__nanoGPTState?.().beat === 7);
+  }
+  await page.close();
+  return { reports, walked: jobs.length, lang, spine };
+}
+
+async function runEmbedViewport(browser, label, pageOpts, { allPhases }) {
+  const zh = await runEmbedLocale(browser, label, pageOpts, "zh", { allPhases });
+  const ja = await runEmbedLocale(browser, label, pageOpts, "ja", { allPhases });
+  const reports = [...zh.reports, ...ja.reports];
+  return {
+    ok: reports.every((item) => item.ok),
+    walked: zh.walked + ja.walked,
+    reports,
+  };
+}
+
+const embedMobile = await runEmbedViewport(
+  browser,
+  "mobile",
+  {
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+    userAgent: MOBILE_UA,
+  },
+  { allPhases: true },
+);
+const embedPc = await runEmbedViewport(
+  browser,
+  "pc",
+  { viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+const embedPc1024 = await runEmbedViewport(
+  browser,
+  "pc1024",
+  { viewport: { width: 1024, height: 640 }, deviceScaleFactor: 2 },
+  { allPhases: false },
+);
+
+async function saveEmbedShots(browser) {
+  const dir = "/opt/cursor/artifacts/emb3";
+  mkdirSync(dir, { recursive: true });
+  const beatOf = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-seen-guide-embed", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const shoot = async (page, key, id, file, taps = 1) => {
+    await jumpLanded(page, key, beatOf(key, id), 2);
+    await page.waitForTimeout(240);
+    for (let i = 0; i < taps; i += 1) {
+      await page.evaluate(() => window.__nanoGPTRagTap());
+      await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+    }
+    await page.screenshot({ path: `${dir}/${file}` });
+    const probe = await page.evaluate(() => window.__nanoGPTStage || null);
+    console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
+  };
+  const zhPc = await open(1440, 900, "zh");
+  await shoot(zhPc, "Embed1", "e1-p1", "e3-ch1-strip-zh-1440.png", 1);
+  await shoot(zhPc, "Embed2", "e2-p2", "e3-ch2-podium-zh-1440.png", 1);
+  await shoot(zhPc, "Embed3", "e3-p4", "e3-ch3-ruler-zh-1440.png", 1);
+  await zhPc.close();
+  const jaPc = await open(1440, 900, "ja");
+  await shoot(jaPc, "Embed2", "e2-p1", "e3-map-ja-1440.png", 1);
+  await shoot(jaPc, "Embed4", "e4-p3", "e3-ch4-lift-ja-1440.png", 1);
+  await shoot(jaPc, "Embed5", "e5-p1", "e3-ch5-rank-ja-1440.png", 1);
+  await jaPc.close();
+  const jaPhone = await open(390, 844, "ja", true);
+  await shoot(jaPhone, "Embed3", "e3-p4", "e3-ch3-ja-390.png", 1);
+  await shoot(jaPhone, "Embed2", "e2-p1", "e3-map-ja-390.png", 1);
+  await jaPhone.close();
+}
+
+await saveEmbedShots(browser);
+
+async function saveEmb4Shots(browser) {
+  const dir = "/opt/cursor/artifacts/emb4";
+  mkdirSync(dir, { recursive: true });
+  const embedBeat = (key, id) => EMBED_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const ragBeat = (key, id) => RAG_LEVEL_PAGES[key].findIndex((item) => item.id === id);
+  const open = async (width, height, lang, mobile = false) => {
+    const page = await browser.newPage({
+      viewport: { width, height },
+      deviceScaleFactor: 1,
+      isMobile: mobile,
+      hasTouch: mobile,
+      userAgent: mobile ? MOBILE_UA : undefined,
+    });
+    await page.addInitScript((next) => {
+      localStorage.setItem("nanogpt-lang", next);
+      localStorage.setItem("nanogpt-seen-guide", "1");
+      localStorage.setItem("nanogpt-seen-guide-rag", "1");
+      localStorage.setItem("nanogpt-seen-guide-embed", "1");
+      localStorage.setItem("nanogpt-game-muted", "1");
+    }, lang);
+    await ready(page);
+    return page;
+  };
+  const shoot = async (page, key, beat, phase, taps, file) => {
+    await jumpLanded(page, key, beat, phase);
+    await page.waitForTimeout(600);
+    for (let i = 0; i < taps; i += 1) {
+      await page.evaluate(() => window.__nanoGPTRagTap());
+      await page.waitForFunction(() => window.__nanoGPTRagSettled === true, { timeout: 5000 });
+    }
+    await page.screenshot({ path: `${dir}/${file}` });
+    const probe = await page.evaluate(() => window.__nanoGPTStage || null);
+    console.log(`shot ${file} stage=${JSON.stringify(probe)}`);
+  };
+  const jaPhone = await open(390, 844, "ja", true);
+  await shoot(jaPhone, "Embed2", embedBeat("Embed2", "e2-p1"), 2, 1, "e4-map-ja-390.png");
+  await jaPhone.close();
+  const zhPhone = await open(390, 844, "zh", true);
+  await shoot(zhPhone, "Embed2", embedBeat("Embed2", "e2-p1"), 2, 1, "e4-map-zh-390.png");
+  await zhPhone.close();
+  const jaPc = await open(1440, 900, "ja");
+  await shoot(jaPc, "Embed4", embedBeat("Embed4", "e4-p3"), 2, 1, "e4-ch4-lift-ja-1440.png");
+  await shoot(jaPc, "Rag5", ragBeat("Rag5", "r5-p4"), 2, 0, "e4-rag-ja-ch5-threshold-1440.png");
+  await shoot(jaPc, "Rag4", ragBeat("Rag4", "r4-p9"), 2, 0, "e4-rag-ja-ch4-pool-1440.png");
+  await shoot(jaPc, "Embed3", embedBeat("Embed3", "e3-p5"), 2, 0, "e4-embed-ja-ch3-p5-1440.png");
+  await jaPc.close();
+  const zhPc = await open(1440, 900, "zh");
+  await shoot(zhPc, "Rag5", ragBeat("Rag5", "r5-p4"), 2, 0, "e4-rag-zh-ch5-threshold-1440.png");
+  await zhPc.close();
+}
+
+await saveEmb4Shots(browser);
+
 await browser.close();
 
-const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024 };
+const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024, embedMobile, embedPc, embedPc1024 };
 writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
 
 const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
@@ -2104,7 +2394,11 @@ const homeOk = home?.ok === true;
 const ragWalked =
   ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
 const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
+const embedWalked =
+  embedMobile.walked === 40 * 5 * 2 && embedPc.walked === 40 * 2 && embedPc1024.walked === 40 * 2;
+const embedOk = embedMobile.ok && embedPc.ok && embedPc1024.ok && embedWalked;
 const stageReports = [...ragMobile.reports, ...ragPc.reports, ...ragPc1024.reports];
+const embedStageReports = [...embedMobile.reports, ...embedPc.reports, ...embedPc1024.reports];
 const stage = stageReports.reduce(
   (sum, report) => {
     const tally = report.stageTally || {};
@@ -2124,9 +2418,34 @@ const stage = stageReports.reduce(
 );
 const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
 const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.empty === 0 && stage.mid >= doPages && stage.checks > 0;
+const embedStage = embedStageReports.reduce(
+  (sum, report) => {
+    const tally = report.stageTally || {};
+    sum.checks += report.stageChecks || 0;
+    sum.mid += report.stageMid || 0;
+    sum.overlaps += tally.overlaps || 0;
+    sum.tiny += tally.tiny || 0;
+    sum.short += tally.short || 0;
+    sum.fill += tally.fill || 0;
+    sum.actors += tally.actors || 0;
+    sum.contrast += tally.contrast || 0;
+    sum.words += tally.words || 0;
+    sum.empty += tally.empty || 0;
+    sum.mapMiss += tally.mapMiss || 0;
+    sum.mapLabelOverlaps += tally.mapLabelOverlaps || 0;
+    sum.mapDrift += tally.mapDrift || 0;
+    sum.lassoOut += tally.lassoOut || 0;
+    return sum;
+  },
+  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, mapDrift: 0, lassoOut: 0 },
+);
+const embedDoPages = embedStageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
+const embedStageOk = embedStage.overlaps === 0 && embedStage.tiny === 0 && embedStage.short === 0 && embedStage.fill === 0 && embedStage.actors === 0 && embedStage.contrast === 0 && embedStage.words === 0 && embedStage.empty === 0 && embedStage.mapMiss === 0 && embedStage.mapLabelOverlaps === 0 && embedStage.mapDrift === 0 && embedStage.lassoOut === 0 && embedStage.mid >= embedDoPages && embedStage.checks > 0;
 const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
+const embedStageLine = `EMBED_STAGE_${embedStageOk ? "OK" : "FAIL"} checks=${embedStage.checks} mid=${embedStage.mid} overlaps=${embedStage.overlaps} tiny=${embedStage.tiny} short=${embedStage.short} fill=${embedStage.fill} actors=${embedStage.actors} contrast=${embedStage.contrast} words=${embedStage.words} empty=${embedStage.empty} mapMiss=${embedStage.mapMiss} mapLabelOverlaps=${embedStage.mapLabelOverlaps} mapDrift=${embedStage.mapDrift} lassoOut=${embedStage.lassoOut}`;
 console.log(stageLine);
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk) {
+console.log(embedStageLine);
+if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk || !embedOk || !embedStageOk) {
   console.error("E2E_FAIL", {
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
@@ -2150,6 +2469,10 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
     ragWalked,
     stageOk,
     stage,
+    embedOk,
+    embedWalked,
+    embedStageOk,
+    embedStage,
     ragMobile: ragMobile.walked,
     ragPc: ragPc.walked,
     ragPc1024: ragPc1024.walked,
@@ -2157,4 +2480,4 @@ if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk
   });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked} jaSpeech=1`);
+console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked} embedMobile=${embedMobile.walked} embedPc=${embedPc.walked} embedPc1024=${embedPc1024.walked} jaSpeech=1`);

@@ -1,4 +1,4 @@
-import { getCourse, getLang, t } from "../i18n/locale.js";
+import { getLang, isPictureCourse, t } from "../i18n/locale.js";
 import { emitTutor, isWidePcTutor } from "../tutor/bus.js";
 import { STICKER_SHADOW_Y, band, clamp, lessonRhythm, makeShell } from "./layout.js";
 import { tutorHangPx } from "./tutor-lane.js";
@@ -46,7 +46,7 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
   else addChrome(scene, { level, total, title, shell });
 
   const rhythm = lessonRhythm(v);
-  const rag = getCourse() === "rag";
+  const rag = isPictureCourse();
   const purposeMin = phone ? (rag ? 108 : 60) : v.h < 560 ? 48 : rag ? 88 : 64;
   const purposeMax = phone ? (rag ? 136 : 76) : rag ? 112 : 88;
   const purposeWant = rag ? (phone ? 124 : 100) : phone ? 68 : v.short ? 70 : v.compact ? 76 : 82;
@@ -83,7 +83,7 @@ export function makeLessonFrame(scene, { level, total, title, startLabel } = {})
 
   const frame = { shell, v, purpose, purposeBand, stage, stageBand, speech, nextBtn, showRobot, rhythm };
   frame.fitPurpose = (phase) => {
-    const rag = getCourse() === "rag";
+    const rag = isPictureCourse();
     const lookOrDo = phase === 1 || phase === 2;
     // Phone already uses the one-line 全文 toggle. On a wide PC the same
     // toggle applies to 看看 / やって so the picture can take half the column.
@@ -113,7 +113,7 @@ export function ctaClearance(frame) {
 }
 
 function pcPackedPicture(frame) {
-  return getCourse() === "rag" && isWidePcTutor() && Boolean(frame?.purpose?.collapsed);
+  return isPictureCourse() && isWidePcTutor() && Boolean(frame?.purpose?.collapsed);
 }
 
 /** Drop the pink button to the bottom edge so the picture can use the footer padding. */
@@ -294,7 +294,7 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     }
     purpose.setVisible(true);
     more.setVisible(false);
-    const ragLesson = getCourse() === "rag";
+    const ragLesson = isPictureCourse();
     const ja = getLang() === "ja";
     const wrap = (value, font, width) => (ragLesson && ja
       ? wrapAtBreaks(scene, value, font, width, displayText)
