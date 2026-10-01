@@ -7,6 +7,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 15
     defaults:
       run:
@@ -19,7 +20,7 @@ jobs:
           cache: npm
           cache-dependency-path: game/package-lock.json
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: node -e "const fs=require('fs');const {chromium}=require('playwright');if(!fs.existsSync(chromium.executablePath()))throw new Error('Pinned browser image mismatch')"
       - name: Check source and build capture preview
         run: |
           npm run check
@@ -47,6 +48,7 @@ jobs:
   visual:
     needs: build
     runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -63,7 +65,7 @@ jobs:
           cache: npm
           cache-dependency-path: game/package-lock.json
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - run: node -e "const fs=require('fs');const {chromium}=require('playwright');if(!fs.existsSync(chromium.executablePath()))throw new Error('Pinned browser image mismatch')"
       - uses: actions/download-artifact@v4
         with:
           name: candidate-cartoon-game
