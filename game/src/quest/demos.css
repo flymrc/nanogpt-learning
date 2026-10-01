@@ -66,7 +66,7 @@
 .qd-machine-face { display: block; width: 104px; padding: 6px; border: 3px solid #7fb9a5; background: #faffee; border-radius: 15px; font-size: 26px; color: #365b51; }
 .qd-lottery { display: flex; flex-direction: column; gap: 10px; align-items: center; background: #fff0cd; padding: 16px 12px; border: 3px solid #d3ae68; border-radius: 14px 14px 30px 30px; }
 .qd-lottery .qd-label { margin: 0; }
-.qd-tickets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; width: min(100%, 270px); padding: 12px 4px; }
+.qd-tickets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px 10px; width: min(100%, 270px); padding: 12px 4px; }
 .qd-ticket { display: flex; align-items: center; justify-content: center; height: 37px; border: 2px solid #c5a667; border-radius: 6px; background: #fffdfa; font-size: 24px; font-weight: 800; box-shadow: 0 3px 0 #dfc98e; transform: rotate(-4deg); }
 .qd-ticket:nth-child(even) { transform: rotate(5deg); }
 .qd-ticket.is-picked { border-color: #dc7b76; background: #ffd8d2; animation: qd-pick .6s both; }

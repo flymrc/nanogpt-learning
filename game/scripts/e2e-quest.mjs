@@ -10,12 +10,13 @@ const success={
  'embed-1':['encode'],'embed-2':['two','unfold'],'embed-3':['align'],'embed-4':['reveal'],'embed-5':['out'],
 };
 const browser=await chromium.launch({...(process.env.CHROME?{executablePath:process.env.CHROME}:{}),args:['--no-sandbox','--use-gl=angle','--use-angle=swiftshader']});
-const reports=[],errors=[];
+const reports=[],errors=[],failures=[];
 try{
  const page=await browser.newPage({viewport:{width:390,height:844}});
  page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(()=>{localStorage.setItem('nanogpt-game-muted','1');});
  const geometry=async(label)=>{
+   await page.evaluate(()=>new Promise(r=>requestAnimationFrame(r)));
    const g=await page.evaluate(()=>{
      const root=document.getElementById('quest-root'),box=root.getBoundingClientRect();
      const controls=[...root.querySelectorAll('button,a,p,strong,summary')].filter(e=>e.getClientRects().length);
@@ -28,9 +29,12 @@ try{
        const a=pieces[i].getBoundingClientRect(),b=pieces[j].getBoundingClientRect();
        if(Math.min(a.right,b.right)-Math.max(a.left,b.left)>1 && Math.min(a.bottom+4,b.bottom+4)-Math.max(a.top,b.top)>1)collisions.push([pieces[i].className,pieces[j].className]);
      }
-     return {collisions,rootWidth:box.width,viewport:innerWidth,horizontal:root.scrollWidth>root.clientWidth+2,bad,overflow};
+     const nav=root.querySelector('.quest-trail').getBoundingClientRect(),active=root.querySelector('[aria-current="step"]').getBoundingClientRect();
+     const currentNavHidden=active.left<nav.left-2||active.right>nav.right+2;
+     return {currentNavHidden,collisions,rootWidth:box.width,viewport:innerWidth,horizontal:root.scrollWidth>root.clientWidth+2,bad,overflow};
    });
-   assert.deepEqual(g.collisions,[],`${label}: local collisions`);assert.equal(g.horizontal,false,`${label}: root overflow`);assert.deepEqual(g.bad,[],`${label}: control text`);assert.deepEqual(g.overflow,[],`${label}: local overflow`);reports.push({label,...g});
+   if(g.currentNavHidden||g.collisions.length||g.horizontal||g.bad.length||g.overflow.length)failures.push({label,...g});
+   reports.push({label,...g});
  };
  const home=async(lang)=>{
    await page.goto(base);await page.waitForFunction(()=>window.__nanoGPTGame?.scene.getScenes(true)[0]?.sys.settings.key==='Home',{timeout:60000});
@@ -93,7 +97,8 @@ try{
  await page.setViewportSize({width:390,height:844});await page.reload();await page.locator('#quest-root').waitFor();
  assert.equal(await page.locator('#tutor-dock').isVisible(),false);
  assert.equal(await page.locator('.quest-portrait').isVisible(),false);
- assert.deepEqual(errors,[]);writeFileSync(`${out}/summary.json`,JSON.stringify({reports,errors,quests:15,locales:2,viewports:3},null,2));
+ writeFileSync(`${out}/summary.json`,JSON.stringify({reports,errors,failures,quests:15,locales:2,viewports:3},null,2));
+ assert.deepEqual(errors,[]);assert.deepEqual(failures,[],"Every quest layout must pass");
  console.log('QUEST_OK',JSON.stringify({states:reports.length,quests:15,locales:2,viewports:3,errors}));
 }catch(error){
  for(const page of browser.contexts().flatMap(c=>c.pages())){console.error('QUEST_STATE',await page.locator('#quest-root').innerText().catch(()=>''));await page.screenshot({path:`${out}/failure.png`,fullPage:true}).catch(()=>{});}

@@ -14,6 +14,10 @@ try {
   const before=await page.evaluate(()=>window.__nanoGPTTutorHiDPI().animation.elapsed);
   await page.waitForTimeout(800);
   assert.ok(await page.evaluate(()=>window.__nanoGPTTutorHiDPI().animation.elapsed)>before+200,"model ticker must advance");
+  await page.waitForFunction(()=>{
+    const p=window.__nanoGPTTutorHiDPI?.()?.params;
+    return p?.eyeOpen>0.9 && p?.mouthOpen<0.25;
+  },{timeout:15000});
   const state=await page.evaluate(()=>window.__nanoGPTTutorHiDPI());
   assert.equal(state.modelCount,1);assert.ok(state.place.bounds.h>700);
   await page.addStyleTag({content:'html,body,#app-layout,#pc-stage,#tutor-dock,#tutor-stage{background:transparent!important} #pc-stage{visibility:hidden} #tutor-dock{visibility:visible}'});

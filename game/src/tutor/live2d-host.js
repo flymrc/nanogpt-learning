@@ -808,6 +808,8 @@ function installDebugProbe() {
         return {
           angleX: read("ParamAngleX"),
           angleY: read("ParamAngleY"),
+          eyeOpen: read("ParamEyeLOpen"),
+          mouthOpen: read("ParamMouthOpenY"),
           eyeX: read("ParamEyeBallX"),
           eyeY: read("ParamEyeBallY"),
         };

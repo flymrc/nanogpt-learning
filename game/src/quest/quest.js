@@ -110,6 +110,14 @@ export function mountQuest(scene,courseId,index=0) {
     extras.append(animation,reading,el('p',L('新关卡先用文字带路。原来的录音都留在完整动画里。','新しいステージは文字で案内するよ。もとの音声は、くわしいアニメで聞けるよ。')));board.append(extras);
     root.append(board);
     const foot=el('footer',L('先猜一猜 · 动手试试 · 答一题，拿星星','予想する · やってみる · 1もん といて星をゲット'),{class:'quest-bottom'});foot.append(el("br"),el("a","Hiyori © Live2D Inc.",{href:"https://www.live2d.com/en/learn/sample/model-terms/",target:"_blank",rel:"noopener noreferrer"}));root.append(foot);
+    requestAnimationFrame(()=>{
+      if(!trail.isConnected)return;
+      const selected=trail.querySelector('[aria-current="step"]');
+      if(selected){
+        const n=trail.getBoundingClientRect(),b=selected.getBoundingClientRect();
+        trail.scrollLeft+=b.left-n.left-(trail.clientWidth-b.width)/2;
+      }
+    });
     root.querySelector('h1')?.focus({preventScroll:true});
   }
   go(index,true);
