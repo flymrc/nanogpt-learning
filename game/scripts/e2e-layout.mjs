@@ -1897,6 +1897,30 @@ async function jumpRag(page, key, beat, phase, name) {
   };
 }
 
+async function waitCourseTitleTutor(page) {
+  if (page.viewportSize().width < 1024) return;
+  // Course titles and the independently loaded Cubism model do not become
+  // ready together. Require the real, visible fitted canvas before geometry.
+  try {
+    await page.waitForFunction(() => {
+      const canvas = document.getElementById("tutor-canvas");
+      if (!canvas || canvas.dataset.fitted !== "1") return false;
+      const box = canvas.getBoundingClientRect();
+      const style = getComputedStyle(canvas);
+      return box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+    }, undefined, { timeout: 30000 });
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      fitted: document.getElementById("tutor-canvas")?.dataset.fitted,
+      tutor: document.documentElement.dataset.tutor,
+      fallback: !!document.querySelector(".tutor-fallback"),
+      gate: window.__nanoGPTTutorGate,
+      hiDpi: window.__nanoGPTTutorHiDPI,
+    }));
+    throw new Error(`Course title tutor did not become ready: ${JSON.stringify(state)}; ${error.message}`);
+  }
+}
+
 async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
   const page = await browser.newPage(pageOpts);
   await page.addInitScript((next) => {
@@ -1912,6 +1936,7 @@ async function runRagLocale(browser, label, pageOpts, lang, { allPhases }) {
     { timeout: 20000 },
   );
   await page.waitForTimeout(300);
+  await waitCourseTitleTutor(page);
   await assertRagVo(page, "RagTitle", 0);
   const title = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (!title?.ok) {
@@ -2191,6 +2216,7 @@ async function runEmbedLocale(browser, label, pageOpts, lang, { allPhases }) {
     { timeout: 20000 },
   );
   await page.waitForTimeout(300);
+  await waitCourseTitleTutor(page);
   await assertEmbedVo(page, "EmbedTitle", 0);
   const title = await page.evaluate(() => window.__nanoGPTAssertLayout());
   if (!title?.ok) {

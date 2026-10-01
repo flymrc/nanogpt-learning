@@ -1636,7 +1636,9 @@ export function drawEmbedArt(scene, stage, page, { phase = 0 } = {}) {
   scene.__embedStep = step;
   const phone = !isWidePcTutor();
   const ceiling = ceilingOf(scene, stage);
-  const capSize = phone ? 16 : 18;
+  // Short desktops need 16px captions so real Japanese text bounds keep
+  // the 12px card-shadow gap without shrinking the picture.
+  const capSize = phone || window.innerHeight < 720 ? 16 : 18;
   const capSlot = phone ? 22 : (typeof window !== "undefined" && window.innerHeight < 720 ? 18 : 26);
   const block = STICKER_SHADOW_Y + CAPTION_CLEAR + capSlot;
   const room = Math.max(48, ceiling - stage.top - 2);

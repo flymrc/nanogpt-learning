@@ -30,6 +30,7 @@ jobs:
       - name: Build immutable test output
         run: |
           npm run build
+          node scripts/e2e-course-readiness.mjs
           find dist -type f -print0 | sort -z | xargs -0 sha256sum > output/quest/build-sha256.txt
       - uses: actions/upload-artifact@v4
         with:
