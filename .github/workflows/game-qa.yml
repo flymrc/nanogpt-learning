@@ -1,0 +1,90 @@
+name: Cartoon game acceptance
+on:
+  push:
+    branches: [cartoon-quest-v2, main]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Check source and build capture preview
+        run: |
+          npm run check
+          npm run preview -- --host 127.0.0.1 --port 4182 > /tmp/game-preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4182/ >/dev/null && break; sleep 1; done
+          node scripts/capture-tutor.mjs
+      - name: Build immutable test output
+        run: |
+          npm run build
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > output/quest/build-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidate-cartoon-game
+          path: |
+            game/dist/
+            game/public/assets/hiyori-guide.png
+          retention-days: 7
+      - name: Preserve character capture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-render-evidence
+          path: game/output/quest/
+          retention-days: 7
+  visual:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [quest, reader, legacy]
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-cartoon-game
+          path: game/
+      - name: Start immutable preview
+        run: |
+          npm run preview -- --host 127.0.0.1 --port 4182 > /tmp/game-preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4182/ >/dev/null && break; sleep 1; done
+      - name: New child-first game acceptance
+        if: matrix.suite == 'quest'
+        run: npm run e2e:quest
+      - name: Reader and interrupted navigation regressions
+        if: matrix.suite == 'reader'
+        run: npm run e2e:reader && npm run e2e:regressions
+      - name: All original animation layouts
+        if: matrix.suite == 'legacy'
+        run: npm run e2e
+      - name: Preserve screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-qa-${{ matrix.suite }}
+          path: game/output/
+          retention-days: 7

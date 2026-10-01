@@ -5,7 +5,7 @@ const browser=await chromium.launch({...(process.env.CHROME?{executablePath:proc
 try {
   const page=await browser.newPage({viewport:{width:390,height:844}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base);
+  await page.goto(`${base}?reader=1`);
   await page.getByRole('heading',{level:1}).waitFor();
   assert.equal(await page.evaluate(()=>Boolean(window.__nanoGPTGame)),false,'reader must not initialize Phaser');
   assert.equal(await page.evaluate(()=>performance.getEntriesByType('resource').filter(r=>r.name.includes('/audio/')).length),0,'reader must request no audio');

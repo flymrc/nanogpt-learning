@@ -1,9 +1,10 @@
 # Agent notes — nanoGPT 闯关 (`game/`)
 
-## Default reader and retained animations
+## Default cartoon quests and retained animations
 
-The default entry is now `game/src/learning/reader.js`: 15 bilingual chapters with native HTML exercises. See `game/LEARNING_MAP.md` for the complete mapping to all 149 original pages and sources. Changes to this path must pass `npm run check`, `npm run e2e:reader`, and `npm run e2e:regressions`. Reading text and controls stay at least 16px, and viewing a page never counts as passing its check.
+The default entry is the illustrated Phaser Home. Course cards enter `game/src/scenes/QuestScene.js` and the child-first `game/src/quest/` path: 15 short bilingual quests, interactive toys, and retryable checks. Viewing never earns a star: a successful toy action and a correct check are both required. Main reading and all controls stay at least 16px. `?reader=1` or `#learn/...` retains the optional advanced reader. `?animation=1` retains the original 149-page animation course. Do not replace the default game with the reader.
 
+Changes must pass `npm run check`, `npm run e2e:quest`, `npm run e2e:reader`, `npm run e2e:regressions`, and the full original `npm run e2e`. GitHub Actions can run these when the dot cloud sandbox cannot launch Chromium. The verified distribution must stay unchanged during suites. The original voices remain under `public/audio/`; new short quests use text, music, and effects, with no silently substituted voice. Hiyori stays on wide desktop. Mobile prioritizes the game and legible text and does not require the character. The static Hiyori fallback is rendered from the unchanged existing model by `scripts/capture-tutor.mjs`, not a new character.
 The Phaser requirements below still apply to the retained animation mode (`?animation=1` or existing scene deep links); `npm run e2e` explicitly enters that mode and keeps all original page and intermediate-frame checks. Do not remove the animation checks when changing the default reader. Audio is loaded on demand; reviewed corrections in `speech-fallbacks.json` use current Web Speech text while historical recordings are retained. Build once before browser suites and keep `dist/` unchanged during those suites.
 
 This repo is a Phaser lesson. Layout bugs on a phone are **your** bugs.

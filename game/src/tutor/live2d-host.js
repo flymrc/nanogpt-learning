@@ -241,7 +241,7 @@ async function bootLive2d() {
   try {
     loaded = await PIXI.live2d.Live2DModel.from(modelUrl(), {
       autoInteract: false,
-      autoUpdate: true,
+      autoUpdate: false,
     });
   } catch (err) {
     if (bootGen === gen) {
@@ -263,6 +263,17 @@ async function bootLive2d() {
   clearStageModels(pixiApp);
   model = loaded;
   pixiApp.stage.addChild(model);
+  // Advance with this renderer's ticker rather than an unrelated shared ticker.
+  // This also lets the official pose hide mutually exclusive arm layers before
+  // measuring the mesh; an unadvanced first frame shows both arm drawings.
+  model.internalModel.pose?.reset(model.internalModel.coreModel);
+  model.internalModel.coreModel.update();
+  const animatedModel = model;
+  app.ticker.add(() => {
+    if (model === animatedModel) animatedModel.update(app.ticker.deltaMS);
+  }, undefined, PIXI.UPDATE_PRIORITY.HIGH);
+  model.update(16);
+  app.render();
   model.interactive = true;
   model.anchor.set(0.5, 0.12);
   placeModel();
@@ -655,8 +666,8 @@ function showStaticFallback() {
   if (!dock || dock.querySelector(".tutor-fallback")) return;
   const img = document.createElement("img");
   img.className = "tutor-fallback";
-  img.alt = "卡通助教";
-  img.src = `${import.meta.env.BASE_URL}assets/robot.svg`;
+  img.alt = "ひより · 卡通助教";
+  img.src = `${import.meta.env.BASE_URL}assets/hiyori-guide.png`;
   dock.appendChild(img);
 }
 
@@ -778,6 +789,12 @@ function installDebugProbe() {
       canvasCount: canvases.length,
       stageChildren: kids.length,
       modelCount: kids.filter((child) => child?.internalModel).length,
+      animation: {
+        elapsed: model?.elapsedTime || 0,
+        pose: Boolean(model?.internalModel?.pose),
+        armA: model?.internalModel?.coreModel?.getPartOpacityById?.("PartArmA"),
+        armB: model?.internalModel?.coreModel?.getPartOpacityById?.("PartArmB"),
+      },
       look: { target: { ...lookTarget }, current: { ...lookCurrent } },
       params: (() => {
         const core = model?.internalModel?.coreModel;

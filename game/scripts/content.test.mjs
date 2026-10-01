@@ -58,3 +58,16 @@ test('malformed hashes cannot crash startup; fractional indexes become integers'
   location.hash='#Level1/-3/0.5';assert.deepEqual(readEntryTarget(),{scene:'Level1',beat:0,phase:0});
   delete globalThis.location;delete globalThis.sessionStorage;
 });
+
+test('child-first quests cover 15 bilingual chapters with transfer checks',()=>{
+  const zh=json('game/src/quest/copy.zh.json'),ja=json('game/src/quest/copy.ja.json');
+  assert.equal(zh.length,15);assert.equal(ja.length,15);
+  assert.deepEqual(zh.map(q=>q.id),ja.map(q=>q.id));
+  for(const pack of [zh,ja])for(const q of pack){
+    assert.match(q.id,/^(nanogpt|rag|embed)-[1-5]$/);
+    for(const f of ['title','goal','guide','actionHint','teaching','remember','question'])assert.ok(q[f]?.trim(),`${q.id}:${f}`);
+    assert.equal(q.choices.length,3);assert.ok(q.choices[q.answer]);
+    q.choices.forEach(c=>{assert.ok(c.text.trim());assert.ok(c.feedback.trim());});
+  }
+  assert.deepEqual(zh.map(q=>q.answer),ja.map(q=>q.answer));
+});

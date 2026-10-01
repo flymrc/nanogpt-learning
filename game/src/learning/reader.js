@@ -12,7 +12,7 @@ const txt=value=>value[lang];
 const sourceBase='https://github.com/flymrc/nanogpt-learning/blob/main/';
 const passed=new Set();
 const routeFor=(course,index)=>`#learn/${course}/${index+1}`;
-const legacyRequested=()=>!location.hash.startsWith('#learn') && (new URLSearchParams(location.search).has('animation') || new URLSearchParams(location.search).has('scene') || /^#(?:Level|Rag|Embed|Title|End)/.test(location.hash));
+const legacyRequested=()=>!location.hash.startsWith('#learn') && !new URLSearchParams(location.search).has('reader');
 
 function link(text,href) { return el('a',text,{href}); }
 function focusTitle() { root.querySelector('h1')?.focus({preventScroll:true}); }
@@ -21,6 +21,7 @@ function heading(section,n,title) { const h=el('h2');h.append(el('span',String(n
 function render() {
   document.documentElement.dataset.reader='true'; root.hidden=false;
   document.getElementById('reader-return')?.remove();
+  document.getElementById('quest-return')?.remove();
   const game=window.__nanoGPTGame;
   if(game){game.sound.stopAll();game.loop.sleep();window.speechSynthesis?.cancel();}
   document.documentElement.lang=lang==='ja'?'ja':'zh-CN';
@@ -31,7 +32,7 @@ function render() {
   const header=el('header');header.append(link(L('小G学习室 · 三门课','ジーくんの学習室 · 3コース'),'#learn'));
   const language=el('button',lang==='zh'?'日本語':'中文',{type:'button',id:'reader-language'});
   language.addEventListener('click',()=>{lang=lang==='zh'?'ja':'zh';try{localStorage.setItem('nanogpt-lang',lang);}catch{}render();document.getElementById('reader-language').focus();});
-  header.append(language);root.append(header);
+  header.append(link(L("回冒险岛","ぼうけん島へ"),location.pathname),language);root.append(header);
   const match=location.hash.match(/^#learn\/(nanogpt|rag|embed)\/([1-5])$/);
   if(!match) { home();return; }
   const [,courseId,n]=match,index=Number(n)-1,chapter=CHAPTERS[courseId][index],course=COURSES.find(c=>c.id===courseId);
@@ -85,7 +86,7 @@ async function openLegacy() {
   }
   try {await legacyPromise;} catch {legacyPromise=null;root.hidden=false;document.documentElement.dataset.reader='true';root.replaceChildren(el('p',L('动画加载失败。','アニメーションを読み込めません。')),link(L('返回学习','学習へ戻る'),'#learn'));return;}
   if(version!==routeVersion)return;
-  const back=el('a',L('返回文字学习','文章で学ぶ画面へ'),{id:'reader-return',href:'#learn'});
+  const back=el('a',L('进阶阅读','くわしく読む'),{id:'reader-return',href:'#learn'});
   back.addEventListener('click',event=>{
     event.preventDefault();
     const game=window.__nanoGPTGame;
@@ -97,7 +98,16 @@ async function openLegacy() {
     game?.loop.sleep();
     location.href=location.pathname+routeFor(course,m?Number(m[2])-1:0);
   });
-  document.querySelector('#catalog-overlay .sheet-card').append(back);
+  const questBack=el('a',L('回到冒险闯关','ぼうけんステージへ'),{id:'quest-return',href:location.pathname});
+  questBack.addEventListener('click',event=>{
+    event.preventDefault();
+    const game=window.__nanoGPTGame,key=game?.scene.getScenes(true)[0]?.sys.settings.key||'';
+    const m=key.match(/^(Level|Rag|Embed)([1-5])$/);
+    const course=m?{Level:'nanogpt',Rag:'rag',Embed:'embed'}[m[1]]:'nanogpt';
+    game?.loop.sleep();
+    location.href=location.pathname+`?quest=1#quest/${course}/${m?m[2]:1}`;
+  });
+  document.querySelector('#catalog-overlay .sheet-card').append(questBack,back);
 }
 window.addEventListener('hashchange',()=>{
   if(location.hash.startsWith('#learn')){routeVersion++;render();focusTitle();window.scrollTo(0,0);}

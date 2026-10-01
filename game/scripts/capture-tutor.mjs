@@ -7,7 +7,13 @@ try {
   page.on('console',m=>{if(m.type()==='error')console.log(m.text())});
   await page.goto(`${process.env.E2E_URL||'http://127.0.0.1:4182/'}?animation=1`);
   await page.waitForFunction(()=>window.__nanoGPTTutorHiDPI?.()?.modelCount===1,{timeout:90000});
-  await page.waitForTimeout(1800);
+  await page.waitForFunction(()=>{
+    const a=window.__nanoGPTTutorHiDPI?.()?.animation;
+    return a?.pose && Math.min(a.armA,a.armB)<0.02 && Math.max(a.armA,a.armB)>0.98;
+  },{timeout:20000});
+  const before=await page.evaluate(()=>window.__nanoGPTTutorHiDPI().animation.elapsed);
+  await page.waitForTimeout(800);
+  assert.ok(await page.evaluate(()=>window.__nanoGPTTutorHiDPI().animation.elapsed)>before+200,"model ticker must advance");
   const state=await page.evaluate(()=>window.__nanoGPTTutorHiDPI());
   assert.equal(state.modelCount,1);assert.ok(state.place.bounds.h>700);
   await page.addStyleTag({content:'html,body,#app-layout,#pc-stage,#tutor-dock,#tutor-stage{background:transparent!important} #pc-stage{visibility:hidden} #tutor-dock{visibility:visible}'});

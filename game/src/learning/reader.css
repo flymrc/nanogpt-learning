@@ -46,7 +46,7 @@ html[data-reader="true"] body > :not(#learning-root):not(script):not(#reader-err
 #learning-root .chapter-footer a { padding:12px 0; }
 #learning-root .skip-link { position:absolute; left:-9999px; }
 #learning-root .skip-link:focus { position:static; }
-#reader-return { display:block; margin-top:16px; font:600 16px system-ui; padding:10px 14px; border:2px solid #23523e; border-radius:7px; color:#23523e; background:#fffef9; }
+#reader-return, #quest-return { display:block; margin-top:16px; font:600 16px system-ui; padding:10px 14px; border:2px solid #23523e; border-radius:7px; color:#23523e; background:#fffef9; }
 @media(max-width:760px) {
  #learning-root { padding:0 20px 36px; }
  #learning-root header { gap:12px; }

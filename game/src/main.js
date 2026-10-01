@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import BootScene from "./scenes/BootScene.js";
 import HomeScene from "./scenes/HomeScene.js";
+import QuestScene from "./scenes/QuestScene.js";
 import TitleScene from "./scenes/TitleScene.js";
 import Level1Scene from "./scenes/Level1Scene.js";
 import Level2Scene from "./scenes/Level2Scene.js";
@@ -74,6 +75,7 @@ const config = {
   scene: [
     BootScene,
     HomeScene,
+    QuestScene,
     TitleScene,
     Level1Scene,
     Level2Scene,
@@ -233,7 +235,7 @@ async function boot() {
       scene.scene.restart(payload);
       return;
     }
-    scene.scene.restart();
+    scene.scene.restart(key === "Quest" ? { course: scene.questCourse, index: scene.questIndex } : undefined);
   };
   window.addEventListener("nanogpt-lang", onLang);
   document.getElementById("lang-toggle")?.addEventListener("click", (event) => {

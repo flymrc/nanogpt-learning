@@ -9,7 +9,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto(base);
+  await page.goto(`${base}?reader=1`);
   await page.getByRole('heading',{level:1}).waitFor();
   for(let i=0;i<8;i++){
     await page.keyboard.press('Tab');
@@ -76,7 +76,7 @@ try {
   for(const viewport of [{width:390,height:844},{width:1180,height:757},{width:1440,height:900}]){
     await page.setViewportSize(viewport);
     for(const lang of ['zh','ja']){
-      await page.goto(base);
+      await page.goto(`${base}?reader=1`);
       if((await page.locator('html').getAttribute('lang')) !== (lang==='ja'?'ja':'zh-CN')) await page.locator('#reader-language').click();
       await page.screenshot({path:`${out}/home-${lang}-${viewport.width}.png`,fullPage:true});
       for(const course of ['nanogpt','rag','embed'])for(let chapter=1;chapter<=5;chapter++){

@@ -14,7 +14,8 @@
     "test": "node --test scripts/content.test.mjs",
     "e2e:reader": "node scripts/e2e-reader.mjs",
     "e2e:regressions": "node scripts/e2e-regressions.mjs",
-    "check": "npm run test && npm run i18n && npm run build"
+    "check": "npm run test && npm run i18n && npm run build",
+    "e2e:quest": "node scripts/e2e-quest.mjs"
   },
   "dependencies": {
     "phaser": "^3.88.2"

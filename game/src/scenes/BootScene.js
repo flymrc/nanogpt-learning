@@ -48,6 +48,10 @@ export default class BootScene extends Phaser.Scene {
     this.game.registry.set("assetsReady", true);
     const entry = readEntryTarget();
     this.time.delayedCall(220, () => {
+      if (/^#quest\/(nanogpt|rag|embed)\/[1-5]$/.test(location.hash)) {
+        this.scene.start("Quest");
+        return;
+      }
       if (!entry) {
         this.scene.start("Home");
         return;

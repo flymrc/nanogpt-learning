@@ -407,7 +407,9 @@ function buildCard(scene, spec, x, y, w, h, scale = 1) {
     if (!enabled || !spec.scene) return;
     unlockAudio(scene);
     playSfx(scene, "sfx-tap", 0.28);
-    scene.scene.start(spec.scene);
+    if (!new URLSearchParams(location.search).has("animation")) {
+      scene.scene.start("Quest", { course: spec.id, index: 0 });
+    } else scene.scene.start(spec.scene);
   });
   const inner = { left: -w / 2 + 8, top: -h / 2 + 8, right: w / 2 - 8, bottom: h / 2 - 8 };
   card.list.forEach((child) => {
@@ -565,7 +567,9 @@ function publishHub(scene, cards) {
   window.__nanoGPTOpenTutorial = () => {
     const spec = TUTORIALS.find((item) => item.status === "ready" && item.scene);
     if (!spec) return null;
-    scene.scene.start(spec.scene);
-    return spec.scene;
+    if (!new URLSearchParams(location.search).has("animation")) {
+      scene.scene.start("Quest", { course: spec.id, index: 0 });
+    } else scene.scene.start(spec.scene);
+    return new URLSearchParams(location.search).has("animation") ? spec.scene : "Quest";
   };
 }
