@@ -217,29 +217,40 @@ export function hideBootSplash() {
 
 export function watchResize(scene, { restart = false, persist } = {}) {
   let timer = 0;
-  const handle = (gameSize) => {
+  let afterStep = null;
+  const cancelPending = () => {
     window.clearTimeout(timer);
+    if (afterStep) scene.game.events.off("poststep", afterStep);
+    afterStep = null;
+  };
+  const handle = (gameSize) => {
+    cancelPending();
     timer = window.setTimeout(() => {
-      if (!scene.sys.isActive()) return;
-      const dpr = scene.game?.registry.get("dpr") || displayRatio();
-      const prev = scene.registry.get("_viewSize") || { w: 0, h: 0 };
-      const next = {
-        w: Math.round(gameSize.width / dpr),
-        h: Math.round(gameSize.height / dpr),
+      // SceneManager handles explicit navigation at the start of the frame.
+      // Read progress only afterwards: a late resize must never queue an old
+      // phase behind a newer chapter/phase navigation request.
+      afterStep = () => {
+        afterStep = null;
+        if (!scene.sys.isActive()) return;
+        const dpr = scene.game?.registry.get("dpr") || displayRatio();
+        const prev = scene.registry.get("_viewSize") || { w: 0, h: 0 };
+        const next = {
+          w: Math.round(gameSize.width / dpr),
+          h: Math.round(gameSize.height / dpr),
+        };
+        const dw = Math.abs(next.w - prev.w);
+        const dh = Math.abs(next.h - prev.h);
+        const flipped = prev.w && prev.h && next.w > next.h !== prev.w > prev.h;
+        if (dw < 28 && dh < 28 && !flipped) return;
+        scene.registry.set("_viewSize", next);
+        if (restart) {
+          const payload = persist?.();
+          scene.scene.restart(payload || undefined);
+          return;
+        }
+        if (typeof scene.relayout === "function") scene.relayout(getView(scene));
       };
-      const dw = Math.abs(next.w - prev.w);
-      const dh = Math.abs(next.h - prev.h);
-      const flipped = prev.w && prev.h && next.w > next.h !== prev.w > prev.h;
-      if (dw < 28 && dh < 28 && !flipped) return;
-      scene.registry.set("_viewSize", next);
-      if (restart) {
-        const payload = persist?.();
-        scene.scene.restart(payload || undefined);
-        return;
-      }
-      if (typeof scene.relayout === "function") {
-        scene.relayout(getView(scene));
-      }
+      scene.game.events.once("poststep", afterStep);
     }, 160);
   };
   const dpr = scene.game?.registry.get("dpr") || displayRatio();
@@ -250,7 +261,7 @@ export function watchResize(scene, { restart = false, persist } = {}) {
   scene.scale.on("resize", handle);
   scene.events.once("shutdown", () => {
     scene.scale.off("resize", handle);
-    window.clearTimeout(timer);
+    cancelPending();
   });
 }
 

@@ -41,3 +41,8 @@ html[data-quest="true"] #game{visibility:hidden}
 @media(max-width:700px){.quest-portrait{display:none}.quest-dialogue{padding:14px;min-height:0}}
 /* Child-first reading uses a readable floor, including hints and credits. */
 #quest-root .quest-eyebrow,#quest-root .quest-dialogue strong,#quest-root .quest-extras p,#quest-root .quest-bottom{font-size:16px}
+
+html[data-quest="true"] #app-layout{background:linear-gradient(#fff2d8,#efd4b9)}
+html[data-quest="true"] #quest-root{background:transparent}
+#quest-root .quest-heading h1:focus{outline:none}
+html[lang="ja"] #quest-root{font-family:"Noto Sans JP","Noto Sans SC",system-ui,sans-serif}

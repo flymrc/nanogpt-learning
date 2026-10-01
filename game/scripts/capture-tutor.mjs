@@ -17,7 +17,8 @@ try {
   await page.waitForFunction(start=>window.__nanoGPTTutorHiDPI().animation.elapsed>start+200,before,{timeout:15000});
   await page.waitForFunction(()=>{
     const p=window.__nanoGPTTutorHiDPI?.()?.params;
-    return p?.eyeOpen>0.9 && p?.mouthOpen<0.25;
+    const a=window.__nanoGPTTutorHiDPI?.()?.animation;
+    return p?.eyeOpen>0.9 && p?.mouthOpen<0.25 && Math.min(a.armA,a.armB)<0.02 && Math.max(a.armA,a.armB)>0.98;
   },{timeout:15000});
   const state=await page.evaluate(()=>window.__nanoGPTTutorHiDPI());
   assert.equal(state.modelCount,1);assert.ok(state.place.bounds.h>700);

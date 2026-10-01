@@ -38,6 +38,19 @@ try {
   await page.waitForURL(/#learn\/rag\/1$/);
   await page.locator('#learning-root article h1').waitFor();
   assert.equal(await page.evaluate(()=>Boolean(window.__nanoGPTGame)),false);
+  // Deterministic navigation/resize race: timers may run before a queued frame.
+  await page.goto(`${base}?animation=1#Level2/0/0`);
+  await page.waitForFunction(()=>window.__nanoGPTState?.().scene==='Level2'&&window.__nanoGPTState?.().phase===0);
+  await page.evaluate(()=>{
+    const game=window.__nanoGPTGame;
+    game.loop.sleep();
+    window.__nanoGPTJump('Level2',0,2);
+    game.scale.resize(game.scale.width-80,game.scale.height);
+  });
+  await page.waitForTimeout(250);
+  await page.evaluate(()=>window.__nanoGPTGame.loop.wake());
+  await page.waitForFunction(()=>window.__nanoGPTState?.().scene==='Level2'&&window.__nanoGPTState?.().beat===0&&window.__nanoGPTState?.().phase===2,null,{timeout:15000});
+  assert.equal(await page.evaluate(()=>window.__nanoGPTGame.scene.getScenes(true).length),1);
   for(const hash of ['#Level1/0.5/2','#%E0%A4%A','#Level1/0/0.5']) {
     await page.goto(`${base}?animation=1&probe=${Date.now()}${hash}`);
     await page.waitForFunction(()=>{const key=window.__nanoGPTGame?.scene.getScenes(true)[0]?.sys.settings.key;return key==='Home'||key==='Level1';},{timeout:60000});
