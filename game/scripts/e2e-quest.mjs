@@ -53,7 +53,8 @@ try{
      }
      for(const q of copies[lang]){
        const [course,n]=q.id.split('-');
-       await page.goto(`${base}#quest/${course}/${n}`);await page.locator('#quest-root').waitFor();
+       await page.goto(`${base}#quest/${course}/${n}`);
+       await page.waitForFunction(id=>document.querySelector('#quest-root')?.dataset.questId===id,q.id,{timeout:15000});
        assert.equal(await page.locator('#quest-root').getAttribute('data-quest-id'),q.id);
        assert.equal(await page.locator('#quest-root .quest-primary').isEnabled(),false,'viewing must not pass');
        await geometry(`${q.id}:${lang}:${viewport.width}:play`);
@@ -87,6 +88,9 @@ try{
  await page.reload();await page.locator('#quest-root').waitFor();assert.equal(await page.locator('#quest-root').getAttribute('data-quest-id'),'nanogpt-2');
  await page.locator('.quest-controls button').nth(1).click();await page.waitForFunction(()=>document.documentElement.lang==='zh-CN');
  assert.equal(await page.locator('#quest-root').getAttribute('data-quest-id'),'nanogpt-2');
+ await page.locator('.quest-controls button').first().click();
+ await page.waitForFunction(()=>window.__nanoGPTGame?.scene.getScenes(true)[0]?.sys.settings.key==='Home');
+ await page.goBack();await page.waitForFunction(()=>document.querySelector('#quest-root')?.dataset.questId==='nanogpt-2');
  await page.locator('.quest-extras summary').click();await page.locator('.quest-extras a').first().click();
  await page.waitForFunction(()=>window.__nanoGPTGame?.scene.getScenes(true)[0]?.sys.settings.key==='Level2');
  await page.goto(`${base}?reader=1#learn/nanogpt/2`);await page.locator('#learning-root h1').waitFor();assert.equal(await page.evaluate(()=>Boolean(window.__nanoGPTGame)),false);
@@ -101,6 +105,7 @@ try{
  assert.deepEqual(errors,[]);assert.deepEqual(failures,[],"Every quest layout must pass");
  console.log('QUEST_OK',JSON.stringify({states:reports.length,quests:15,locales:2,viewports:3,errors}));
 }catch(error){
+ writeFileSync(`${out}/summary.json`,JSON.stringify({reports,errors,failures,incomplete:true,error:String(error)},null,2));
  for(const page of browser.contexts().flatMap(c=>c.pages())){console.error('QUEST_STATE',await page.locator('#quest-root').innerText().catch(()=>''));await page.screenshot({path:`${out}/failure.png`,fullPage:true}).catch(()=>{});}
  throw error;
 }finally{await browser.close();}

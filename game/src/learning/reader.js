@@ -115,6 +115,12 @@ window.addEventListener('hashchange',()=>{
     // Browser Back can restore a query-free legacy deep link after the
     // reader put its game loop to sleep. Reboot from that exact deep link.
     if(legacyPromise)location.reload();else openLegacy();
+  } else {
+    const target=location.hash.match(/^#quest\/(nanogpt|rag|embed)\/([1-5])$/);
+    const active=window.__nanoGPTGame?.scene.getScenes(true)[0];
+    if(target&&active&&active.sys.settings.key!=='Quest'&&active.sys.settings.key!=='Boot'){
+      active.scene.start('Quest',{course:target[1],index:Number(target[2])-1});
+    }
   }
 });
 if(legacyRequested())openLegacy();else render();

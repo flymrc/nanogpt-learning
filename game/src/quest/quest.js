@@ -30,21 +30,26 @@ export function mountQuest(scene,courseId,index=0) {
   scene.game.registry.set("pendingNarration",null);
   scene.game.registry.set("pendingVoice",null);
   scene.game.registry.get("voice")?.stop();
+  let handledRoute='';
   const go=(i,replace=false)=>{
     current=Math.max(0,Math.min(4,i));phase='play';didAction=false;passed=false;
     scene.questIndex=current;
     const hash=`#quest/${courseId}/${current+1}`;
+    handledRoute=hash;
     if(location.hash!==hash)history[replace?'replaceState':'pushState']({quest:true},'',`${location.pathname}${hash}`);
     render();
   };
   const goHome=()=>{history.pushState({},'',location.pathname);scene.scene.start('Home');};
   const onPop=()=>{
+    if(disposed||handledRoute===location.hash)return;
+    handledRoute=location.hash;
     const m=location.hash.match(/^#quest\/(nanogpt|rag|embed)\/([1-5])$/);
     if(m&&m[1]===courseId)go(Number(m[2])-1,true);
     else if(m)scene.scene.restart({course:m[1],index:Number(m[2])-1});
     else if(!location.hash)scene.scene.start('Home');
   };
   window.addEventListener('popstate',onPop);
+  window.addEventListener('hashchange',onPop);
   scene.retreat=()=>current>0?go(current-1):goHome();
   function render(){
     cleanDemo?.();cleanDemo=null;root.replaceChildren();root.scrollTop=0;
@@ -121,5 +126,5 @@ export function mountQuest(scene,courseId,index=0) {
     root.querySelector('h1')?.focus({preventScroll:true});
   }
   go(index,true);
-  return ()=>{disposed=true;cleanDemo?.();window.removeEventListener('popstate',onPop);root.remove();delete document.documentElement.dataset.quest;cancelSpeech();};
+  return ()=>{disposed=true;cleanDemo?.();window.removeEventListener('popstate',onPop);window.removeEventListener('hashchange',onPop);root.remove();delete document.documentElement.dataset.quest;cancelSpeech();};
 }
