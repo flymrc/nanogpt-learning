@@ -7,7 +7,7 @@ mkdirSync('output/quest',{recursive:true});
 try {
   page = await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});
   page.on('console',m=>{if(m.type()==='error')console.log(m.text())});
-  await page.goto(`${process.env.E2E_URL||'http://127.0.0.1:4182/'}?animation=1`);
+  await page.goto(`${process.env.E2E_URL||'http://127.0.0.1:4182/'}?animation=1&capture=1`);
   await page.waitForFunction(()=>window.__nanoGPTTutorHiDPI?.()?.modelCount===1,{timeout:90000});
   await page.waitForFunction(()=>{
     const a=window.__nanoGPTTutorHiDPI?.()?.animation;
@@ -20,6 +20,7 @@ try {
     const a=window.__nanoGPTTutorHiDPI?.()?.animation;
     return p?.eyeOpen>0.9 && p?.mouthOpen<0.25 && Math.min(a.armA,a.armB)<0.02 && Math.max(a.armA,a.armB)>0.98;
   },{timeout:15000});
+  assert.equal(await page.evaluate(()=>window.__nanoGPTFreezeTutorForCapture()),true);
   const state=await page.evaluate(()=>window.__nanoGPTTutorHiDPI());
   assert.equal(state.modelCount,1);assert.ok(state.place.bounds.h>700);
   await page.addStyleTag({content:'html,body,#app-layout,#pc-stage,#tutor-dock,#tutor-stage{background:transparent!important} #pc-stage{visibility:hidden} #tutor-dock{visibility:visible}'});

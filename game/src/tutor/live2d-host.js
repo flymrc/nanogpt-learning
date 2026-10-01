@@ -777,6 +777,26 @@ function applyLookOverwrite() {
 }
 
 function installDebugProbe() {
+  if (new URLSearchParams(location.search).get("capture") === "1") {
+    // Asset generation only. Normal visits keep the fully animated tutor.
+    window.__nanoGPTFreezeTutorForCapture = () => {
+      if (!pixiApp || !model) return false;
+      pixiApp.stop();
+      talking = false;
+      if (mouthRaf) cancelAnimationFrame(mouthRaf);
+      mouthRaf = 0;
+      const core = model.internalModel.coreModel;
+      core.setParameterValueById("ParamEyeLOpen", 1);
+      core.setParameterValueById("ParamEyeROpen", 1);
+      core.setParameterValueById("ParamMouthOpenY", 0);
+      core.setPartOpacityById("PartArmA", 1);
+      core.setPartOpacityById("PartArmB", 0);
+      core.update();
+      model.deltaTime = 0;
+      pixiApp.render();
+      return true;
+    };
+  }
   window.__nanoGPTTutorHiDPI = () => {
     const canvas = document.getElementById("tutor-canvas");
     const stage = document.getElementById("tutor-stage");

@@ -46,3 +46,4 @@ html[data-quest="true"] #app-layout{background:linear-gradient(#fff2d8,#efd4b9)}
 html[data-quest="true"] #quest-root{background:transparent}
 #quest-root .quest-heading h1:focus{outline:none}
 html[lang="ja"] #quest-root{font-family:"Noto Sans JP","Noto Sans SC",system-ui,sans-serif}
+html[data-quest="true"] #game-shell,html[data-quest="true"] #pc-stage{background:transparent!important}
