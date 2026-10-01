@@ -73,6 +73,14 @@ function expectedVo(lang, key, beat) {
   };
 }
 
+// Run one complete course per CI job; the default retains all original coverage.
+const COURSE = process.env.E2E_COURSE || "all";
+if (!["all", "nanogpt", "rag", "embed"].includes(COURSE)) {
+  throw new Error(`Invalid E2E_COURSE=${JSON.stringify(COURSE)}; expected all, nanogpt, rag, or embed`);
+}
+const courseSelected = (course) => COURSE === "all" || COURSE === course;
+console.log(`E2E_SCOPE scope=${COURSE}`);
+
 const OUT = process.env.E2E_OUT || "output/legacy";
 mkdirSync(OUT, { recursive: true });
 const animationBase = new URL(process.env.E2E_URL || "http://127.0.0.1:4182/");
@@ -87,7 +95,7 @@ const launchOptions = {
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader"],
 };
-const browser = await chromium.launch(launchOptions);
+const browser = courseSelected("nanogpt") ? await chromium.launch(launchOptions) : null;
 
 async function ready(page) {
   page.on('pageerror', error => console.error('PAGE_ERROR', error.stack));
@@ -904,7 +912,8 @@ async function assertMuteSlash(page) {
   return box;
 }
 
-const speech = await assertJaSpeech(browser);
+// Shared speech/language, Home, and Live2D coverage belongs to nanogpt.
+const speech = courseSelected("nanogpt") ? await assertJaSpeech(browser) : undefined;
 
 const LIVE2D_FIT_SIZES = [
   [1440, 900],
@@ -1439,7 +1448,7 @@ async function assertHiddenBackdrop(page) {
   }
 }
 
-const nanoRun = (async () => {
+const nanoRun = courseSelected("nanogpt") ? (async () => {
 const mobile = await runViewport(
   "mobile",
   {
@@ -1474,7 +1483,7 @@ const pc1024 = await runViewport(
 const live2dFit = await assertLive2dPanel(browser);
 const home = await assertHomeHub(browser);
 return { mobile, pc, pc1024, live2dFit, home };
-})();
+})() : Promise.resolve(null);
 
 function homeShot(lang, width, height) {
   return `${OUT}/home/home-${lang}-${width}x${height}.png`;
@@ -1962,7 +1971,7 @@ async function runRagViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
-const ragRun = (async () => {
+const ragRun = courseSelected("rag") ? (async () => {
 const browser = await chromium.launch(launchOptions);
 const ragMobile = await runRagViewport(
   browser,
@@ -1993,7 +2002,7 @@ await saveRag5Shots(browser);
 await saveRag6Shots(browser);
 await browser.close();
 return { ragMobile, ragPc, ragPc1024 };
-})();
+})() : Promise.resolve(null);
 
 async function shootRag5(page, key, beat, phase, taps, file) {
   await jumpLanded(page, key, beat, phase);
@@ -2236,7 +2245,7 @@ async function runEmbedViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
-const embedRun = (async () => {
+const embedRun = courseSelected("embed") ? (async () => {
 const browser = await chromium.launch(launchOptions);
 const embedMobile = await runEmbedViewport(
   browser,
@@ -2267,7 +2276,7 @@ await saveEmbedShots(browser);
 await saveEmb4Shots(browser);
 await browser.close();
 return { embedMobile, embedPc, embedPc1024 };
-})();
+})() : Promise.resolve(null);
 
 async function saveEmbedShots(browser) {
   const dir = `${OUT}/emb3`;
@@ -2373,139 +2382,152 @@ async function saveEmb4Shots(browser) {
 
 
 
-// Each course uses its own browser process so focus changes do not pause
-// another course's Phaser loop. Preserve every original
-// assertion and final count, while overlapping the three independent walks.
-const [
-  { mobile, pc, pc1024, live2dFit, home },
-  { ragMobile, ragPc, ragPc1024 },
-  { embedMobile, embedPc, embedPc1024 },
-] = await Promise.all([nanoRun, ragRun, embedRun]);
-await browser.close();
+// Each selected course keeps its own browser process. No unselected course
+// launches a browser or executes a walk; default "all" retains all three walks.
+const [nano, rag, embed] = await Promise.all([nanoRun, ragRun, embedRun]);
+await browser?.close();
 
-const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024, embedMobile, embedPc, embedPc1024 };
-writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
+const summary = {
+  scope: COURSE,
+  executedCourses: [nano && "nanogpt", rag && "rag", embed && "embed"].filter(Boolean),
+  ...(nano ? { ...nano, speech } : {}),
+  ...(rag || {}),
+  ...(embed || {}),
+};
+const validation = {};
+const successCounts = [];
 
-const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
-const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && pc1024.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen && pc1024.notesOpen;
-const spineOk =
-  mobile.spine.l1 === 11 &&
-  mobile.spine.l2 === 11 &&
-  mobile.spine.l3 === 9 &&
-  mobile.spine.l4 === 9 &&
-  mobile.spine.l5 === 9 &&
-  mobile.spine.phases === 5 &&
-  pc.spine.l1 === 11 &&
-  pc.spine.l5 === 9;
-const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49 && pc1024.walked === 49;
-const pseudoOk =
-  tipOk(mobile.pseudoEncode, "号码") &&
-  tipOk(pc.pseudoEncode, "号码") &&
-  tipOk(mobile.pseudoShift, "右") &&
-  tipOk(pc.pseudoShift, "右") &&
-  tipOk(mobile.pseudoLoss, "扣分") &&
-  tipOk(pc.pseudoLoss, "扣分") &&
-  tipOk(mobile.pseudoMask, "前面") &&
-  tipOk(pc.pseudoMask, "前面") &&
-  tipOk(mobile.pseudoTrain, "一点点") &&
-  tipOk(pc.pseudoTrain, "一点点") &&
-  tipOk(mobile.pseudoSample, "接") &&
-  tipOk(pc.pseudoSample, "接");
-const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
-const trainOk = mobile.trainLayout?.ok && pc.trainLayout?.ok;
-const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
-const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
-const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
-const speechOk = speech?.voiced === true && speech?.missing === true;
-const live2dOk = live2dFit?.ok === true;
-const homeOk = home?.ok === true;
-const ragWalked =
-  ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
-const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
-const embedWalked =
-  embedMobile.walked === 40 * 5 * 2 && embedPc.walked === 40 * 2 && embedPc1024.walked === 40 * 2;
-const embedOk = embedMobile.ok && embedPc.ok && embedPc1024.ok && embedWalked;
-const stageReports = [...ragMobile.reports, ...ragPc.reports, ...ragPc1024.reports];
-const embedStageReports = [...embedMobile.reports, ...embedPc.reports, ...embedPc1024.reports];
-const stage = stageReports.reduce(
-  (sum, report) => {
-    const tally = report.stageTally || {};
-    sum.checks += report.stageChecks || 0;
-    sum.mid += report.stageMid || 0;
-    sum.overlaps += tally.overlaps || 0;
-    sum.tiny += tally.tiny || 0;
-    sum.short += tally.short || 0;
-    sum.fill += tally.fill || 0;
-    sum.actors += tally.actors || 0;
-    sum.contrast += tally.contrast || 0;
-    sum.words += tally.words || 0;
-    sum.empty += tally.empty || 0;
-    return sum;
-  },
-  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 },
-);
-const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
-const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.empty === 0 && stage.mid >= doPages && stage.checks > 0;
-const embedStage = embedStageReports.reduce(
-  (sum, report) => {
-    const tally = report.stageTally || {};
-    sum.checks += report.stageChecks || 0;
-    sum.mid += report.stageMid || 0;
-    sum.overlaps += tally.overlaps || 0;
-    sum.tiny += tally.tiny || 0;
-    sum.short += tally.short || 0;
-    sum.fill += tally.fill || 0;
-    sum.actors += tally.actors || 0;
-    sum.contrast += tally.contrast || 0;
-    sum.words += tally.words || 0;
-    sum.empty += tally.empty || 0;
-    sum.mapMiss += tally.mapMiss || 0;
-    sum.mapLabelOverlaps += tally.mapLabelOverlaps || 0;
-    sum.mapDrift += tally.mapDrift || 0;
-    sum.lassoOut += tally.lassoOut || 0;
-    return sum;
-  },
-  { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, mapDrift: 0, lassoOut: 0 },
-);
-const embedDoPages = embedStageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
-const embedStageOk = embedStage.overlaps === 0 && embedStage.tiny === 0 && embedStage.short === 0 && embedStage.fill === 0 && embedStage.actors === 0 && embedStage.contrast === 0 && embedStage.words === 0 && embedStage.empty === 0 && embedStage.mapMiss === 0 && embedStage.mapLabelOverlaps === 0 && embedStage.mapDrift === 0 && embedStage.lassoOut === 0 && embedStage.mid >= embedDoPages && embedStage.checks > 0;
-const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
-const embedStageLine = `EMBED_STAGE_${embedStageOk ? "OK" : "FAIL"} checks=${embedStage.checks} mid=${embedStage.mid} overlaps=${embedStage.overlaps} tiny=${embedStage.tiny} short=${embedStage.short} fill=${embedStage.fill} actors=${embedStage.actors} contrast=${embedStage.contrast} words=${embedStage.words} empty=${embedStage.empty} mapMiss=${embedStage.mapMiss} mapLabelOverlaps=${embedStage.mapLabelOverlaps} mapDrift=${embedStage.mapDrift} lassoOut=${embedStage.lassoOut}`;
-console.log(stageLine);
-console.log(embedStageLine);
-if (failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk || !ragOk || !stageOk || !embedOk || !embedStageOk) {
-  console.error("E2E_FAIL", {
+if (nano) {
+  const { mobile, pc, pc1024, live2dFit, home } = nano;
+  const failed = [...mobile.reports, ...pc.reports, ...pc1024.reports].filter((r) => !r.ok);
+  const overlays = mobile.bookOpen.titles >= 5 && pc.bookOpen.titles >= 5 && pc1024.bookOpen.titles >= 5 && mobile.notesOpen && pc.notesOpen && pc1024.notesOpen;
+  const spineOk =
+    mobile.spine.l1 === 11 &&
+    mobile.spine.l2 === 11 &&
+    mobile.spine.l3 === 9 &&
+    mobile.spine.l4 === 9 &&
+    mobile.spine.l5 === 9 &&
+    mobile.spine.phases === 5 &&
+    pc.spine.l1 === 11 &&
+    pc.spine.l5 === 9;
+  const walkedAll = mobile.walked === 49 * 5 && pc.walked === 49 && pc1024.walked === 49;
+  const pseudoOk =
+    tipOk(mobile.pseudoEncode, "号码") &&
+    tipOk(pc.pseudoEncode, "号码") &&
+    tipOk(mobile.pseudoShift, "右") &&
+    tipOk(pc.pseudoShift, "右") &&
+    tipOk(mobile.pseudoLoss, "扣分") &&
+    tipOk(pc.pseudoLoss, "扣分") &&
+    tipOk(mobile.pseudoMask, "前面") &&
+    tipOk(pc.pseudoMask, "前面") &&
+    tipOk(mobile.pseudoTrain, "一点点") &&
+    tipOk(pc.pseudoTrain, "一点点") &&
+    tipOk(mobile.pseudoSample, "接") &&
+    tipOk(pc.pseudoSample, "接");
+  const attnOk = mobile.attnLayout?.ok && pc.attnLayout?.ok;
+  const trainOk = mobile.trainLayout?.ok && pc.trainLayout?.ok;
+  const sampleOk = mobile.sampleLayout?.ok && pc.sampleLayout?.ok;
+  const chromeOk = mobile.chrome.actionsRight <= mobile.chrome.width + 1 && mobile.chrome.chromeRight <= mobile.chrome.width + 1;
+  const flowOk = mobile.guideShown && pc.guideShown && pc1024.guideShown;
+  const speechOk = speech?.voiced === true && speech?.missing === true;
+  const live2dOk = live2dFit?.ok === true;
+  const homeOk = home?.ok === true;
+  const ok = !(failed.length || !overlays || !walkedAll || !spineOk || !pseudoOk || !attnOk || !trainOk || !sampleOk || !chromeOk || !flowOk || !speechOk || !live2dOk || !homeOk);
+  validation.nanogpt = {
+    ok,
     failed: failed.map((r) => r.name),
     mobileWalked: mobile.walked,
     pcWalked: pc.walked,
     pc1024Walked: pc1024.walked,
-    overlays,
-    spineOk,
-    pseudoOk,
-    attnOk,
-    trainOk,
-    sampleOk,
-    chromeOk,
-    flowOk,
-    speechOk,
-    speech,
-    live2dOk,
-    live2dFit,
-    homeOk,
-    home,
-    ragOk,
-    ragWalked,
-    stageOk,
-    stage,
-    embedOk,
-    embedWalked,
-    embedStageOk,
-    embedStage,
-    ragMobile: ragMobile.walked,
-    ragPc: ragPc.walked,
-    ragPc1024: ragPc1024.walked,
+    overlays, walkedAll, spineOk, pseudoOk, attnOk, trainOk, sampleOk,
+    chromeOk, flowOk, speechOk, speech, live2dOk, live2dFit, homeOk, home,
     mobileChrome: mobile.chrome,
-  });
+  };
+  const counts = `mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} jaSpeech=${Number(speechOk)}`;
+  console.log(`E2E_COURSE_${ok ? "OK" : "FAIL"} scope=nanogpt ${counts}`);
+  successCounts.push(counts);
+}
+
+if (rag) {
+  const { ragMobile, ragPc, ragPc1024 } = rag;
+  const ragWalked =
+    ragMobile.walked === 60 * 5 * 2 && ragPc.walked === 60 * 2 && ragPc1024.walked === 60 * 2;
+  const ragOk = ragMobile.ok && ragPc.ok && ragPc1024.ok && ragWalked;
+  const stageReports = [...ragMobile.reports, ...ragPc.reports, ...ragPc1024.reports];
+  const stage = stageReports.reduce(
+    (sum, report) => {
+      const tally = report.stageTally || {};
+      sum.checks += report.stageChecks || 0;
+      sum.mid += report.stageMid || 0;
+      sum.overlaps += tally.overlaps || 0;
+      sum.tiny += tally.tiny || 0;
+      sum.short += tally.short || 0;
+      sum.fill += tally.fill || 0;
+      sum.actors += tally.actors || 0;
+      sum.contrast += tally.contrast || 0;
+      sum.words += tally.words || 0;
+      sum.empty += tally.empty || 0;
+      return sum;
+    },
+    { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0 },
+  );
+  const doPages = stageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
+  const stageOk = stage.overlaps === 0 && stage.tiny === 0 && stage.short === 0 && stage.fill === 0 && stage.actors === 0 && stage.contrast === 0 && stage.words === 0 && stage.empty === 0 && stage.mid >= doPages && stage.checks > 0;
+  const stageLine = `RAG_STAGE_${stageOk ? "OK" : "FAIL"} checks=${stage.checks} mid=${stage.mid} overlaps=${stage.overlaps} tiny=${stage.tiny} short=${stage.short} fill=${stage.fill} actors=${stage.actors} contrast=${stage.contrast} words=${stage.words} empty=${stage.empty}`;
+  console.log(stageLine);
+  const ok = ragOk && stageOk;
+  validation.rag = { ok, ragOk, ragWalked, stageOk, stage, ragMobile: ragMobile.walked, ragPc: ragPc.walked, ragPc1024: ragPc1024.walked };
+  const counts = `ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked}`;
+  console.log(`E2E_COURSE_${ok ? "OK" : "FAIL"} scope=rag ${counts}`);
+  successCounts.push(counts);
+}
+
+if (embed) {
+  const { embedMobile, embedPc, embedPc1024 } = embed;
+  const embedWalked =
+    embedMobile.walked === 40 * 5 * 2 && embedPc.walked === 40 * 2 && embedPc1024.walked === 40 * 2;
+  const embedOk = embedMobile.ok && embedPc.ok && embedPc1024.ok && embedWalked;
+  const embedStageReports = [...embedMobile.reports, ...embedPc.reports, ...embedPc1024.reports];
+  const embedStage = embedStageReports.reduce(
+    (sum, report) => {
+      const tally = report.stageTally || {};
+      sum.checks += report.stageChecks || 0;
+      sum.mid += report.stageMid || 0;
+      sum.overlaps += tally.overlaps || 0;
+      sum.tiny += tally.tiny || 0;
+      sum.short += tally.short || 0;
+      sum.fill += tally.fill || 0;
+      sum.actors += tally.actors || 0;
+      sum.contrast += tally.contrast || 0;
+      sum.words += tally.words || 0;
+      sum.empty += tally.empty || 0;
+      sum.mapMiss += tally.mapMiss || 0;
+      sum.mapLabelOverlaps += tally.mapLabelOverlaps || 0;
+      sum.mapDrift += tally.mapDrift || 0;
+      sum.lassoOut += tally.lassoOut || 0;
+      return sum;
+    },
+    { checks: 0, mid: 0, overlaps: 0, tiny: 0, short: 0, fill: 0, actors: 0, contrast: 0, words: 0, empty: 0, mapMiss: 0, mapLabelOverlaps: 0, mapDrift: 0, lassoOut: 0 },
+  );
+  const embedDoPages = embedStageReports.filter((report) => /-p2-do$/.test(report.name || "")).length;
+  const embedStageOk = embedStage.overlaps === 0 && embedStage.tiny === 0 && embedStage.short === 0 && embedStage.fill === 0 && embedStage.actors === 0 && embedStage.contrast === 0 && embedStage.words === 0 && embedStage.empty === 0 && embedStage.mapMiss === 0 && embedStage.mapLabelOverlaps === 0 && embedStage.mapDrift === 0 && embedStage.lassoOut === 0 && embedStage.mid >= embedDoPages && embedStage.checks > 0;
+  const embedStageLine = `EMBED_STAGE_${embedStageOk ? "OK" : "FAIL"} checks=${embedStage.checks} mid=${embedStage.mid} overlaps=${embedStage.overlaps} tiny=${embedStage.tiny} short=${embedStage.short} fill=${embedStage.fill} actors=${embedStage.actors} contrast=${embedStage.contrast} words=${embedStage.words} empty=${embedStage.empty} mapMiss=${embedStage.mapMiss} mapLabelOverlaps=${embedStage.mapLabelOverlaps} mapDrift=${embedStage.mapDrift} lassoOut=${embedStage.lassoOut}`;
+  console.log(embedStageLine);
+  const ok = embedOk && embedStageOk;
+  validation.embed = { ok, embedOk, embedWalked, embedStageOk, embedStage, embedMobile: embedMobile.walked, embedPc: embedPc.walked, embedPc1024: embedPc1024.walked };
+  const counts = `embedMobile=${embedMobile.walked} embedPc=${embedPc.walked} embedPc1024=${embedPc1024.walked}`;
+  console.log(`E2E_COURSE_${ok ? "OK" : "FAIL"} scope=embed ${counts}`);
+  successCounts.push(counts);
+}
+
+const expectedCourses = ["nanogpt", "rag", "embed"].filter(courseSelected);
+if (summary.executedCourses.join(",") !== expectedCourses.join(",")) {
+  throw new Error(`Incomplete selected course execution: ${summary.executedCourses} expected ${expectedCourses}`);
+}
+summary.validation = validation;
+writeFileSync(`${OUT}/summary.json`, JSON.stringify(summary, null, 2));
+if (Object.values(validation).some((result) => !result.ok)) {
+  console.error("E2E_FAIL", { scope: COURSE, validation });
   process.exit(1);
 }
-console.log(`E2E_OK mobile=${mobile.walked} pc=${pc.walked} pc1024=${pc1024.walked} ragMobile=${ragMobile.walked} ragPc=${ragPc.walked} ragPc1024=${ragPc1024.walked} embedMobile=${embedMobile.walked} embedPc=${embedPc.walked} embedPc1024=${embedPc1024.walked} jaSpeech=1`);
+console.log(`E2E_OK scope=${COURSE} ${successCounts.join(" ")}`);

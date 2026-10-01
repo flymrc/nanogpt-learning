@@ -1,0 +1,64 @@
+name: Immutable animation acceptance
+on:
+  push:
+    branches: [cartoon-animation-qa]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  animation:
+    if: github.repository == 'flymrc/nanogpt-learning' && github.ref == 'refs/heads/cartoon-animation-qa'
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.58.2-noble
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        course: [nanogpt, rag, embed]
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+      - run: npm ci
+      - name: Verify the exact source build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {data:run}=await github.rest.actions.getWorkflowRun({owner:context.repo.owner,repo:context.repo.repo,run_id:36893708608});
+            const {data:jobs}=await github.rest.actions.listJobsForWorkflowRun({owner:context.repo.owner,repo:context.repo.repo,run_id:36893708608});
+            if(run.head_sha!=='9d4ac20c86c7bf57adf674a4c9ab661acfd30142'||!jobs.jobs.some(j=>j.name==='build'&&j.conclusion==='success'))throw new Error('The required immutable source build is unavailable');
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-cartoon-game
+          run-id: 36893708608
+          github-token: ${{ github.token }}
+          path: game/
+      - uses: actions/download-artifact@v4
+        with:
+          name: character-render-evidence
+          run-id: 36893708608
+          github-token: ${{ github.token }}
+          path: verification/
+      - name: Verify unchanged distribution and start preview
+        run: |
+          sha256sum -c ../verification/build-sha256.txt
+          npm run preview -- --host 127.0.0.1 --port 4182 > /tmp/game-preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4182/ >/dev/null && break; sleep 1; done
+      - name: All pages and assertions for this course
+        env:
+          E2E_COURSE: ${{ matrix.course }}
+        run: npm run e2e
+      - name: Preserve scoped screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: animation-${{ matrix.course }}
+          path: game/output/
+          retention-days: 7

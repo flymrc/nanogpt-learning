@@ -49,11 +49,18 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     container: mcr.microsoft.com/playwright:v1.58.2-noble
-    timeout-minutes: 60
+    name: ${{ matrix.label }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
-        suite: [quest, reader, legacy]
+        include:
+          - { suite: quest, label: 'visual (quest)', course: '' }
+          - { suite: reader, label: 'visual (reader)', course: '' }
+          - { suite: legacy, label: 'visual (legacy-nanogpt)', course: nanogpt }
+          - { suite: legacy, label: 'visual (legacy-rag)', course: rag }
+          - { suite: legacy, label: 'visual (legacy-embed)', course: embed }
     defaults:
       run:
         working-directory: game
@@ -82,11 +89,13 @@ jobs:
         run: npm run e2e:reader && npm run e2e:regressions
       - name: All original animation layouts
         if: matrix.suite == 'legacy'
+        env:
+          E2E_COURSE: ${{ matrix.course }}
         run: npm run e2e
       - name: Preserve screenshots and reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: game-qa-${{ matrix.suite }}
+          name: game-qa-${{ matrix.suite }}${{ matrix.course }}
           path: game/output/
           retention-days: 7
