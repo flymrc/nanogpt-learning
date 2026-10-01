@@ -854,7 +854,7 @@ async function assertKeyLines(page) {
     ["Level5", 0, 2, ["新的字"], "zh-c5-intro-do"],
   ];
   for (const [key, beat, phase, needles, file] of cases) {
-    await page.evaluate(([k, b, p]) => window.__nanoGPTJump(k, b, p), [key, beat, phase]);
+    await jumpLanded(page, key, beat, phase);
     await page.waitForFunction(() => window.__nanoGPTCard?.shown, { timeout: 15000 });
     await page.waitForTimeout(300);
     const card = await page.evaluate(() => window.__nanoGPTCard || {});
@@ -866,7 +866,7 @@ async function assertKeyLines(page) {
     }
     await page.screenshot({ path: `${OUT}/mobile-${file}.png` });
   }
-  await page.evaluate(() => window.__nanoGPTJump("Level1", 4, 1));
+  await jumpLanded(page, "Level1", 4, 1);
   await page.waitForTimeout(300);
   await page.click("#book-toggle");
   await page.waitForTimeout(250);
