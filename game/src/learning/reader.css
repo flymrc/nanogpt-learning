@@ -14,7 +14,6 @@ html[data-reader="true"] body > :not(#learning-root):not(script):not(#reader-err
 #learning-root button, #learning-root input, #learning-root select { font:inherit; line-height:1.4; min-height:44px; padding:10px 14px; border:1px solid #a8b8ac; border-radius:7px; background:#fffef9; color:#23372f; max-width:100%; }
 #learning-root button { cursor:pointer; font-weight:650; }
 #learning-root button[type="submit"] { background:#23523e; color:white; border-color:#23523e; }
-#learning-root :focus-visible, #reader-return:focus-visible { outline:3px solid #bd602b; outline-offset:4px; }
 #learning-root .eyebrow { color:#52665b; font-weight:600; font-size:16px; margin-top:36px; }
 #learning-root .lead { max-width:740px; font-size:20px; }
 #learning-root .course-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:24px; margin:32px 0; }
@@ -46,7 +45,6 @@ html[data-reader="true"] body > :not(#learning-root):not(script):not(#reader-err
 #learning-root .chapter-footer a { padding:12px 0; }
 #learning-root .skip-link { position:absolute; left:-9999px; }
 #learning-root .skip-link:focus { position:static; }
-#reader-return { display:block; margin-top:16px; font:600 16px system-ui; padding:10px 14px; border:2px solid #23523e; border-radius:7px; color:#23523e; background:#fffef9; }
 @media(max-width:760px) {
  #learning-root { padding:0 20px 36px; }
  #learning-root header { gap:12px; }

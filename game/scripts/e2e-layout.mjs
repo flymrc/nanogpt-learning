@@ -8,8 +8,8 @@
  * Big-band checks alone missed that class (caption on the Second tiles, ellipsis on S).
  * Home is extra: 390×844, 1024×522, 1024×640, 1440×900, 1920×1080, zh and ja.
  */
-import { chromium } from 'playwright';
-import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { chromium, chromeLaunchOptions } from './browser.mjs';
+import { mkdirSync, writeFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import { present } from "../src/i18n/locale.js";
 import { JA } from "../src/i18n/ja.js";
@@ -29,7 +29,6 @@ const LEVEL_PAGES = {
   Level4: pagesFor(4),
   Level5: pagesFor(5),
 };
-const speechReplacements = JSON.parse(readFileSync(new URL('../src/audio/speech-fallbacks.json', import.meta.url), 'utf8'));
 
 const RAG_LEVEL_PAGES = {
   Rag1: ragPagesFor(1),
@@ -67,7 +66,6 @@ function expectedVo(lang, key, beat) {
   const id = key === "Title" ? "title" : LEVEL_PAGES[key][beat].id;
   return {
     id,
-    source: speechReplacements[`${lang}:${id}.vo`] ? 'speech' : 'clip',
     prefix: pack.voiceBeat,
     text: present(pack[`${id}.vo`] || "").replace(/\s+/g, " ").trim(),
   };
@@ -75,18 +73,16 @@ function expectedVo(lang, key, beat) {
 
 const OUT = process.env.E2E_OUT || "output/legacy";
 mkdirSync(OUT, { recursive: true });
-const animationBase = new URL(process.env.E2E_URL || "http://127.0.0.1:4182/");
-animationBase.searchParams.set('animation', '1');
-const BASE = animationBase.href;
+// The kid animation home is the site root. No query parameter is needed.
+const BASE = process.env.E2E_URL || "http://127.0.0.1:4182/";
 
 const PHASE_NAMES = ["aim", "look", "do", "box", "check"];
 const SNAP = /title|L1-b1-p2|L2-b0-p0|L2-b5-p0|L2-b2-p2|L1-b0-p0/;
 
-const launchOptions = {
-  ...(process.env.CHROME ? { executablePath: process.env.CHROME } : {}),
+const launchOptions = chromeLaunchOptions({
   headless: true,
   args: ["--no-sandbox", "--disable-dev-shm-usage", "--use-gl=angle", "--use-angle=swiftshader"],
-};
+});
 const browser = await chromium.launch(launchOptions);
 
 async function ready(page) {
@@ -113,7 +109,7 @@ async function assertVo(page, key, beat) {
       const body = line.startsWith(expected.prefix) ? line.slice(expected.prefix.length).trim() : "";
       return pageId === expected.id
         && narr.id === expected.id
-        && narr.source === expected.source
+        && narr.source === "clip"
         && body === expected.text
         && utter === expected.text
         && narrText === expected.text;
@@ -1439,7 +1435,7 @@ async function assertHiddenBackdrop(page) {
   }
 }
 
-const nanoRun = (async () => {
+const nanoRun = async () => {
 const mobile = await runViewport(
   "mobile",
   {
@@ -1474,7 +1470,7 @@ const pc1024 = await runViewport(
 const live2dFit = await assertLive2dPanel(browser);
 const home = await assertHomeHub(browser);
 return { mobile, pc, pc1024, live2dFit, home };
-})();
+};
 
 function homeShot(lang, width, height) {
   return `${OUT}/home/home-${lang}-${width}x${height}.png`;
@@ -1724,7 +1720,7 @@ async function assertHomeDeepLinks(page) {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level2" && state.beat === 1 && state.phase === 2;
   }, null, { timeout: 30000 });
-  await openFresh(page, `${BASE}&scene=Level1&beat=2&phase=1`);
+  await openFresh(page, `${BASE}?scene=Level1&beat=2&phase=1`);
   await page.waitForFunction(() => {
     const state = window.__nanoGPTState?.();
     return state?.scene === "Level1" && state.beat === 2 && state.phase === 1;
@@ -1962,7 +1958,7 @@ async function runRagViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
-const ragRun = (async () => {
+const ragRun = async () => {
 const browser = await chromium.launch(launchOptions);
 const ragMobile = await runRagViewport(
   browser,
@@ -1993,7 +1989,7 @@ await saveRag5Shots(browser);
 await saveRag6Shots(browser);
 await browser.close();
 return { ragMobile, ragPc, ragPc1024 };
-})();
+};
 
 async function shootRag5(page, key, beat, phase, taps, file) {
   await jumpLanded(page, key, beat, phase);
@@ -2236,7 +2232,7 @@ async function runEmbedViewport(browser, label, pageOpts, { allPhases }) {
   };
 }
 
-const embedRun = (async () => {
+const embedRun = async () => {
 const browser = await chromium.launch(launchOptions);
 const embedMobile = await runEmbedViewport(
   browser,
@@ -2267,7 +2263,7 @@ await saveEmbedShots(browser);
 await saveEmb4Shots(browser);
 await browser.close();
 return { embedMobile, embedPc, embedPc1024 };
-})();
+};
 
 async function saveEmbedShots(browser) {
   const dir = `${OUT}/emb3`;
@@ -2374,13 +2370,18 @@ async function saveEmb4Shots(browser) {
 
 
 // Each course uses its own browser process so focus changes do not pause
-// another course's Phaser loop. Preserve every original
-// assertion and final count, while overlapping the three independent walks.
+// another course's Phaser loop. The walks run one after another by default
+// (as on 5cf647a): on a loaded 8-core box the overlapped walks starved the
+// nanoGPT page and timed out. E2E_PARALLEL=1 overlaps them on a big machine.
+// Every assertion and final count is the same either way.
+const runs = process.env.E2E_PARALLEL === "1"
+  ? await Promise.all([nanoRun(), ragRun(), embedRun()])
+  : [await nanoRun(), await ragRun(), await embedRun()];
 const [
   { mobile, pc, pc1024, live2dFit, home },
   { ragMobile, ragPc, ragPc1024 },
   { embedMobile, embedPc, embedPc1024 },
-] = await Promise.all([nanoRun, ragRun, embedRun]);
+] = runs;
 await browser.close();
 
 const summary = { mobile, pc, pc1024, speech, home, ragMobile, ragPc, ragPc1024, embedMobile, embedPc, embedPc1024 };

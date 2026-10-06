@@ -238,7 +238,7 @@ function drawTiles(scene, stage, glyphs, top, { minW = 28, minH = 28, maxW = 46,
     scene.frame.stage.add(node);
     if (onTap) {
       node.setInteractive(
-        new Phaser.Geom.Rectangle(-grid.tileW / 2, -grid.tileH / 2, grid.tileW, grid.tileH),
+        new Phaser.Geom.Rectangle(0, 0, grid.tileW, grid.tileH),
         Phaser.Geom.Rectangle.Contains,
       );
       node.on("pointerdown", (pointer, _x, _y, event) => {

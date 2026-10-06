@@ -147,7 +147,7 @@ export default class EndScene extends Phaser.Scene {
 
       panel.setSize(cardW, cardH);
       panel.setInteractive(
-        new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH),
+        new Phaser.Geom.Rectangle(0, 0, cardW, cardH),
         Phaser.Geom.Rectangle.Contains,
       );
       panel.on("pointerdown", (pointer, _lx, _ly, event) => {

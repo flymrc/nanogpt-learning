@@ -262,7 +262,7 @@ export function addPurposeBanner(scene, rect, { phone = false } = {}) {
     more.setText(t("purposeMore"));
     more.setPosition(-next.w / 2 + 26 + kicker.width + 10, row);
     more.setVisible(true);
-    box.setInteractive(new Phaser.Geom.Rectangle(-next.w / 2, -next.h / 2, next.w, next.h), Phaser.Geom.Rectangle.Contains);
+    box.setInteractive(new Phaser.Geom.Rectangle(0, 0, next.w, next.h), Phaser.Geom.Rectangle.Contains);
     box.on("pointerdown", (_pointer, _x, _y, event) => {
       event?.stopPropagation?.();
       openCopyPop(window.__nanoGPTPurposeFull || "");

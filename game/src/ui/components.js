@@ -281,7 +281,7 @@ export function createButton(scene, x, y, label, onClick, opts = {}) {
 
   container.add(cap ? [bg, text, cap] : [bg, text]);
   container.setSize(w, h);
-  container.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
+  container.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
   container.input.cursor = "pointer";
 
   container.on("pointerover", () => {
@@ -381,17 +381,7 @@ export function makeChip(scene, x, y, { glyph, id, accent = C.blue, width = 62, 
     idText.setFontSize(idSize);
     guard += 1;
   }
-  let textOk = layoutChipText(ch, idText, height, stripeH) && idSize >= MIN_ID_FONT;
-  // Short landscape cards can fit a glyph and ID side by side, but cannot
-  // fit two font line boxes above the stripe. Keep the 12px font minimum.
-  if (!textOk && ch.width + idText.width + 10 <= width) {
-    const top = -height / 2 + 2;
-    const bottom = height / 2 - stripeH - 2;
-    const total = ch.width + 6 + idText.width;
-    ch.setPosition(-total / 2 + ch.width / 2, (top + bottom) / 2);
-    idText.setPosition(total / 2 - idText.width / 2, (top + bottom) / 2);
-    textOk = Math.max(ch.height, idText.height) <= bottom - top && idSize >= MIN_ID_FONT;
-  }
+  const textOk = layoutChipText(ch, idText, height, stripeH) && idSize >= MIN_ID_FONT;
   const parts = [g, ch, idText];
   if (height >= 56) {
     const clipH = Math.max(6, height * 0.1);
@@ -490,7 +480,7 @@ export function makeFactChip(scene, x, y, { value, label, tip, note, accent = C.
   box.setData("shadow", true);
   box.setData("valueText", valueText);
   box.setValue = (next) => valueText.setText(next);
-  box.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height), Phaser.Geom.Rectangle.Contains);
+  box.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
   box.input.cursor = "pointer";
   box.on("pointerdown", (pointer, _lx, _ly, event) => {
     event?.stopPropagation?.();
@@ -673,7 +663,7 @@ export function makeTag(scene, x, y, text, accent = C.blue, opts = {}) {
   tag.setData("shadow", false);
   if (opts.note) {
     tag.add(scene.add.text(w / 2 - 9, 0, "?", uiText(12, { color: C.text })).setOrigin(0.5));
-    tag.setInteractive(new Phaser.Geom.Rectangle(-w / 2, -h / 2, w, h), Phaser.Geom.Rectangle.Contains);
+    tag.setInteractive(new Phaser.Geom.Rectangle(0, 0, w, h), Phaser.Geom.Rectangle.Contains);
     tag.input.cursor = "pointer";
     tag.on("pointerdown", (pointer, _lx, _ly, event) => {
       event?.stopPropagation?.();

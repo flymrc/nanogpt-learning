@@ -312,40 +312,89 @@ export function flushNarration(scene) {
 const clipUrls = new Map(eachVoClip().map(({ cacheKey, url }) => [cacheKey, url]));
 let clipRequest = 0;
 const retainedClips = [];
+// A clip that failed to load (blocked, aborted, 404, undecodable, or a format
+// this browser cannot play) behaves exactly like a clip that was never
+// preloaded on 5cf647a: this session speaks that line with Web Speech, and a
+// missing Japanese voice shows the missing-voice tip.
+const failedClips = new Set();
+
+function clipQueued(loader, key) {
+  let queued = false;
+  const match = (file) => {
+    if (file?.key === key) queued = true;
+  };
+  loader.list?.each?.(match);
+  loader.inflight?.each?.(match);
+  loader.queue?.each?.(match);
+  return queued;
+}
+
 function loadNarrationClip(scene, next) {
   const url = clipUrls.get(next.clip);
-  if (!url) { speakSynthesis(scene, next); return; }
+  if (!url || failedClips.has(next.clip)) {
+    speakSynthesis(scene, next);
+    return;
+  }
   const request = ++clipRequest;
   stopClip(scene);
   cancelSpeech();
+  const loader = scene.load;
   const event = `filecomplete-audio-${next.clip}`;
+  let settled = false;
+  const live = () => request === clipRequest && scene.sys.isActive() && !readMuted();
   const cleanup = () => {
-    scene.load.off(event, complete);
-    scene.load.off('loaderror', failed);
-    scene.events.off('shutdown', shutdown);
+    loader.off(event, complete);
+    loader.off("loaderror", failed);
+    loader.off("complete", drained);
+    scene.events.off("shutdown", shutdown);
   };
-  const shutdown = () => { cleanup(); if (request === clipRequest) clipRequest++; };
+  const fallBack = () => {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    failedClips.add(next.clip);
+    if (live()) speakSynthesis(scene, next);
+  };
+  const shutdown = () => {
+    settled = true;
+    cleanup();
+    if (request === clipRequest) clipRequest += 1;
+  };
   const complete = () => {
+    if (settled) return;
+    if (!scene.cache.audio.exists(next.clip)) {
+      fallBack();
+      return;
+    }
+    settled = true;
     cleanup();
     retainedClips.push(next.clip);
     while (retainedClips.length > 6) {
       const key = retainedClips.shift();
       if (key !== next.clip) scene.cache.audio.remove(key);
     }
-    if (request !== clipRequest || !scene.sys.isActive() || readMuted()) return;
-    scene.game.registry.set('pendingNarration', next);
+    if (!live()) return;
+    scene.game.registry.set("pendingNarration", next);
     flushNarration(scene);
   };
-  const failed = file => {
-    if (file?.key !== next.clip) return;
-    cleanup();
-    if (request === clipRequest && scene.sys.isActive() && !readMuted()) speakSynthesis(scene, next);
+  const failed = (file) => {
+    if (file?.key === next.clip) fallBack();
   };
-  scene.load.once(event, complete);
-  scene.load.on('loaderror', failed);
-  scene.events.once('shutdown', shutdown);
-  scene.load.audio(next.clip, url);
-  if (!scene.load.isLoading()) scene.load.start();
+  // The loader drained without caching this clip: treat it as missing.
+  const drained = () => {
+    if (!scene.cache.audio.exists(next.clip)) fallBack();
+  };
+  loader.once(event, complete);
+  loader.on("loaderror", failed);
+  loader.on("complete", drained);
+  scene.events.once("shutdown", shutdown);
+  loader.audio(next.clip, url);
+  if (!clipQueued(loader, next.clip) && !scene.cache.audio.exists(next.clip)) {
+    // Phaser drops files with no playable URL on this device.
+    fallBack();
+    return;
+  }
+  if (!loader.isLoading()) loader.start();
 }
 
 export function cancelSpeech() {

@@ -93,7 +93,8 @@ function linesOf(body) {
 
 function firstSentence(text) {
   const cleanText = clean(text).replace(/\s+/g, " ");
-  const cut = cleanText.split(/(?<=[^「『])(?:[。！？])(?=[^」』]|$)/u)[0];
+  // A quote that only holds punctuation (「？」を タップ) is not a sentence end.
+  const cut = cleanText.split(/(?<![「『])[。！？]/u)[0];
   return (cut || cleanText).trim();
 }
 
