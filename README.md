@@ -2,10 +2,6 @@
 
 个人 **nanoGPT / 深度学习** 学习进度仓库。
 
-网页默认提供 nanoGPT、RAG、Embedding 各五章的中日双语学习路径：问题 → 输入输出 → 动手例子 → 结果 → 原理。每章另有可重试的理解检查、技术进阶与原始资料入口；原图画动画和全部 149 页教材保留，按需打开。浏览章节不计为检查通过。
-
-本地运行、验证命令、新旧章节映射及实验来源见 [学习路径与验证说明](game/LEARNING_MAP.md)。此界面不运行模型训练或付费 API；小计算与保存实验分别标明。
-
 对照路线来自：
 - 原帖学习路径：Transformer + 字符级语言模型 + nanoGPT 验收标准
 - 官方实现：[karpathy/nanoGPT](https://github.com/karpathy/nanoGPT)（核对过的 commit：`3adf61e154c3fe3fca428ad6bc3818b27a3b8291`）
@@ -45,14 +41,16 @@
 
 ```
 notes/          # 按步骤展开的学习笔记
-game/           # 15章双语学习主线及原149页图画动画（见 game/LEARNING_MAP.md）
+game/           # Phaser 3 闯关：第 1–5 章点击动画（见 game/README.md）
 experiments/    # 训练日志、loss、采样样例（待用）
 code/           # 自己的改动 / 对照实现（待用）
 ```
 
-进入 [`game/`](game/)：`cd game && npm ci && npm run dev`，默认打开学习主线，每章可切换到原图画动画。
+想把笔记变成可点的动画，进入 [`game/`](game/)：`cd game && npm install && npm run dev`。
 
-原动画保留 nanoGPT 49页、RAG 60页、Embedding 40页；每页可查看文字和伪代码。只有打开动画后才按需加载 Phaser 和旁白，宽屏动画可显示 Live2D 助教，手机不加载。课程映射和验收方式见 [`game/LEARNING_MAP.md`](game/LEARNING_MAP.md)。
+给大人的文字版（中日双语 15 章，带练习）是可选入口：在网址后加 `?reader=1`。孩子首页不链接它，说明见 [`game/LEARNING_MAP.md`](game/LEARNING_MAP.md)。
+
+游戏用 31 拍把笔记讲成纸带类比：第 1–2 章 13 拍，第 3 章 6 拍讲因果注意力，第 4 章 6 拍讲开训，第 5 章 6 拍讲采样。每一课可以点「伪代码」。宽屏电脑右侧会出 Live2D 助教，手机不加载。详情见 [`game/README.md`](game/README.md)。
 
 ## 参考
 

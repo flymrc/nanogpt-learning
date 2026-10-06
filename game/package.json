@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "i18n": "node scripts/i18n-parity.mjs",
     "vo": "node scripts/generate-lesson-vo.mjs",
+    "vo:check": "node scripts/vo-check.mjs",
     "e2e": "node scripts/i18n-parity.mjs && node scripts/e2e-layout.mjs",
     "test": "node --test scripts/content.test.mjs",
     "e2e:reader": "node scripts/e2e-reader.mjs",

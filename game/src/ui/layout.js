@@ -217,6 +217,9 @@ export function hideBootSplash() {
 
 export function watchResize(scene, { restart = false, persist } = {}) {
   let timer = 0;
+  // Each create() is a new run of the (reused) scene instance.
+  const run = {};
+  scene.__resizeRun = run;
   const handle = (gameSize) => {
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
@@ -233,8 +236,16 @@ export function watchResize(scene, { restart = false, persist } = {}) {
       if (dw < 28 && dh < 28 && !flipped) return;
       scene.registry.set("_viewSize", next);
       if (restart) {
-        const payload = persist?.();
-        scene.scene.restart(payload || undefined);
+        // A start() queued before this timer (a page jump, a tab, a language
+        // switch) must win. Restart on the next update of this same run only:
+        // if the queued start already replaced the run, do nothing. Otherwise
+        // a late resize (the phone voice note growing once its clip is ready)
+        // restarted the scene with the page it was leaving.
+        scene.events.once("update", () => {
+          if (scene.__resizeRun !== run || !scene.sys.isActive()) return;
+          const payload = persist?.();
+          scene.scene.restart(payload || undefined);
+        });
         return;
       }
       if (typeof scene.relayout === "function") {

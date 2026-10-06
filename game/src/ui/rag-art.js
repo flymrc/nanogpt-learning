@@ -715,7 +715,8 @@ function paintCardZoom(scene, card, w, h, item) {
   });
   card.add(box);
   box.setSize(slipW, slipH);
-  box.setInteractive(new Phaser.Geom.Rectangle(-slipW / 2, -slipH / 2, slipW, slipH), Phaser.Geom.Rectangle.Contains);
+  box.setInteractive(new Phaser.Geom.Rectangle(0, 0, slipW, slipH), Phaser.Geom.Rectangle.Contains);
+  box.setData("ragSlip", true);
   box.on("pointerdown", (_pointer, _x, _y, event) => {
     event?.stopPropagation?.();
     scene.__ragZoom = null;
@@ -792,9 +793,10 @@ function paintCardGrid(scene, card, w, h, items) {
     card.add(cell);
     cell.setSize(shape.cellW, shape.cellH);
     cell.setInteractive(
-      new Phaser.Geom.Rectangle(-shape.cellW / 2, -shape.cellH / 2, shape.cellW, shape.cellH),
+      new Phaser.Geom.Rectangle(0, 0, shape.cellW, shape.cellH),
       Phaser.Geom.Rectangle.Contains,
     );
+    cell.setData("ragCell", item.page);
     cell.on("pointerdown", (_pointer, _x, _y, event) => {
       event?.stopPropagation?.();
       scene.__ragZoom = item.page;
@@ -979,7 +981,6 @@ function paintShareRow(scene, parent, x, y, rowW, rowH, word, maxShare, step) {
     maxH: rowH - 2,
     size: font,
     color: C.goldCss,
-    locked: true,
   });
   markBox(share, "share", { id: label, w: share.width, h: share.height });
   parent.add(row);
@@ -987,7 +988,7 @@ function paintShareRow(scene, parent, x, y, rowW, rowH, word, maxShare, step) {
 }
 
 function shareColumns(scene, words, inner, avail, font) {
-  const minRow = shareRowHeight(scene, font);
+  const minRow = font + 6;
   const { min } = shareWordMin(scene, words, font);
   const minCol = Math.min(inner, min);
   const maxCols = Math.max(1, Math.min(words.length, Math.floor((inner + 6) / (minCol + 6))));
@@ -1055,20 +1056,17 @@ function shareWordMin(scene, words, font) {
   return { longest, num, min: longest + num + 20 };
 }
 
-function shareRowHeight(scene, font) {
-  return textBlock(scene, "Ag0.123", font, 480).height + 6;
-}
-
 function boardFits(scene, board, bw, bh, font) {
   const words = board.words || [];
   if (!words.length) return true;
   const { min } = shareWordMin(scene, words, font);
-  const avail = bh - (font + 26);
+  const header = font + 12;
+  const avail = bh - header - 8;
   const inner = bw - 14;
   if (avail < font + 4 || inner < min) return false;
   const cols = Math.max(1, Math.floor((inner + 6) / (min + 6)));
   const rows = Math.ceil(words.length / cols);
-  return rows * shareRowHeight(scene, font) <= avail + 1;
+  return rows * (font + 6) <= avail + 1;
 }
 
 function paintShares(scene, card, g, w, h, spec, step) {
@@ -1094,9 +1092,7 @@ function paintShares(scene, card, g, w, h, spec, step) {
     const inner = w - 28;
     const cols = Math.max(1, Math.min(words.length || 1, Math.floor((inner + 6) / (min + 6))));
     const rows = Math.max(1, Math.ceil((words.length || 1) / cols));
-    // Match paintShareBoard's header, top/bottom padding and measured text
-    // height. Font size alone undercounts line boxes on some platforms.
-    return font + 26 + rows * shareRowHeight(scene, font);
+    return font + 14 + rows * (font + 6);
   });
   const sum = sizes.reduce((total, size) => total + size, 0) + gap * (n - 1);
   if (sum > h - 8) {

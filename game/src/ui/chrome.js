@@ -90,12 +90,8 @@ export function bindVoiceNote() {
     const note = line?.parentElement;
     if (!line) return;
     const words = [...line.querySelectorAll(".voice-word")];
-    const chinese = document.documentElement.lang.toLowerCase().startsWith("zh");
     for (const word of words) {
-      // Chinese has no spaces between words. Keeping a whole sentence nowrap
-      // can overflow when a following time token and punctuation join its line.
-      // Explicit number/time units remain unbroken in both languages.
-      if (word.dataset.glue !== "1") word.classList.toggle("is-breakable", chinese);
+      if (word.dataset.glue !== "1") word.classList.remove("is-breakable");
     }
     const limit = line.clientWidth || note?.clientWidth || 0;
     if (limit < 8) return;

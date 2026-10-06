@@ -133,6 +133,14 @@ function applyGameSize(game) {
     canvas.style.height = `${css.h}px`;
   }
   game.scale.updateBounds();
+  // Phaser computes displayScale inside resize(), before the CSS size above is
+  // applied. Recompute it from the final canvas bounds, or pointer input stays
+  // scaled to the old width (about 10px off at the right of a 1440 lesson,
+  // enough to miss a phase tab and advance the phase instead).
+  const bounds = game.scale.canvasBounds;
+  if (bounds.width > 0 && bounds.height > 0) {
+    game.scale.displayScale.set(game.scale.baseSize.width / bounds.width, game.scale.baseSize.height / bounds.height);
+  }
   game.scene.getScenes(true).forEach((scene) => syncRetinaCamera(scene, css.w, css.h, dpr));
 }
 
@@ -167,7 +175,7 @@ async function boot() {
         ]
       : [];
     await Promise.race([
-      Promise.allSettled([document.fonts.ready, ...loads]),
+      Promise.all([document.fonts.ready, ...loads]),
       new Promise((resolve) => window.setTimeout(resolve, 8000)),
     ]);
   }
@@ -314,4 +322,10 @@ async function boot() {
   };
 }
 
-boot();
+// `?reader=1` opens the optional text reader instead of the kid animation.
+// The site root (and every hash deep link) boots the animation home.
+if (new URLSearchParams(location.search).get("reader") === "1") {
+  import("./learning/reader.js");
+} else {
+  boot();
+}

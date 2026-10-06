@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
+import { launchChrome } from './browser.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
-const base = process.env.E2E_URL || 'http://127.0.0.1:4182/';
+// The text reader is opt-in at `?reader=1`; the site root is the kid animation.
+const readerUrl = new URL(process.env.E2E_URL || 'http://127.0.0.1:4182/');
+readerUrl.searchParams.set('reader', '1');
+const base = readerUrl.href;
 const out = process.env.READER_OUT || 'output/reader';
 mkdirSync(out,{recursive:true});
-const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {});
+const browser = await launchChrome();
 try {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];

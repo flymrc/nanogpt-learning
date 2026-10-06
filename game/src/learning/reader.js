@@ -6,13 +6,14 @@ const root = el('div', null, { id:'learning-root' });
 document.body.append(root);
 let lang;
 try { lang=localStorage.getItem('nanogpt-lang')==='ja'?'ja':'zh'; } catch { lang='zh'; }
-let legacyPromise, routeVersion=0;
 const L=(zh,ja)=>lang==='ja'?ja:zh;
 const txt=value=>value[lang];
 const sourceBase='https://github.com/flymrc/nanogpt-learning/blob/main/';
 const passed=new Set();
 const routeFor=(course,index)=>`#learn/${course}/${index+1}`;
-const legacyRequested=()=>!location.hash.startsWith('#learn') && (new URLSearchParams(location.search).has('animation') || new URLSearchParams(location.search).has('scene') || /^#(?:Level|Rag|Embed|Title|End)/.test(location.hash));
+// Opt-in text reader (`?reader=1`). The kid animation home stays the site root
+// and never links here. Animation links leave the reader for the kid deep link.
+const animationHref=target=>`${location.pathname}#${target}/0/0`;
 
 function link(text,href) { return el('a',text,{href}); }
 function focusTitle() { root.querySelector('h1')?.focus({preventScroll:true}); }
@@ -20,9 +21,6 @@ function chapterSource(chapter) { return lang==='ja'?chapter.sourceJa:chapter.so
 function heading(section,n,title) { const h=el('h2');h.append(el('span',String(n),{class:'step-no','aria-hidden':'true'}),document.createTextNode(title));section.append(h); }
 function render() {
   document.documentElement.dataset.reader='true'; root.hidden=false;
-  document.getElementById('reader-return')?.remove();
-  const game=window.__nanoGPTGame;
-  if(game){game.sound.stopAll();game.loop.sleep();window.speechSynthesis?.cancel();}
   document.documentElement.lang=lang==='ja'?'ja':'zh-CN';
   root.replaceChildren();
   root.append(link(L('跳到正文','本文へ移動'),'#reader-main'));
@@ -64,7 +62,7 @@ function render() {
   original.addEventListener('toggle',async()=>{if(!original.open||loaded)return;loaded=true;const loading=el('p',L('正在读取原文…','本文を読み込み中…'));original.append(loading);try{const data=await import('./original.js');loading.remove();data.appendOriginal(original,courseId,index+1,lang);}catch{loading.textContent=L('读取失败。可关闭后重试，或打开上方原始资料。','読み込めません。閉じて再試行するか、上の元資料を開いてください。');loaded=false;}});
   details.append(original);article.append(details);
   const footer=el('div',null,{class:'chapter-footer'});
-  const animation=link(L('打开本章图画动画','この章の絵・アニメーションを開く'),`?animation=1#${chapter.animation}/0/0`);footer.append(animation);
+  const animation=link(L('打开本章图画动画','この章の絵・アニメーションを開く'),animationHref(chapter.animation));footer.append(animation);
   if(index<4)footer.append(link(L('下一章 →','次の章 →'),routeFor(courseId,index+1)));else footer.append(link(L('返回课程首页','コース一覧へ'),'#learn'));
   article.append(footer);layout.append(article);root.append(layout);
 }
@@ -76,35 +74,5 @@ function home() {
   COURSES.forEach((course,i)=>{const card=el('section',null,{class:'course-card'});card.append(el('span',`0${i+1} / ${L('五章','全5章')}`,{class:'course-num'}),el('h2',course.name),el('p',txt(course.intro)),link(txt(CHAPTERS[course.id][0].title),routeFor(course.id,0)));cards.append(card);});
   main.append(cards,el('p',L('说明：不运行模型训练，不调用付费 API。练习会明确标出手动操作、实时小计算或保存的实验。检查通过仅代表本次题目答对。','モデルの訓練や有料 API は使いません。手動操作・その場の小計算・保存済み実験を区別します。確認済みは今回の問題に正解したことだけを表します。')));root.append(main);
 }
-async function openLegacy() {
-  const version=++routeVersion;
-  root.hidden=true;document.documentElement.dataset.reader='false';
-  if(!legacyPromise) {
-    const font=el('link',null,{rel:'stylesheet',href:'https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Noto+Emoji:wght@500&family=Noto+Sans+JP:wght@500;700&family=Noto+Sans+SC:wght@500;700;900&family=Noto+Sans+Symbols+2&family=ZCOOL+QingKe+HuangYou&display=swap'});document.head.append(font);
-    legacyPromise=import('../main.js');
-  }
-  try {await legacyPromise;} catch {legacyPromise=null;root.hidden=false;document.documentElement.dataset.reader='true';root.replaceChildren(el('p',L('动画加载失败。','アニメーションを読み込めません。')),link(L('返回学习','学習へ戻る'),'#learn'));return;}
-  if(version!==routeVersion)return;
-  const back=el('a',L('返回文字学习','文章で学ぶ画面へ'),{id:'reader-return',href:'#learn'});
-  back.addEventListener('click',event=>{
-    event.preventDefault();
-    const game=window.__nanoGPTGame;
-    const key=game?.scene.getScenes(true)[0]?.sys.settings.key||'';
-    const m=key.match(/^(Level|Rag|Embed)([1-5])$/);
-    const course=m?{Level:'nanogpt',Rag:'rag',Embed:'embed'}[m[1]]:'nanogpt';
-    // Stop the old scene before changing the hash: its next frame can
-    // otherwise persist its animation route over the pending reader route.
-    game?.loop.sleep();
-    location.href=location.pathname+routeFor(course,m?Number(m[2])-1:0);
-  });
-  document.querySelector('#catalog-overlay .sheet-card').append(back);
-}
-window.addEventListener('hashchange',()=>{
-  if(location.hash.startsWith('#learn')){routeVersion++;render();focusTitle();window.scrollTo(0,0);}
-  else if(legacyRequested()&&document.documentElement.dataset.reader==='true'){
-    // Browser Back can restore a query-free legacy deep link after the
-    // reader put its game loop to sleep. Reboot from that exact deep link.
-    if(legacyPromise)location.reload();else openLegacy();
-  }
-});
-if(legacyRequested())openLegacy();else render();
+window.addEventListener('hashchange',()=>{render();focusTitle();window.scrollTo(0,0);});
+render();

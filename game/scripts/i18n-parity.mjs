@@ -16,7 +16,7 @@ import { RAG_JA } from "../src/i18n/rag/ja.js";
 import { RAG_END, RAG_PAGES, RAG_TITLE } from "../src/i18n/rag/skeleton.js";
 import { RAG_ZH } from "../src/i18n/rag/zh.js";
 import { END_BEAT, TITLE_BEAT } from "../src/data/lessons.js";
-import { checkEmbedVoFiles, checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
+import { checkBeatClips, checkEmbedVoFiles, checkRagVoFiles, checkVoFiles } from "./vo-check.mjs";
 
 const BANNED = [
   "纸带",
@@ -97,8 +97,8 @@ if (!ZH["c5-sign"].includes("不放") || !JA["c5-sign"].includes("のせませ�
 }
 if (!ZH["c5-intro.aim"].includes("一个接一个，接得越来越长")) fail("c5 intro aim still has a script marker");
 if (!JA["c5-intro.aim"].includes("一つずつ")) fail("ja c5 intro aim still has a script marker");
-if (!ZH["c3-sum.summary"].includes("Q") || !ZH["c3-sum.summary"].includes("K") || !ZH["c3-sum.summary"].includes("块") || ZH["c3-sum.summary"].includes("像不像")) {
-  fail("chapter 3 summary must preserve Q/K matching and weights, not character similarity");
+if (!ZH["c3-sum.summary"].includes("像不像") || !ZH["c3-sum.summary"].includes("块")) {
+  fail("chapter 3 summary must say how looking back works");
 }
 if (ZH["c1-p4.checkQ"].includes("假名")) fail("zh c1-p4 must not say 假名");
 for (const [key, value] of Object.entries(ZH)) {
@@ -201,7 +201,7 @@ function checkRagPack() {
   const poolScores = (pool?.items || []).map((item) => item.score).join(",");
   const poolJson = en.meaning.questions.find((item) => item.id === "q3_pool").top3.map((row) => row.score_x100).join(",");
   if (pool?.kind !== "bars" || poolScores !== poolJson) fail(`ja pool picture ${poolScores} != ${poolJson}`);
-  const verified = spawnSync(process.env.PYTHON || (process.platform === "win32" ? "python" : "python3"), ["verify_ja_scores.py"], { cwd: join(root, "rag"), encoding: "utf8" });
+  const verified = spawnSync("python3", ["verify_ja_scores.py"], { cwd: join(root, "rag"), encoding: "utf8" });
   if (verified.status !== 0) fail(verified.stdout || verified.stderr || "verify_ja_scores.py");
   const allowedFor = (data) => {
     const allowed = scoreSet(data);
@@ -359,6 +359,7 @@ const embedKeys = checkEmbedPack();
 for (const error of checkVoFiles()) fail(error);
 for (const error of checkRagVoFiles()) fail(error);
 for (const error of checkEmbedVoFiles()) fail(error);
+for (const error of checkBeatClips().errors) fail(error);
 
 if (errors.length) {
   console.error("I18N_FAIL");

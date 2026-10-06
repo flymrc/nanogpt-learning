@@ -1,8 +1,10 @@
-# 简明主线与原教材映射
+# 可选文字阅读（`?reader=1`）与原教材映射
 
-默认入口为 `src/learning/reader.js`。每章按问题、输入输出、动手例子、结果、原理展开，并提供一道需要提交的迁移题。浏览不计检查通过；一次答对也不表示已经掌握整个主题。中日两种语言共用章节结构、实验逻辑和来源，文案在 `curriculum.js` 中成对维护。
+网站根目录（`/`）是给孩子的 Phaser 动画首页：三门课的卡片、Live2D 助教（宽屏电脑）、`#Level2/1/2`、`#Rag5/4/2`、`#Embed2/1/2` 和 `?scene=` 深链接都不需要任何查询参数。孩子首页不链接到文字阅读。
 
-原教材没有删除。每章“技术进阶与证据”提供原始资料、保存实验数据，以及本章全部原页面文字；“打开本章图画动画”加载原 Phaser 课程。动画的“目录”提供“返回文字学习”链接。直接 `#Level…`、`#Rag…`、`#Embed…` 和 `?scene=` 链接仍可用。`?animation=1` 打开原动画首页。
+文字阅读是给大人的可选入口，只在网址带 `?reader=1` 时打开（`src/learning/reader.js`，由 `src/main.js` 按需加载，不启动 Phaser，不请求音频）。每章按问题、输入输出、动手例子、结果、原理展开，并提供一道需要提交的迁移题。浏览不计检查通过；一次答对也不表示已经掌握整个主题。中日两种语言共用章节结构、实验逻辑和来源，文案在 `curriculum.js` 中成对维护。文字阅读的措辞不是孩子课文；孩子课文只在 `src/i18n/` 与 `embed/script/`、`rag/` 的源稿里。
+
+每章“技术进阶与证据”提供原始资料、保存实验数据，以及本章全部原页面文字。“打开本章图画动画”离开文字阅读，打开孩子动画的深链接（例如 `/#Rag1/0/0`）。
 
 | 新章节 | 保留的原页面 | 关键概念与依据 |
 |---|---|---|
@@ -34,16 +36,13 @@
 
 ## 语音与资源
 
-阅读首页不加载 Phaser、Google Fonts、Live2D或音频。动画按需启动；其启动只预载BGM和两个音效，课程旁白按需取用并最多保留6段解码缓存。修改科学表述的13条旧录音保留作为历史资源，但通过 `speech-fallbacks.json` 明确停用，改读当前Web Speech文字。没有设备对应语言声音时仍显示完整文本与原缺失声音提示。
-
-语音校验继续检查原录音存在、大小与manifest；新增校验要求替代文本hash、历史录音hash和编辑原因均匹配，禁止不带审阅记录地忽略陈旧录音。需要重新录音时使用原生成器并更新此清单。显式审阅后的语音替代可运行 `node scripts/record-speech-fallbacks.mjs "编辑原因"`，该命令不调用外部服务。
+孩子动画启动时只预载 BGM 和两个音效；每页旁白在需要时读取预先生成的 mp3（edge-tts zh-CN-XiaoxiaoNeural / ja-JP-NanamiNeural），最多保留 6 段解码缓存。每条孩子旁白都必须有对应 mp3：`npm run vo:check`（`npm run i18n` 也会跑）在任何一条缺少录音或文字与录音不一致时失败。没有 Web Speech 替代清单。某段录音读取失败（网络中断、被拦截）时，和 5cf647a 上没有预载到录音一样，本次会话改用 Web Speech 读这一句；日文没有声音时显示原来的缺少声音提示。
 
 ## 本地验收
 
 ```sh
 cd game
 npm ci
-npx playwright install chromium
 npm run check
 npm run preview -- --host 127.0.0.1 --port 4182
 ```
@@ -56,6 +55,6 @@ npm run e2e:regressions
 npm run e2e
 ```
 
-如使用已安装Chrome，设置 `CHROME` 为其绝对路径；Windows PowerShell 示例：`$env:CHROME='C:\Program Files\Google\Chrome\Application\chrome.exe'`。`PYTHON` 可指定Python解释器，默认Windows为python、其他系统为python3。`E2E_URL` 覆盖预览地址。截图与报告输出至被git忽略的 `game/output/`。
+浏览器：设置了 `CHROME` 就用它；否则用系统的 Google Chrome（`/usr/bin/google-chrome-stable`，能播放 mp3 旁白）；都没有时用 Playwright 自带的 Chromium（`npx playwright install chromium`）。`PYTHON` 可指定 Python 解释器。`E2E_URL` 覆盖预览地址（默认 `http://127.0.0.1:4182/`），文字阅读测试自动加上 `?reader=1`。截图与报告默认输出到被 git 忽略的 `game/output/`，`npm run e2e` 可用 `E2E_OUT` 改目录。
 
-`e2e:reader` 对15章×2语言×3视口逐章执行例子、错答、反馈与正确重试，并检查正文最低16px、无横向溢出、键盘课程入口和原文展开。`e2e:regressions` 使用真实鼠标点击图卡五个区域、验证异常URL、标题和音频预算。原 `e2e` 保留完整动画逐页和阶段中间帧检查；其程序化动画步进不代替新增真实命中测试。
+`e2e:reader` 在 `?reader=1` 对15章×2语言×3视口逐章执行例子、错答、反馈与正确重试，并检查正文最低16px、无横向溢出、键盘课程入口和原文展开。`e2e:regressions` 在网站根目录检查孩子首页（字体、PC 上的 Live2D、没有文字阅读链接）、无查询参数的深链接、按需旁白，并在 1440×900（鼠标）和 390×844（触摸）用真实点击检查 RAG 图卡、Embedding 图卡、阶段标签、RAG 卡片格和放大的卡片；还检查异常 URL 和 `?reader=1` 不启动 Phaser。`e2e` 保留完整动画逐页和阶段中间帧检查。

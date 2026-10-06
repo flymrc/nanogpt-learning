@@ -21,7 +21,6 @@ let course = "nanogpt";
 export function setCourse(next) {
   course = next === "rag" || next === "embed" ? next : "nanogpt";
   if (typeof document !== "undefined") document.documentElement.dataset.course = course;
-  applyDocumentLang();
 }
 
 export function isPictureCourse() {

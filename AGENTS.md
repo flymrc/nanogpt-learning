@@ -1,10 +1,17 @@
 # Agent notes — nanoGPT 闯关 (`game/`)
 
-## Default reader and retained animations
+## Kid copy, voice and PRs (read first)
 
-The default entry is now `game/src/learning/reader.js`: 15 bilingual chapters with native HTML exercises. See `game/LEARNING_MAP.md` for the complete mapping to all 149 original pages and sources. Changes to this path must pass `npm run check`, `npm run e2e:reader`, and `npm run e2e:regressions`. Reading text and controls stay at least 16px, and viewing a page never counts as passing its check.
+- **Kid copy is for an 8-year-old.** Every kid-facing line (`game/src/i18n/zh.js`, `ja.js`, `rag/*`, `embed/*`, the sources `embed/script/zh.md`, `ja.md`, `rag/*.md`, `rag/ja/*.md`, notes and generated strings) stays in the style of a Japanese elementary-school textbook (小学校の教科書): short sentences, everyday words, one idea per line, the 小G / ジーくん story voice. Do not rewrite kid lines into adult or scientific jargon (no パラメータ / 参数记忆, no Q/K in kid lines, no "100 may be rounding" disclaimers, no 约5000次). Precision for adults belongs in the opt-in reader (`?reader=1`), not in the kid lesson.
+- **Every narrated kid line has its mp3.** If a `.vo` line changes, regenerate its clip in the same PR with edge-tts like the existing ones (zh-CN-XiaoxiaoNeural / ja-JP-NanamiNeural; `npm run vo`, `scripts/generate-rag-vo.mjs`, `scripts/generate-embed-vo.mjs`). `npm run vo:check` (also run by `npm run i18n` and `npm run e2e`) fails if any page, title or end beat lacks its clip. There is no Web Speech fallback list for kid lines.
+- Clips load on demand (boot preloads only BGM and two sound effects). A clip that fails to load falls back to Web Speech for that line, with the same missing-voice behaviour as a clip that is not there.
+- **Every change goes through a PR** with `npm run e2e` passing (plus `npm test`, `npm run e2e:regressions` and `npm run e2e:reader`). Put the result lines in the PR. No direct commits to `main`.
 
-The Phaser requirements below still apply to the retained animation mode (`?animation=1` or existing scene deep links); `npm run e2e` explicitly enters that mode and keeps all original page and intermediate-frame checks. Do not remove the animation checks when changing the default reader. Audio is loaded on demand; reviewed corrections in `speech-fallbacks.json` use current Web Speech text while historical recordings are retained. Build once before browser suites and keep `dist/` unchanged during those suites.
+## Entry points
+
+- The site root is the Phaser animation home: `index.html` → `src/main.js`, with the Google font tags in `index.html` and Live2D on wide PC. Hash deep links (`#Level2/1/2`, `#Rag5/4/2`, `#Embed2/1/2`) and `?scene=` open the lesson with no other query parameter. Do not make anything else the default.
+- `?reader=1` opens the optional adult text reader (`src/learning/`, see `game/LEARNING_MAP.md`). It never starts Phaser or audio and is not linked from the kid home. Keep `npm run e2e:reader` passing.
+- Phaser containers have origin 0.5 and Phaser adds `displayOrigin` before the hit test, so a container with `setSize(w, h)` takes `new Phaser.Geom.Rectangle(0, 0, w, h)`, never `(-w / 2, -h / 2, w, h)` (that only answers in the top-left quarter; on 5cf647a most RAG card clicks fell through and advanced the phase). `npm run e2e:regressions` clicks cards, tabs and card cells for real at 1440×900 and 390×844.
 
 This repo is a Phaser lesson. Layout bugs on a phone are **your** bugs.
 **Do not ask the user to find layout bugs.** If overlaps exist, **fail the PR**.
@@ -28,7 +35,7 @@ On mobile, the CTA is pinned in the footer. **Every Phaser label / bar / chip mu
 
 1. `cd game && npm run build` must pass.
 2. Run the visual E2E below. **If any overlap exists, the PR fails.** Do not merge and do not deploy.
-3. Deploy the tested `game/dist/` to the existing `gh-pages` branch root, preserving `.nojekyll` and branch history, **only after E2E passes and the user explicitly asks.** Fetch first and use a fast-forward push; never force-push over concurrent changes.
+3. Deploy `game/` to `gh-pages` (orphan + `.nojekyll`) **only after E2E passes and the user explicitly asks.**
 
 ## E2E visual checks (mandatory)
 
@@ -59,7 +66,7 @@ Also required:
 - Open and close **详细笔记** and **看不懂？**
 - **导读** shows once on a fresh profile (`nanogpt-seen-guide` unset), stays hidden after dismiss + reload, and reopens from **目录**.
 - **目录** lists 5 chapters (把字变成数字 / 猜下一个字，看猜错多少 / 只能看前面的字 / 一次改一点点 / 小G 自己往下写). Short buttons stay 变数字 / 猜下一个 / 看前面 / 改一点 / 往下写 (Japanese 数字に / 次を当てる / 前だけ / 少し直す / 続きを書く). In-lesson headers use the same chapter titles as the kid script. Every chapter starts at page 0 and can be revisited. **返回** steps to the previous section, then the previous page, then the previous chapter.
-- **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core page lines and the steps panel are narrated with Web Speech in both `zh` and `ja` (no pre-recorded lesson mp3s).
+- **Language** toggle (`nanogpt-lang`, `zh` | `ja`) persists across reload. Japanese UI and the voice note follow `ja`. Core page lines play their own pre-generated mp3 in both `zh` and `ja` (Web Speech only when that clip fails to load, with the missing-voice tip for `ja`). The steps panel, home greeting and catalog lines use Web Speech.
 - `window.__nanoGPTAssertLayout()` after `__nanoGPTJump(scene, beat, phase)`. `ok` must be `true`; `overlaps`, `overflows`, and `orphans` must be empty.
 - Animations must not leave orphan layers on top of content.
 - Mobile chips/tags must stay inside the game shell (no horizontal overflow).
@@ -82,7 +89,7 @@ Lesson copy is not inline in the scenes.
 - `game/src/i18n/skeleton.js` is the locale-independent page list: page id, visual type, real numbers, real English book text such as `First Citizen:`, and the key for every visible string. Per-locale example slots (the script’s 【本地化图：zh】 / 【ローカライズ画像：ja】) live on the page as `exampleSlots.zh` and `exampleSlots.ja`.
 - `game/src/i18n/zh.js` and `game/src/i18n/ja.js` hold every visible string and every voice line, under the same keys. Japanese is the kid-script text, not a translation of the Chinese file. The Chinese chapter-1 intro example is 「床前明月＿」→ 光, and the 🍎🍌 row stays. Japanese keeps its own calendar example.
 - `game/scripts/i18n-parity.mjs` fails if a key is missing on either side, a value is empty, or a skeleton page points at a key that does not exist. `npm run e2e` runs this check first.
-- The language switch swaps text, the example slot, and Web Speech. New lines are spoken with Web Speech in both zh and ja. Do not point voice lines at the old Chinese mp3 clips.
+- The language switch swaps text, the example slot, and the voice. Every `.vo` line has its own mp3 per language, named by the hash of its current text (`vo-manifest.json`, `rag-vo-manifest.json`, `embed-vo-manifest.json`). Never point a line at a clip recorded for different text.
 
 ## Game facts (do not invent)
 
